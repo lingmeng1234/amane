@@ -1,0 +1,867 @@
+"""ConfigManager 测试 - ColdSettings, HotSettings, ConfigManager"""
+
+import os
+import tomllib
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from pydantic import ValidationError
+
+from amane.app.bootstrap import build_safe_dirs
+from amane.config import (
+    SAFE_DIRS_ALLOW_ALL,
+    BrowserConfig,
+    ColdSettings,
+    ConfigManager,
+    DownloadableResource,
+    HotSettings,
+    ScrapingConfig,
+    SiteConfig,
+    WatermarkConfig,
+    WorkerConfig,
+)
+from amane.config.manager import LANG_METADATA_FIELD_SET
+from amane.enums import (
+    ApiType,
+    BrowserBackendName,
+    BrowserMode,
+    Language,
+    MetadataField,
+    SiteName,
+    WatermarkCorner,
+    WatermarkKind,
+)
+from amane.parsing import ContentType
+
+_SCRAPE_ROUTE_KEYS = {
+    "censored",
+    "uncensored_dvd",
+    "uncensored_streaming",
+    "chinese",
+    "western",
+    "fc2",
+    "amateur",
+    "hentai",
+}
+
+# ---------------------------------------------------------------------------
+# ColdSettings
+# ---------------------------------------------------------------------------
+
+
+class TestColdSettings:
+    """ColdSettings: 仅环境变量, 不可变"""
+
+    def test_supervised_env(self):
+        with patch.dict(os.environ, {"AMANE_SUPERVISED": "1"}):
+            assert ColdSettings().supervised is True
+
+    def test_update_url_env(self):
+        with patch.dict(os.environ, {"AMANE_UPDATE_URL": "http://127.0.0.1:18765/releases/latest"}):
+            assert ColdSettings().update_url == "http://127.0.0.1:18765/releases/latest"
+
+    def test_update_url_empty_env(self):
+        with patch.dict(os.environ, {"AMANE_UPDATE_URL": ""}):
+            assert ColdSettings().update_url is None
+
+    def test_env_override(self, tmp_path: Path):
+        """AMANE_DATA_DIR 环境变量覆盖默认值"""
+        custom_dir = tmp_path / "custom_data"
+        with patch.dict(os.environ, {"AMANE_DATA_DIR": str(custom_dir)}, clear=False):
+            s = ColdSettings()
+            assert s.data_dir == custom_dir
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("ALLOW_ALL", "ALLOW_ALL"),
+            ("  ALLOW_ALL  ", "ALLOW_ALL"),
+            ("", None),
+            ("   ", None),
+            ("allow_all", [Path("allow_all")]),
+            ("ALLOW_ALL,/media", [Path("ALLOW_ALL"), Path("/media")]),
+            ("/media,/data", [Path("/media"), Path("/data")]),
+        ],
+    )
+    def test_parse_safe_dirs(self, raw: str, expected: object):
+        """整段 ALLOW_ALL 才是哨兵; 大小写不同或夹在列表里都当普通路径."""
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": raw}):
+            assert ColdSettings().safe_dirs == expected
+
+    def test_parse_safe_dirs_rejects_non_path_value(self):
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": ""}), pytest.raises(ValidationError):
+            ColdSettings(safe_dirs=123)  # type: ignore[arg-type]
+
+
+class TestBuildSafeDirs:
+    """build_safe_dirs: ALLOW_ALL / 显式路径 / library 回退."""
+
+    def test_allow_all_is_unrestricted(self, tmp_path: Path):
+        watch = tmp_path / "lib"
+        watch.mkdir()
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": SAFE_DIRS_ALLOW_ALL}):
+            assert build_safe_dirs(ColdSettings(), [str(watch)]) is None
+
+    def test_explicit_existing_dirs(self, tmp_path: Path):
+        a = tmp_path / "a"
+        b = tmp_path / "b"
+        a.mkdir()
+        b.mkdir()
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": f"{a},{b}"}):
+            got = build_safe_dirs(ColdSettings(), [])
+        assert got is not None
+        assert set(got) == {a.resolve(), b.resolve()}
+
+    def test_explicit_missing_dirs_dropped(self, tmp_path: Path):
+        existing = tmp_path / "ok"
+        existing.mkdir()
+        missing = tmp_path / "gone"
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": f"{existing},{missing}"}):
+            got = build_safe_dirs(ColdSettings(), [])
+        assert got == [existing.resolve()]
+
+    def test_explicit_all_missing_is_empty_not_unrestricted(self, tmp_path: Path):
+        missing = tmp_path / "gone"
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": str(missing)}):
+            assert build_safe_dirs(ColdSettings(), []) == []
+
+    def test_unset_falls_back_to_library_paths(self, tmp_path: Path):
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": ""}):
+            got = build_safe_dirs(ColdSettings(), [str(lib), str(tmp_path / "missing")])
+        assert got == [lib.resolve()]
+
+    def test_unset_no_libraries_is_empty(self):
+        with patch.dict(os.environ, {"AMANE_SAFE_DIRS": ""}):
+            assert build_safe_dirs(ColdSettings(), []) == []
+
+
+# ---------------------------------------------------------------------------
+# HotSettings
+# ---------------------------------------------------------------------------
+
+
+class TestHotSettings:
+    """HotSettings: 嵌套结构, 带验证, extra=forbid"""
+
+    def test_unknown_field_rejected(self):
+        """未知字段应抛出 ValidationError"""
+        with pytest.raises(ValidationError, match=r"Extra inputs are not permitted"):
+            HotSettings(unknown_field="value")  # type: ignore[call-arg]
+
+    def test_concurrency_too_low(self):
+        """worker.concurrency < 1 被拒绝"""
+        with pytest.raises(ValidationError, match=r"greater than or equal to 1"):
+            HotSettings(worker=WorkerConfig(concurrency=0))
+
+    def test_poll_interval_too_low(self):
+        """worker.poll_interval < 0.1 被拒绝"""
+        with pytest.raises(ValidationError, match=r"greater than or equal to 0.1"):
+            HotSettings(worker=WorkerConfig(poll_interval=0.01))
+
+    def test_poll_interval_too_high(self):
+        """worker.poll_interval > 10.0 被拒绝"""
+        with pytest.raises(ValidationError, match=r"less than or equal to 10"):
+            HotSettings(worker=WorkerConfig(poll_interval=11.0))
+
+    def test_nfo_output_defaults(self):
+        """旧配置没有 nfo_output 时，使用 NFO 输出默认设置。"""
+        cfg = HotSettings.model_validate({})
+
+        assert cfg.nfo_output.basic_info.number is True
+        assert cfg.nfo_output.basic_info.title is True
+        assert cfg.nfo_output.basic_info.original_title is True
+        assert cfg.nfo_output.basic_info.source_links is True
+
+        assert cfg.nfo_output.people.actors is True
+        assert cfg.nfo_output.people.female is False
+        assert cfg.nfo_output.people.transgender_female is False
+        assert cfg.nfo_output.people.male is False
+
+
+class TestScrapingDownloadResources:
+    """download_resources 旧字段迁移."""
+
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            (
+                {"download_thumb": True, "download_extrafanart": True},
+                [
+                    DownloadableResource.thumb,
+                    DownloadableResource.poster,
+                    DownloadableResource.trailer,
+                    DownloadableResource.extrafanart,
+                ],
+            ),
+            (
+                {"download_thumb": False, "download_extrafanart": True},
+                [DownloadableResource.extrafanart],
+            ),
+            (
+                {"download_thumb": True, "download_extrafanart": False},
+                [
+                    DownloadableResource.thumb,
+                    DownloadableResource.poster,
+                    DownloadableResource.trailer,
+                ],
+            ),
+            (
+                {"download_thumb": False, "download_extrafanart": False},
+                [],
+            ),
+        ],
+    )
+    def test_legacy_bool_migration(self, payload: dict, expected: list[DownloadableResource]):
+        cfg = ScrapingConfig.model_validate(payload)
+        assert cfg.download_resources == expected
+
+    def test_removed_fields_ignored(self):
+        cfg = ScrapingConfig.model_validate({"skip_existing": False, "write_nfo": False})
+        assert "skip_existing" not in type(cfg).model_fields
+        assert "write_nfo" not in type(cfg).model_fields
+
+
+class TestDebugCaptureMigration:
+    def test_scraping_debug_capture_moves_to_logging(self):
+        cfg = HotSettings.model_validate({"scraping": {"debug_capture": True}})
+        assert cfg.logging.debug_capture is True
+
+    def test_logging_debug_capture_wins_if_both_present(self):
+        cfg = HotSettings.model_validate({"scraping": {"debug_capture": True}, "logging": {"debug_capture": False}})
+        assert cfg.logging.debug_capture is False
+
+
+class TestBrowserTimeoutMigration:
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            ({"network": {"browser_timeout": 45000}}, 45000),
+            ({"network": {"browser": {"backend": "camoufox", "timeout": 60000}}}, 60000),
+            ({"network": {"browser_timeout": 45000, "browser": {"timeout": 60000}}}, 60000),
+            ({"network": {"browser": {"backend": "solver"}}}, 30000),
+        ],
+    )
+    def test_browser_timeout_moves_into_browser_config(
+        self, payload: dict, expected: int, monkeypatch: pytest.MonkeyPatch
+    ):
+        import importlib
+
+        original_import_module = importlib.import_module
+
+        def _import_module(name: str):
+            if name == "camoufox":
+                return object()
+            return original_import_module(name)
+
+        monkeypatch.setattr("amane.config.manager.importlib.import_module", _import_module)
+
+        cfg = HotSettings.model_validate(payload)
+        assert cfg.network.browser.timeout == expected
+
+    def test_migrated_value_still_validated(self):
+        with pytest.raises(ValidationError):
+            HotSettings.model_validate({"network": {"browser_timeout": 1000}})
+
+
+class TestBrowserConfigValidation:
+    @pytest.mark.parametrize("url", ["127.0.0.1:8191", "ftp://solver.local"])
+    def test_solver_url_requires_http_scheme(self, url: str):
+        with pytest.raises(ValidationError):
+            BrowserConfig(solver_url=url)
+
+    def test_solver_url_accepts_https(self):
+        assert BrowserConfig(solver_url="https://solver.local:8191").solver_url == "https://solver.local:8191"
+
+
+class TestBrowserBackendAvailability:
+    def test_default_is_off(self):
+        assert BrowserConfig().backend is BrowserBackendName.OFF
+
+    @pytest.mark.parametrize("backend", [BrowserBackendName.OFF, BrowserBackendName.SOLVER])
+    def test_off_and_solver_skip_engine_import(self, monkeypatch: pytest.MonkeyPatch, backend: BrowserBackendName):
+        def _raise(name: str) -> None:
+            raise ImportError(name)
+
+        monkeypatch.setattr("amane.config.manager.importlib.import_module", _raise)
+
+        assert BrowserConfig(backend=backend).backend is backend
+
+    def test_unavailable_engine_rejected(self, monkeypatch: pytest.MonkeyPatch):
+        def _raise(name: str) -> None:
+            raise ImportError(name)
+
+        monkeypatch.setattr("amane.config.manager.importlib.import_module", _raise)
+
+        with pytest.raises(ValidationError, match="请改用 solver"):
+            BrowserConfig(backend=BrowserBackendName.CAMOUFOX)
+        with pytest.raises(ValidationError, match="请改用 solver"):
+            SiteConfig(browser_backend=BrowserBackendName.PATCHRIGHT)
+
+
+class TestSiteBrowserMode:
+    def test_default_is_auto(self):
+        assert SiteConfig().use_browser is BrowserMode.AUTO
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            (True, BrowserMode.ALWAYS),
+            (False, BrowserMode.OFF),
+            ("auto", BrowserMode.AUTO),
+            ("always", BrowserMode.ALWAYS),
+            ("off", BrowserMode.OFF),
+        ],
+    )
+    def test_accepts_modes_and_legacy_bool(self, raw: object, expected: BrowserMode):
+        assert SiteConfig.model_validate({"use_browser": raw}).use_browser is expected
+
+    def test_rejects_unknown_mode(self):
+        with pytest.raises(ValidationError):
+            SiteConfig.model_validate({"use_browser": "browser"})
+
+
+class TestSiteProxy:
+    """站点代理地址必须带协议 (curl 需要它区分 http 与 socks), 空白归一为未配置."""
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "http://127.0.0.1:7890",
+            "https://proxy.example:8443",
+            "socks5://127.0.0.1:1080",
+            "socks5h://user:pass@proxy.example:1080",
+            "socks4://127.0.0.1:1080",
+        ],
+    )
+    def test_accepts_supported_schemes(self, value: str):
+        assert SiteConfig(proxy=value).proxy == value
+
+    @pytest.mark.parametrize("value", ["", "   "])
+    def test_blank_becomes_unset(self, value: str):
+        assert SiteConfig(proxy=value).proxy is None
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "127.0.0.1:1080",  # 无协议: 无法区分 http 与 socks
+            "ftp://127.0.0.1:1080",
+            "socks5://",
+            "socks5://:1080",
+            "not a url",
+        ],
+    )
+    def test_rejects_invalid(self, value: str):
+        with pytest.raises(ValidationError, match="代理地址必须带协议"):
+            SiteConfig(proxy=value)
+
+    def test_defaults(self):
+        cfg = SiteConfig()
+        assert cfg.proxy is None
+        assert cfg.use_proxy is True
+
+
+class TestScrapingPriorityMigration:
+    def test_default_priority_reorders_routes(self):
+        cfg = ScrapingConfig.model_validate(
+            {
+                "default_priority": ["javbus", "javdb"],
+                "content_routes": {"censored": ["javdb", "dmm", "javbus"]},
+            }
+        )
+        assert cfg.content_routes[ContentType.CENSORED] == [SiteName.JAVBUS, SiteName.JAVDB, SiteName.DMM]
+
+    def test_strips_empty_field_priority(self):
+        cfg = ScrapingConfig.model_validate({"field_priority": {"title": [], "plot": ["dmm"]}})
+        assert MetadataField.TITLE not in cfg.field_priority
+        assert cfg.field_priority[MetadataField.PLOT] == [SiteName.DMM]
+
+    def test_strips_empty_field_blacklist(self):
+        cfg = ScrapingConfig.model_validate({"field_blacklist": {"title": [], "plot": ["dmm"]}})
+        assert MetadataField.TITLE not in cfg.field_blacklist
+        assert cfg.field_blacklist[MetadataField.PLOT] == [SiteName.DMM]
+
+    def test_no_default_priority_keeps_route_order(self):
+        cfg = ScrapingConfig.model_validate({"content_routes": {"censored": ["javbus", "javdb"]}})
+        assert cfg.content_routes[ContentType.CENSORED] == [SiteName.JAVBUS, SiteName.JAVDB]
+        assert set(cfg.content_routes) == _SCRAPE_ROUTE_KEYS
+        assert cfg.content_routes[ContentType.FC2] == ScrapingConfig().content_routes[ContentType.FC2]
+
+    def test_uncensored_streaming_number_rules_are_validated(self):
+        cfg = ScrapingConfig.model_validate(
+            {"uncensored_streaming_number_rules": [r"[0-9]{6}[-_][0-9]{2,3}", "N[0-9]+"]}
+        )
+        assert cfg.uncensored_streaming_number_rules == [r"[0-9]{6}[-_][0-9]{2,3}", "N[0-9]+"]
+        with pytest.raises(ValidationError, match="无效的无码流媒体番号规则"):
+            ScrapingConfig(uncensored_streaming_number_rules=["["])
+
+    def test_number_mapping_rules_are_validated(self):
+        cfg = ScrapingConfig.model_validate({"number_mapping_rules": [r"^(RED)-([0-9]+)$ => RED\\2"]})
+        assert cfg.number_mapping_rules == [r"^(RED)-([0-9]+)$ => RED\\2"]
+        with pytest.raises(ValidationError, match="番号映射规则必须使用"):
+            ScrapingConfig(number_mapping_rules=["RED"])
+        with pytest.raises(ValidationError, match="无效的番号映射规则"):
+            ScrapingConfig(number_mapping_rules=["[ => x"])
+
+    def test_uncensored_poster_ratio_is_independent(self):
+        cfg = ScrapingConfig.model_validate({"poster_ratio": 0.65, "uncensored_poster_ratio": 0.82})
+        assert cfg.poster_ratio == 0.65
+        assert cfg.uncensored_poster_ratio == 0.82
+        assert ScrapingConfig().uncensored_poster_ratio == 0.87
+
+    def test_legacy_uncensored_route_becomes_streaming_route(self):
+        cfg = ScrapingConfig.model_validate(
+            {"content_routes": {"uncensored": ["aventertainments", "javdb", "javbus", "avsox", "freejavbt"]}}
+        )
+        assert cfg.content_routes["uncensored_streaming"] == [
+            SiteName.JAVDB,
+            SiteName.JAVBUS,
+            SiteName.AVSOX,
+            SiteName.FREEJAVBT,
+        ]
+        assert cfg.content_routes["uncensored_dvd"] == [
+            SiteName.AVENTERTAINMENTS,
+            SiteName.CARIBBEANCOM_INDEX,
+            SiteName.AVSOX,
+        ]
+
+    def test_default_routes_type_specific_heads(self):
+        routes = ScrapingConfig().content_routes
+        assert routes[ContentType.AMATEUR][0] == SiteName.MGSTAGE
+        assert routes[ContentType.CHINESE] == []
+        assert routes[ContentType.HENTAI] == [SiteName.DMM, SiteName.HANIME1]
+        assert routes[ContentType.WESTERN] == [SiteName.THEPORNDB]
+        assert routes["uncensored_dvd"] == [SiteName.AVENTERTAINMENTS, SiteName.CARIBBEANCOM_INDEX, SiteName.AVSOX]
+        assert routes["uncensored_streaming"][0] == SiteName.TENMUSUME
+        assert routes["uncensored_streaming"].index(SiteName.CARIBBEANCOMPR) < routes["uncensored_streaming"].index(
+            SiteName.D2PASS
+        )
+        assert routes[ContentType.FC2] == [SiteName.FC2]
+
+
+class TestFrozenKeyDictCompleteness:
+    """x-frozen-keys 全量 dict 缺 key 必须按代码枚举补齐, 未知 key 丢弃."""
+
+    def test_defaults_cover_canonical_keys(self):
+        cfg = ScrapingConfig()
+        assert set(cfg.site_config) == set(SiteName)
+        assert set(cfg.content_routes) == _SCRAPE_ROUTE_KEYS
+        assert MetadataField.TITLE in cfg.field_language
+        assert set(cfg.field_language) == LANG_METADATA_FIELD_SET
+
+    @pytest.mark.parametrize(
+        ("payload", "javdb_proxy", "javdb_rate"),
+        [
+            ({"javdb": {"use_proxy": False}}, False, 2),
+            ({}, True, 2),
+            ({"gone": {"use_proxy": False}, "javdb": {"rate_limit": 1.0}}, True, 1.0),
+        ],
+    )
+    def test_site_config_partial_or_unknown_fills_all_sites(
+        self, payload: dict, javdb_proxy: bool, javdb_rate: float
+    ) -> None:
+        cfg = ScrapingConfig.model_validate({"site_config": payload})
+        assert set(cfg.site_config) == set(SiteName)
+        assert cfg.site_config[SiteName.JAVDB].use_proxy is javdb_proxy
+        assert cfg.site_config[SiteName.JAVDB].rate_limit == javdb_rate
+        assert cfg.site_config[SiteName.GFRIENDS].use_proxy is True
+
+    @pytest.mark.parametrize(
+        ("payload", "censored"),
+        [
+            ({"censored": ["javbus"]}, [SiteName.JAVBUS]),
+            ({}, None),
+            ({"gone": ["javdb"], "censored": ["javbus", "dmm"]}, [SiteName.JAVBUS, SiteName.DMM]),
+        ],
+    )
+    def test_content_routes_partial_or_unknown_fills_all_types(
+        self, payload: dict, censored: list[SiteName] | None
+    ) -> None:
+        cfg = ScrapingConfig.model_validate({"content_routes": payload})
+        defaults = ScrapingConfig()
+        assert set(cfg.content_routes) == _SCRAPE_ROUTE_KEYS
+        expected = defaults.content_routes[ContentType.CENSORED] if censored is None else censored
+        assert cfg.content_routes[ContentType.CENSORED] == expected
+        assert cfg.content_routes[ContentType.FC2] == defaults.content_routes[ContentType.FC2]
+
+    def test_content_routes_empty_list_kept(self):
+        cfg = ScrapingConfig.model_validate({"content_routes": {"fc2": []}})
+        assert cfg.content_routes[ContentType.FC2] == []
+        assert cfg.content_routes[ContentType.CENSORED] == ScrapingConfig().content_routes[ContentType.CENSORED]
+
+    @pytest.mark.parametrize(
+        ("payload", "title_lang"),
+        [
+            ({"title": "jp"}, Language.JP),
+            ({}, Language.ZH_CN),
+            ({"gone": "en", "score": "en", "title": "jp"}, Language.JP),
+        ],
+    )
+    def test_field_language_partial_or_unknown_fills_lang_fields(self, payload: dict, title_lang: Language) -> None:
+        cfg = ScrapingConfig.model_validate({"field_language": payload})
+        defaults = ScrapingConfig()
+        assert set(cfg.field_language) == set(defaults.field_language)
+        assert cfg.field_language[MetadataField.TITLE] == title_lang
+        assert cfg.field_language[MetadataField.PLOT] == Language.ZH_CN
+        assert MetadataField.SCORE not in cfg.field_language
+
+    @pytest.mark.parametrize("field", ["site_config", "content_routes", "field_language"])
+    def test_non_dict_rejected(self, field: str):
+        with pytest.raises(ValidationError):
+            ScrapingConfig.model_validate({field: "javdb"})
+
+
+class TestWatermarkConfig:
+    def test_partial_corners_fills_rest(self) -> None:
+        cfg = WatermarkConfig.model_validate({"corners": {"definition": "top_right", "gone": "bottom_left"}})
+        assert cfg.corners[WatermarkKind.DEFINITION] is WatermarkCorner.TOP_RIGHT
+        assert cfg.corners[WatermarkKind.SUBTITLE] is WatermarkCorner.TOP_LEFT
+        assert "gone" not in cfg.corners
+
+    @pytest.mark.parametrize("scale", [0.02, 0.3])
+    def test_scale_out_of_range(self, scale: float) -> None:
+        with pytest.raises(ValidationError):
+            WatermarkConfig(scale=scale)
+
+    def test_invalid_corner_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            WatermarkConfig.model_validate({"corners": {"subtitle": "middle"}})
+
+
+# ---------------------------------------------------------------------------
+# ConfigManager.update()
+# ---------------------------------------------------------------------------
+
+
+class TestConfigManagerUpdate:
+    """ConfigManager.update() - patch 合并语义"""
+
+    def test_single_field(self, mgr: ConfigManager):
+        """更新单个字段"""
+        mgr.update({"network": {"proxy": "socks5://localhost:1080"}})
+        assert mgr.hot.network.proxy == "socks5://localhost:1080"
+
+    def test_multiple_fields_same_section(self, mgr: ConfigManager):
+        """更新同一 section 中的多个字段"""
+        mgr.update({"scraping": {"download_resources": [], "crop_poster": False}})
+        assert mgr.hot.scraping.download_resources == []
+        assert mgr.hot.scraping.crop_poster is False
+        # 其他字段保持不变
+        assert mgr.hot.scraping.jpeg_quality == 95
+
+    def test_multiple_sections(self, mgr: ConfigManager):
+        """跨多个 section 更新字段"""
+        mgr.update(
+            {
+                "network": {"proxy": "http://proxy:8080"},
+                "worker": {"concurrency": 8},
+            }
+        )
+        assert mgr.hot.network.proxy == "http://proxy:8080"
+        assert mgr.hot.worker.concurrency == 8
+
+    def test_empty_patch_noop(self, mgr: ConfigManager):
+        """空 patch 不产生任何变化"""
+        original = mgr.hot.model_dump()
+        mgr.update({})
+        assert mgr.hot.model_dump() == original
+
+    def test_invalid_value_rejected(self, mgr: ConfigManager):
+        """无效值应抛出 ValidationError, 状态保持不变"""
+        original_concurrency = mgr.hot.worker.concurrency
+        with pytest.raises(ValidationError):
+            mgr.update({"worker": {"concurrency": 99}})
+        # 更新失败后状态不变
+        assert mgr.hot.worker.concurrency == original_concurrency
+
+    def test_type_coercion(self, mgr: ConfigManager):
+        """字符串值由 Pydantic 强制转换为正确类型"""
+        mgr.update({"worker": {"concurrency": "5"}})
+        assert mgr.hot.worker.concurrency == 5
+        assert isinstance(mgr.hot.worker.concurrency, int)
+
+    def test_null_clears_optional(self, mgr: ConfigManager):
+        """设置 None 可清除 optional 字段"""
+        mgr.update({"network": {"proxy": "http://x"}})
+        assert mgr.hot.network.proxy == "http://x"
+        mgr.update({"network": {"proxy": None}})
+        assert mgr.hot.network.proxy is None
+
+    def test_empty_section_noop(self, mgr: ConfigManager):
+        """空 section 字典不产生任何变化"""
+        original = mgr.hot.model_dump()
+        mgr.update({"network": {}})
+        assert mgr.hot.model_dump() == original
+
+    def test_sequential_updates_accumulate(self, mgr: ConfigManager):
+        """多次顺序更新累积变更"""
+        mgr.update({"network": {"proxy": "http://a"}})
+        mgr.update({"worker": {"concurrency": 6}})
+        mgr.update({"scraping": {"crop_poster": False}})
+
+        assert mgr.hot.network.proxy == "http://a"
+        assert mgr.hot.worker.concurrency == 6
+        assert mgr.hot.scraping.crop_poster is False
+
+    def test_persists_to_toml(self, mgr: ConfigManager):
+        """更新会写入 TOML 文件，并且 NFO 输出选项能够重新加载。"""
+        mgr.update(
+            {
+                "network": {"proxy": "socks5://127.0.0.1:7890"},
+                "nfo_output": {
+                    "basic_info": {
+                        "number": False,
+                        "source_links": False,
+                    },
+                    "people": {
+                        "actors": False,
+                        "female": True,
+                        "transgender_female": True,
+                    },
+                    "categories": {
+                        "genre": False,
+                    },
+                },
+            }
+        )
+
+        config_path = mgr.cold.config_path
+        assert config_path.exists()
+
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+
+        assert data["network"]["proxy"] == "socks5://127.0.0.1:7890"
+
+        assert data["nfo_output"]["basic_info"]["number"] is False
+        assert data["nfo_output"]["basic_info"]["source_links"] is False
+        assert data["nfo_output"]["people"]["actors"] is False
+        assert data["nfo_output"]["people"]["female"] is True
+        assert data["nfo_output"]["people"]["transgender_female"] is True
+        assert data["nfo_output"]["categories"]["genre"] is False
+
+        # 重新加载配置，验证保存的选项能够恢复。
+        reloaded = ConfigManager.with_cold(mgr.cold)
+
+        assert reloaded.hot.nfo_output.basic_info.number is False
+        assert reloaded.hot.nfo_output.basic_info.source_links is False
+        assert reloaded.hot.nfo_output.people.actors is False
+        assert reloaded.hot.nfo_output.people.female is True
+        assert reloaded.hot.nfo_output.people.transgender_female is True
+        assert reloaded.hot.nfo_output.categories.genre is False
+
+        # 未修改的选项仍然保留默认值。
+        assert reloaded.hot.nfo_output.basic_info.title is True
+        assert reloaded.hot.nfo_output.people.male is False
+        assert reloaded.hot.nfo_output.categories.tag is True
+
+    def test_unknown_section_ignored(self, mgr: ConfigManager):
+        """未知 section 被 Pydantic extra=forbid 拒绝"""
+        with pytest.raises(ValidationError):
+            mgr.update({"nonexistent_section": {"key": "value"}})
+
+
+# ---------------------------------------------------------------------------
+# ConfigManager.load()
+# ---------------------------------------------------------------------------
+
+
+class TestConfigManagerLoad:
+    """ConfigManager.load() - 文件创建, 读取"""
+
+    def test_creates_default_toml_if_missing(self, tmp_path: Path):
+        """config.toml 不存在时, 使用默认值创建"""
+        with patch.dict(os.environ, {"AMANE_DATA_DIR": str(tmp_path)}, clear=False):
+            cold = ColdSettings()
+
+        ConfigManager.with_cold(cold)
+
+        config_path = tmp_path / "config.toml"
+        assert config_path.exists()
+
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+
+        # 默认值不写入 TOML, 因此文件内容应为空
+        assert data == {}
+
+    def test_reads_existing_toml(self, tmp_path: Path):
+        """从已有 TOML 文件读取配置值"""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text('[network]\nproxy = "http://myproxy:3128"\n\n[worker]\nconcurrency = 10\n')
+
+        with patch.dict(os.environ, {"AMANE_DATA_DIR": str(tmp_path)}, clear=False):
+            cold = ColdSettings()
+
+        mgr = ConfigManager.with_cold(cold)
+
+        assert mgr.hot.network.proxy == "http://myproxy:3128"
+        assert mgr.hot.worker.concurrency == 10
+        # 未指定的字段使用默认值
+        assert mgr.hot.scraping.crop_poster is True
+
+    def test_legacy_partial_frozen_dicts_fill_canonical_keys(self, tmp_path: Path):
+        """已有 frozen dict 但缺 key 时, 加载后按代码枚举补齐."""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            "[scraping.site_config.javdb]\n"
+            "use_proxy = false\n"
+            "\n"
+            "[scraping.content_routes]\n"
+            'censored = ["javbus"]\n'
+            "\n"
+            "[scraping.field_language]\n"
+            'title = "jp"\n'
+        )
+
+        with patch.dict(os.environ, {"AMANE_DATA_DIR": str(tmp_path)}, clear=False):
+            cold = ColdSettings()
+
+        mgr = ConfigManager.with_cold(cold)
+        scraping = mgr.hot.scraping
+        defaults = ScrapingConfig()
+        assert set(scraping.site_config) == set(SiteName)
+        assert scraping.site_config[SiteName.JAVDB].use_proxy is False
+        assert scraping.site_config[SiteName.GFRIENDS].use_proxy is True
+        assert set(scraping.content_routes) == _SCRAPE_ROUTE_KEYS
+        assert scraping.content_routes[ContentType.CENSORED] == [SiteName.JAVBUS]
+        assert scraping.content_routes[ContentType.FC2] == defaults.content_routes[ContentType.FC2]
+        assert set(scraping.field_language) == set(defaults.field_language)
+        assert scraping.field_language[MetadataField.TITLE] == Language.JP
+        assert scraping.field_language[MetadataField.PLOT] == Language.ZH_CN
+
+    def test_legacy_paths_section_dropped(self, tmp_path: Path):
+        """旧 TOML 的 [paths] 被忽略, extra=forbid 不因此失败."""
+        config_path = tmp_path / "config.toml"
+        config_path.write_text('[paths]\nmove_mode = "hardlink"\n\n[worker]\nconcurrency = 4\n')
+
+        with patch.dict(os.environ, {"AMANE_DATA_DIR": str(tmp_path)}, clear=False):
+            cold = ColdSettings()
+
+        mgr = ConfigManager.with_cold(cold)
+        assert mgr.hot.worker.concurrency == 4
+
+    def test_round_trip_preserves_values(self, tmp_path: Path):
+        """load → update → load 往返保留所有值"""
+        with patch.dict(os.environ, {"AMANE_DATA_DIR": str(tmp_path)}, clear=False):
+            cold = ColdSettings()
+
+        mgr1 = ConfigManager.with_cold(cold)
+        mgr1.update(
+            {
+                "network": {"proxy": "socks5://roundtrip:1080"},
+                "worker": {"concurrency": 7, "poll_interval": 5.0},
+                "scraping": {"crop_poster": False},
+                "watcher": {"use_polling": True},
+            }
+        )
+
+        # 从相同路径重新加载
+        mgr2 = ConfigManager.with_cold(cold)
+
+        assert mgr2.hot.network.proxy == "socks5://roundtrip:1080"
+        assert mgr2.hot.worker.concurrency == 7
+        assert mgr2.hot.worker.poll_interval == 5.0
+        assert mgr2.hot.scraping.crop_poster is False
+        assert mgr2.hot.watcher.use_polling is True
+
+
+class TestLLMConfig:
+    """llm 配置: 自定义提示词的持久化与归一, api_type 的默认值与往返."""
+
+    def test_round_trip_preserves_prompts(self, mgr: ConfigManager):
+        mgr.update({"llm": {"system_prompt": "只用中性词汇.", "field_prompts": {"title": "标题不超过 30 字."}}})
+
+        reloaded = ConfigManager.with_cold(mgr.cold)
+
+        assert reloaded.hot.llm.system_prompt == "只用中性词汇."
+        assert reloaded.hot.llm.field_prompts == {MetadataField.TITLE: "标题不超过 30 字."}
+
+    def test_clearing_prompts_restores_builtin(self, mgr: ConfigManager):
+        mgr.update({"llm": {"system_prompt": "只用中性词汇.", "field_prompts": {"title": "标题不超过 30 字."}}})
+        mgr.update({"llm": {"system_prompt": None, "field_prompts": {}}})
+
+        reloaded = ConfigManager.with_cold(mgr.cold)
+
+        assert reloaded.hot.llm.system_prompt is None
+        assert reloaded.hot.llm.field_prompts == {}
+
+    def test_blank_prompts_not_persisted(self, mgr: ConfigManager):
+        """空白提示词归一为未配置, 配置段回到全默认时不写入 TOML."""
+        mgr.update({"llm": {"system_prompt": "   ", "field_prompts": {"plot": "  "}}})
+
+        with open(mgr.cold.config_path, "rb") as f:
+            data = tomllib.load(f)
+
+        assert data == {}
+        assert mgr.hot.llm.system_prompt is None
+        assert mgr.hot.llm.field_prompts == {}
+
+    def test_legacy_title_option_migrates_to_japanese_switch(self):
+        enabled = HotSettings.model_validate({"llm": {"translate_fields": ["title", "plot"]}}).llm
+        disabled = HotSettings.model_validate({"llm": {"translate_fields": ["plot"]}}).llm
+
+        assert enabled.translate_japanese_title is True
+        assert enabled.translate_western_title is False
+        assert "title" not in [field.value for field in enabled.translate_fields]
+        assert disabled.translate_japanese_title is False
+        assert disabled.translate_western_title is False
+
+    def test_title_switch_defaults_and_independence(self):
+        defaults = HotSettings.model_validate({}).llm
+        western = HotSettings.model_validate({"llm": {"translate_western_title": True}}).llm
+
+        assert defaults.translate_japanese_title is True
+        assert defaults.translate_western_title is False
+        assert western.translate_japanese_title is True
+        assert western.translate_western_title is True
+
+    def test_api_type_default_and_round_trip(self, mgr: ConfigManager):
+        """默认 chat 与原先固定走 Chat Completions 的语义一致; 未知协议拒绝."""
+        assert mgr.hot.llm.api_type is ApiType.CHAT
+
+        mgr.update({"llm": {"api_type": "anthropic"}})
+        assert ConfigManager.with_cold(mgr.cold).hot.llm.api_type is ApiType.ANTHROPIC
+
+        with pytest.raises(ValidationError, match=r"Input should be 'chat', 'response' or 'anthropic'"):
+            mgr.update({"llm": {"api_type": "bogus"}})
+
+
+class TestBskBackendAvailability:
+    def test_missing_cli_rejects_global_backend(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr("amane.net.bsk.shutil.which", lambda name: None)
+
+        with pytest.raises(ValidationError, match="未找到 bsk CLI"):
+            BrowserConfig(backend=BrowserBackendName.BSK)
+        # 来源级覆盖看不到全局 bsk_path, 只在这一层放行, 运行期再报.
+        assert SiteConfig(browser_backend=BrowserBackendName.BSK).browser_backend is BrowserBackendName.BSK
+
+    def test_declared_path_is_enough(self, monkeypatch: pytest.MonkeyPatch, tmp_path):
+        fake = tmp_path / "bsk"
+        fake.write_text("", encoding="utf-8")
+        monkeypatch.setattr("amane.net.bsk.shutil.which", lambda name: None)
+
+        config = BrowserConfig(bsk_path=str(fake), backend=BrowserBackendName.BSK)
+
+        assert config.backend is BrowserBackendName.BSK
+
+    def test_declared_path_must_exist_even_if_path_has_bsk(self, monkeypatch: pytest.MonkeyPatch, tmp_path):
+        monkeypatch.setattr("amane.net.bsk.shutil.which", lambda name: "/usr/bin/bsk")
+
+        with pytest.raises(ValidationError, match="未找到 bsk CLI"):
+            BrowserConfig(bsk_path=str(tmp_path / "absent"), backend=BrowserBackendName.BSK)
+
+
+def test_default_uncensored_streaming_route_appends_avsox() -> None:
+    cfg = ScrapingConfig()
+    assert cfg.content_routes["uncensored_streaming"][-1] == SiteName.AVSOX
+
+
+def test_default_actor_source_orders() -> None:
+    from amane.config.manager import ActorScrapingConfig
+
+    cfg = ActorScrapingConfig()
+    assert [str(site) for site in cfg.profile_sites] == ["minnano", "theporndb", "wikipedia", "javdb", "avbase"]
+    assert [str(site) for site in cfg.image_sites] == ["tushy", "tushy_raw", "gfriends"]

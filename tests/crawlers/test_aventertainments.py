@@ -1,0 +1,247 @@
+from __future__ import annotations
+
+from typing import cast
+
+import pytest
+
+from amane.crawlers import registry
+from amane.crawlers.http import HttpClient
+from amane.crawlers.models import SearchQuery
+from amane.crawlers.sites.aventertainments import (
+    _detail_links,
+    _image_bytes_valid,
+    _metadata_from_page,
+    _search_number_key,
+)
+from amane.enums import SiteName
+
+DETAIL_URL = "https://www.aventertainments.com/dvd/detail?pro=87393&lang=2&cat=29"
+
+
+def _detail_html(number: str = "S2MBD-046") -> str:
+    return f"""<!doctype html>
+    <html><head><title>Encore Vol.46</title>
+      <meta property="og:image" content="https://imgs02.aventertainments.com/new/jacket_images/dvd1s2mbd-046.webp">
+      <script type="application/ld+json">{{
+        "@context":"https://schema.org", "@type":"VideoObject",
+        "name":"Encore Vol.46", "description":"Example plot",
+        "uploadDate":"2015-04-24T00:00:00+09:00",
+        "contentUrl":"https://ppvclips02.aventertainments.com/00m3u8/{number}/{number}.m3u8"
+      }}</script>
+    </head><body>
+      <div class="single-info"><span class="title">商品番号</span><span class="tag-title">{number}</span></div>
+      <div class="single-info">
+        <span class="title">主演女優</span>
+        <span class="value"><a>Example Actress</a></span>
+      </div>
+      <div class="single-info"><span class="title">スタジオ</span><span class="value">Example Studio</span></div>
+      <div class="single-info"><span class="title">シリーズ</span><span class="value">Example Series</span></div>
+      <div class="single-info"><span class="title">発売日</span><span class="value">04/24/2015</span></div>
+      <div class="single-info"><span class="title">収録時間</span><span class="value">Apx. 130 Min.</span></div>
+      <div class="single-info">
+        <span class="title">カテゴリ</span>
+        <span class="value-category"><a>完全無修正</a><a>店長推薦</a></span>
+      </div>
+      <div class="tab-area">
+        <a href="/dvd/detail?pro=87392&amp;lang=2&amp;cat=29" data-tippy="View on DVD">DVD</a>
+        <a href="/dvd/detail?pro=87393&amp;lang=2&amp;cat=29" data-tippy="View on Blu-ray">Blu-ray</a>
+      </div>
+      <video id="player1_html5" poster="https://imgs02.aventertainments.com/new/bigcover/dvd1s2mbd-046.webp"></video>
+      <a class="lightbox" href="https://imgs02.aventertainments.com/new/bigcover/dvd1s2mbd-046.webp">ジャケット画像</a>
+    </body></html>"""
+
+
+def test_aventertainments_is_registered_as_film_source() -> None:
+    assert registry.get(SiteName.AVENTERTAINMENTS) is not None
+
+
+def test_parser_preserves_each_actor_link_as_an_independent_name() -> None:
+    html = _detail_html().replace(
+        '<span class="value"><a>Example Actress</a></span>',
+        '<span class="value">'
+        '<a href="/actress/1">AAA（BBB）</a>'
+        '<a href="/actress/2">CCC(BBB)</a>'
+        '<a href="/actress/3">DDD EEE</a>'
+        '<a href="/actress/4">FFF</a>'
+        '<a href="/actress/5">GGG</a>'
+        '<a href="/actress/6">HHH</a>'
+        "</span>",
+    )
+    metadata = _metadata_from_page(DETAIL_URL, html)
+    assert metadata is not None
+    assert [actor.name for actor in metadata.actors] == ["AAA（BBB）", "CCC(BBB)", "DDD EEE", "FFF", "GGG", "HHH"]
+
+
+def test_parser_maps_jacket_to_poster_and_bigcover_to_thumb() -> None:
+    metadata = _metadata_from_page(DETAIL_URL, _detail_html())
+    assert metadata is not None
+    assert metadata.number == "S2MBD-046"
+    assert metadata.poster_urls == ["https://imgs02.aventertainments.com/new/jacket_images/dvd1s2mbd-046.webp"]
+    assert metadata.cover_urls == ["https://imgs02.aventertainments.com/new/bigcover/dvd1s2mbd-046.webp"]
+    assert metadata.original_poster_urls == ["https://imgs02.aventertainments.com/new/jacket_images/dvd1s2mbd-046.webp"]
+    assert metadata.double_page_poster_urls == metadata.poster_urls
+    assert metadata.double_page_cover_urls == metadata.cover_urls
+    assert metadata.release == "2015-04-24"
+    assert metadata.runtime == 130
+    assert metadata.actors[0].name == "Example Actress"
+
+
+def test_parser_extracts_bigcover_from_product_image_area_without_video_poster() -> None:
+    bigcover = "https://imgs02.aventertainments.com/new/bigcover/dvd1smbd-06.webp"
+    html = _detail_html("SMBD-06").replace(
+        '<video id="player1_html5" poster="https://imgs02.aventertainments.com/new/bigcover/dvd1s2mbd-046.webp"></video>',
+        '<div class="col-12" style="text-align: center;"><img src="' + bigcover + '" class="img-fluid" /></div>'
+        '<a class="lightbox" href="' + bigcover + '">ジャケット画像</a>',
+    )
+    metadata = _metadata_from_page(
+        "https://www.aventertainments.com/dvd/detail?pro=34593&lang=2&cat=29",
+        html,
+    )
+    assert metadata is not None
+    assert metadata.number == "SMBD-06"
+    assert metadata.poster_urls == ["https://imgs02.aventertainments.com/new/jacket_images/dvd1s2mbd-046.webp"]
+    assert metadata.cover_urls == [bigcover]
+
+
+def test_parser_extracts_all_modal_screenshots_and_deduplicates_urls() -> None:
+    screenshots = "".join(
+        f'<img src="https://imgs02.aventertainments.com/vodimages/screenshot/large/RED027_{group}/{i:03}.webp">'
+        for group in ("s1", "s2")
+        for i in range(1, 35)
+    )
+    html = _detail_html().replace(
+        "</body></html>",
+        f'<div id="sscontainerppv123">{screenshots}'
+        '<img src="https://imgs02.aventertainments.com/vodimages/screenshot/large/RED027_s1/001.webp">'
+        "</div></body></html>",
+    )
+    metadata = _metadata_from_page(DETAIL_URL, html)
+    assert metadata is not None
+    assert len(metadata.extrafanart) == 68
+    assert metadata.extrafanart[0].endswith("RED027_s1/001.webp")
+    assert metadata.extrafanart[-1].endswith("RED027_s2/034.webp")
+
+
+def test_parser_falls_back_to_screenshot_preview_gallery() -> None:
+    html = _detail_html().replace(
+        "</body></html>",
+        '<div class="gallery-block grid-gallery">'
+        '<img src="/vodimages/screenshot/large/ABC_s1/001.webp">'
+        '<img src="/vodimages/screenshot/large/ABC_s1/002.webp">'
+        "</div></body></html>",
+    )
+    metadata = _metadata_from_page(DETAIL_URL, html)
+    assert metadata is not None
+    assert metadata.extrafanart == [
+        "https://imgs02.aventertainments.com/vodimages/screenshot/large/ABC_s1/001.webp",
+        "https://imgs02.aventertainments.com/vodimages/screenshot/large/ABC_s1/002.webp",
+    ]
+
+
+def test_search_number_key_normalizes_case_and_hyphens_without_merging_dvd_and_bd() -> None:
+    assert _search_number_key("s2m-046") == "s2m046"
+    assert _search_number_key("S2MBD-046") == "s2mbd046"
+    assert _search_number_key("S2M-046") != _search_number_key("S2MBD-046")
+
+
+def test_parser_does_not_use_video_poster_when_bigcover_link_is_missing() -> None:
+    html = _detail_html().replace(
+        '<a class="lightbox" href="https://imgs02.aventertainments.com/new/bigcover/dvd1s2mbd-046.webp">ジャケット画像</a>',
+        "",
+    )
+    metadata = _metadata_from_page(DETAIL_URL, html)
+    assert metadata is not None
+    assert metadata.original_poster_urls == ["https://imgs02.aventertainments.com/new/jacket_images/dvd1s2mbd-046.webp"]
+    assert metadata.cover_urls == []
+    assert metadata.double_page_poster_urls == []
+
+
+def test_parser_prefers_real_product_description_over_jsonld_boilerplate() -> None:
+    html = (
+        _detail_html()
+        .replace(
+            '"description":"Example plot"',
+            '"description":"Encore Vol.46 | AVエンターテインメント : site slogan"',
+        )
+        .replace(
+            "</body></html>",
+            '<div class="product-description mt-20">First synopsis paragraph<br/><br/>Second synopsis paragraph</div></body></html>',
+        )
+    )
+    metadata = _metadata_from_page(DETAIL_URL, html)
+    assert metadata is not None
+    assert metadata.plot == "First synopsis paragraph\n\nSecond synopsis paragraph"
+
+
+def test_parser_does_not_use_jsonld_title_or_site_tagline_as_plot() -> None:
+    html = _detail_html().replace(
+        '"description":"Example plot"',
+        '"description":"Encore Vol.46 | AVエンターテインメント : site slogan"',
+    )
+    metadata = _metadata_from_page(DETAIL_URL, html)
+    assert metadata is not None
+    assert metadata.plot is None
+
+
+def test_search_result_links_are_limited_to_product_detail_pages() -> None:
+    page = """<a href="/dvd/detail?pro=87393&amp;lang=2&amp;cat=29">Blu-ray</a>
+              <a href="/dvd/detail?pro=87392&amp;lang=2&amp;cat=29">DVD</a>
+              <a href="/ppv/detail?pro=10090">PPV</a>"""
+    links = _detail_links(page, "https://www.aventertainments.com/dvd/search?keyword=S2M-046")
+    assert len(links) == 2
+    assert all("/dvd/detail?" in link for link in links)
+
+
+def test_image_validator_rejects_html_and_accepts_webp() -> None:
+    assert _image_bytes_valid(b"RIFF" + b"\x00\x00\x00\x00" + b"WEBP" + b"data")
+    assert not _image_bytes_valid(b"<!doctype html><title>not found</title>")
+
+
+class _FakeClient:
+    def __init__(self, pages: dict[str, str], images: dict[str, bytes]) -> None:
+        self.pages = pages
+        self.images = images
+
+    async def get_html(self, url: str, **kwargs: object) -> str:
+        return self.pages.get(url, "")
+
+    async def get_bytes(self, url: str, **kwargs: object) -> bytes:
+        return self.images.get(url, b"")
+
+
+def _version_html(number: str, image_stem: str) -> str:
+    html = _detail_html(number)
+    return html.replace("dvd1s2mbd-046.webp", f"{image_stem}.webp")
+
+
+@pytest.mark.asyncio
+async def test_search_does_not_treat_bd_sibling_as_a_search_match() -> None:
+    from amane.crawlers.sites.aventertainments import AVEntertainmentsCrawler
+
+    search_url = "https://www.aventertainments.com/dvd/search?lang=2&cat=29&keyword=S2M-046&searchby=keyword&page=1"
+    bd_url = "https://www.aventertainments.com/dvd/detail?pro=87393&lang=2&cat=29"
+    dvd_url = "https://www.aventertainments.com/dvd/detail?pro=87392&lang=2&cat=29"
+    search_html = (
+        '<a href="/dvd/detail?pro=87392&amp;lang=2&amp;cat=29">DVD</a>'
+        '<a href="/dvd/detail?pro=87393&amp;lang=2&amp;cat=29">Blu-ray</a>'
+    )
+    crawler = AVEntertainmentsCrawler(
+        cast(
+            HttpClient,
+            _FakeClient(
+                {search_url: search_html, bd_url: _detail_html("S2MBD-046"), dvd_url: _detail_html("S2M-046")},
+                {},
+            ),
+        )
+    )
+    assert await crawler._search(SearchQuery("S2M-046")) == dvd_url
+
+
+def test_parser_extracts_title_from_h3_when_jsonld_and_h1_are_absent() -> None:
+    html = _detail_html("SMBD-06")
+    html = html.replace('"name":"Encore Vol.46",', "")
+    html = html.replace("<head><title>Encore Vol.46</title>", "<head><title></title>")
+    html = html.replace("<body>", "<body><h3>S Model 06 : 沢木樹里 (ブルーレイ版)</h3>")
+    metadata = _metadata_from_page(DETAIL_URL, html)
+    assert metadata is not None
+    assert metadata.title == "S Model 06 : 沢木樹里 (ブルーレイ版)"

@@ -1,0 +1,110 @@
+"""airav 只认站内写法 ``FC2-PPV-<id>``, 其余番号用原样写法.
+
+线上实录: 管线产出的 FC2 番号不带 PPV (``FC2-<id>``), 用该写法检索站内 0 条; 换成 ``FC2-PPV-<id>`` 命中.
+假出站通道按 URL 子串路由, 未声明的 URL 一律失败, 因此检索词的形态, 顺序与请求次数都被断言 — 真实响应用例
+只能断言最终命中, 覆盖不到这两者.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from unittest.mock import AsyncMock
+
+import pytest
+
+from amane.crawlers.models import SearchQuery
+from amane.crawlers.sites.airav import AiravCrawler
+from amane.net.errors import RequestError
+
+from .driven import http_client
+
+HIT = "https://airav.io/video?hid=99-22-03696"
+# 站内条目标题以番号开头, 详情链接的 hid 与番号不同形.
+HIT_PAGE = """<html><body>
+<div class="oneVideo"><a href="/video?hid=99-22-03696"></a><h5>FC2-PPV-3061625 人生初拍攝。</h5></div>
+</body></html>"""
+EMPTY_PAGE = """<html><body><div class="no-result">0</div></body></html>"""
+
+Route = Callable[[str], str]
+
+
+def _ok(text: str) -> Route:
+    def route(_url: str) -> str:
+        return text
+
+    return route
+
+
+def _fake_web(routes: dict[str, Route]) -> AsyncMock:
+    """URL 含某键即走该路由; 未声明的 URL 判失败."""
+    web = AsyncMock()
+
+    async def get_text(url: str, **kwargs: object) -> str:
+        for pattern, route in routes.items():
+            if pattern in url:
+                return route(url)
+        raise RequestError(url, "no mock matched")
+
+    web.get_text.side_effect = get_text
+    return web
+
+
+SEARCH_CASES: list[tuple[str, dict[str, Route], str | None, int]] = [
+    # 管线产出的形态: 首个检索词换成站内写法, 一次请求命中
+    ("FC2-3061625", {"kw=FC2-PPV-3061625": _ok(HIT_PAGE)}, HIT, 1),
+    # 入参已是站内写法: 形态重复, 不重发同一检索词 (该形态在站内也没有)
+    ("FC2-PPV-3061625", {"kw=FC2-PPV-3061625": _ok(EMPTY_PAGE)}, None, 1),
+    # 站内写法落空后退回原样写法
+    ("FC2-3061625", {"kw=FC2-PPV-3061625": _ok(EMPTY_PAGE), "kw=FC2-3061625": _ok(HIT_PAGE)}, HIT, 2),
+    # 非 FC2 番号只用原样写法
+    ("SSIS-497", {"kw=SSIS-497": _ok(EMPTY_PAGE)}, None, 1),
+    # 站内只有相近番号: 不取首条
+    (
+        "FC2-3061625",
+        {"kw=FC2-PPV-3061625": _ok(HIT_PAGE.replace("3061625", "3061620")), "kw=FC2-3061625": _ok(EMPTY_PAGE)},
+        None,
+        2,
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("query", "routes", "expected_url", "expected_calls"), SEARCH_CASES)
+async def test_search_uses_site_spelling(
+    query: str, routes: dict[str, Route], expected_url: str | None, expected_calls: int
+) -> None:
+    web = _fake_web(routes)
+    crawler = AiravCrawler(client=http_client(web))
+    assert await crawler._search(SearchQuery(query)) == expected_url
+    assert web.get_text.await_count == expected_calls
+
+
+def test_strip_source_label_prefixes() -> None:
+    from amane.crawlers.sites.airav import _strip_source_label
+
+    assert _strip_source_label("caribbeancom_051318-665") == "051318-665"
+    assert _strip_source_label("1pondo051318_001") == "051318_001"
+    assert _strip_source_label("10musume-051318_01") == "051318_01"
+    assert _strip_source_label("pacopacomama051318_001") == "051318_001"
+    assert _strip_source_label("HEYZO-3607") == "HEYZO-3607"
+
+
+@pytest.mark.asyncio
+async def test_scrape_preserves_plot_line_breaks() -> None:
+    """详情页简介保留 br 换行及段落分隔."""
+    html = """
+    <html><body>
+        <li>番号<span>SSIS-497</span></li>
+        <div class="video-title"><h1>SSIS-497 Test title</h1></div>
+        <div class="video-info">
+            <p>First line<br>Second line<br><br>Second paragraph</p>
+        </div>
+    </body></html>
+    """
+    web = _fake_web({"airav.io/video": _ok(html)})
+    crawler = AiravCrawler(client=http_client(web))
+
+    metadata = await crawler._scrape("https://airav.io/video?id=test")
+
+    assert metadata is not None
+    assert metadata.plot == ("First line\nSecond line\n\nSecond paragraph")

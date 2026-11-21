@@ -1,0 +1,51 @@
+import type { ParseKeys } from "i18next";
+import type { MetadataField } from "@/client/types.gen";
+import { assertExhaustive, exhaustiveRecord } from "@/lib/exhaustive";
+
+/** 顺序即锁菜单显示顺序. */
+export const LOCKABLE_FIELDS = [
+  "title",
+  "original_title",
+  "actors",
+  "actor_birthplace",
+  "actor_overview",
+  "studio",
+  "publisher",
+  "release",
+  "runtime",
+  "tags",
+  "series",
+  "plot",
+  "original_plot",
+  "directors",
+  "poster_urls",
+  "cover_urls",
+  "trailer_urls",
+  "extrafanart",
+  "score",
+] as const satisfies readonly MetadataField[];
+
+assertExhaustive<MetadataField>()(LOCKABLE_FIELDS);
+
+/** MetadataField → metadata 命名空间下的字段标签 key. */
+export const FIELD_LABEL_KEY = exhaustiveRecord<MetadataField>()({
+  title: "detail.fields.title",
+  original_title: "detail.fields.originalTitle",
+  plot: "detail.fields.plot",
+  original_plot: "detail.fields.originalPlot",
+  actors: "detail.fields.actors",
+  actor_birthplace: "detail.fields.actorBirthplace",
+  actor_overview: "detail.fields.actorOverview",
+  directors: "detail.fields.directors",
+  tags: "detail.fields.tags",
+  series: "detail.fields.series",
+  release: "detail.fields.release",
+  runtime: "detail.fields.runtime",
+  publisher: "detail.fields.publisher",
+  studio: "detail.fields.studio",
+  poster_urls: "detail.fields.poster",
+  cover_urls: "detail.fields.cover",
+  trailer_urls: "detail.fields.trailer",
+  extrafanart: "detail.fields.extrafanart",
+  score: "detail.fields.score",
+} as const satisfies Record<MetadataField, ParseKeys<"metadata">>);

@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+if TYPE_CHECKING:
+    import asyncio
+    from collections.abc import Iterator
+    from typing import Unpack
+
+    from ..embeddings import EmbeddingStore
+    from ..models import MediaFile
+    from ..repo_types import MediaFileUpdates
+    from ..repository import MediaChangeHook
+
+# SQLite 单条语句的绑定变量上限 (3.32+ 为 32766). 500 给语句里其它占位留余量.
+SQL_IN_CHUNK_SIZE = 500
+
+
+def chunks[T](items: list[T]) -> Iterator[list[T]]:
+    """按 ``SQL_IN_CHUNK_SIZE`` 分批绑定数量随数据增长的 id 列表.
+
+    整批 id 放进一条语句会超过 SQLite 的绑定变量上限, 报 ``too many SQL variables``.
+    """
+    for start in range(0, len(items), SQL_IN_CHUNK_SIZE):
+        yield items[start : start + SQL_IN_CHUNK_SIZE]
+
+
+async def acquire_write_lock(session: AsyncSession) -> None:
+    """读改写路径先取得 SQLite 写锁, 使判定与写入同处一个事务.
+
+    pysqlite 只在 DML 前发出 BEGIN, 纯 SELECT 落在事务之外. 调用前会话不得已有未结束事务;
+    写锁持有期间不得执行网络或磁盘等待.
+    """
+    connection = await session.connection()
+    await connection.exec_driver_sql("BEGIN IMMEDIATE")
+
+
+class RepositoryMixinBase:
+    """子类须提供 ``_session()``. 任务 mixin 还依赖 ``_task_insert_lock`` 串行化入队互斥."""
+
+    _task_insert_lock: asyncio.Lock
+    # 向量 sidecar 与图片变化通知的钩子; 仅条目写路径与级联删除使用.
+    _embeddings: EmbeddingStore | None
+    _media_hook: MediaChangeHook | None
+
+    def _session(self) -> AsyncSession:
+        raise NotImplementedError
+
+    async def notify_media_changed(self, metadata_id: int) -> None:
+        raise NotImplementedError
+
+    async def update_media_file_in_session(
+        self, session: AsyncSession, media_id: int, **updates: Unpack[MediaFileUpdates]
+    ) -> MediaFile | None:
+        """声明由 MediaRepoMixin 提供、供其他 Repository mixin 协作调用的事务内接口."""
+        raise NotImplementedError

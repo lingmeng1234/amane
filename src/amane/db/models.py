@@ -1,0 +1,886 @@
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any, NoReturn
+
+from sqlalchemy import Boolean, Column, Index, String, Text, UniqueConstraint, exists, func, or_, text
+from sqlalchemy.sql.elements import ColumnElement
+from sqlmodel import JSON, Field, SQLModel, col, select
+
+from ..enums import ActorGender, DownloadableResource, LibraryAutomation, LibraryIngest, LinkMode, MoveMode
+from ..library import (
+    DEFAULT_SUBTITLE_EXTENSIONS,
+    DEFAULT_TRAILER_PATTERN,
+    BlacklistPattern,
+    MinFileSize,
+    SubtitleExtensions,
+    TrailerPattern,
+)
+from ..organize.path_templates import VIDEO_TEMPLATE_DEFAULT, PathTemplate
+from ..organize.strm_content import StrmContentTemplate
+from ..parsing import VR_TAGS, ContentType, Mosaic, is_vr
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+class MediaIdentityType(StrEnum):
+    """WESTERN 媒体的稳定身份类型。"""
+
+    LOCAL_OSHASH = "LOCAL_OSHASH"
+    FILE_115_ID = "115_FILE_ID"
+
+
+class MediaFileStatus(StrEnum):
+    PENDING = "pending"
+    SCRAPED = "scraped"
+    FAILED = "failed"
+    SKIP = "skip"
+
+
+class OshashSubmissionStatus(StrEnum):
+    PENDING = "pending"
+    SUBMITTING = "submitting"
+    UNCERTAIN = "uncertain"
+
+
+class TaskType(StrEnum):
+    SCRAPE = "scrape"
+    ORGANIZE = "organize"
+    REFRESH = "refresh"
+    CLEANUP = "cleanup"
+    UPSCALE = "upscale"
+    R18_IMPORT = "r18_import"
+    ACTOR_SCRAPE = "actor_scrape"
+    ACTOR_PUSH = "actor_push"
+    RESCRAPE = "rescrape"
+    SCAN_INVALID = "scan_invalid"
+    DELETE = "delete"
+    SEMANTIC_INDEX = "semantic_index"
+    SEMANTIC_BENCHMARK = "semantic_benchmark"
+
+
+class RoutineType(StrEnum):
+    CLEANUP = "cleanup"
+    UPSCALE = "upscale"
+    R18_IMPORT = "r18_import"
+    RESCRAPE = "rescrape"
+    SEMANTIC_INDEX = "semantic_index"
+
+
+class TaskStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class FeedItemState(StrEnum):
+    ACTIVE = "active"
+    IGNORED = "ignored"
+    ALL = "all"
+
+
+class FeedItemReadState(StrEnum):
+    UNREAD = "unread"
+    READ = "read"
+    ALL = "all"
+
+
+# 列表排序字段显式枚举, 禁止 getattr 反射任意列名; 未映射的枚举值须在 repository 报错.
+
+
+class SortOrder(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+class MetadataSortField(StrEnum):
+    NUMBER = "number"
+    TITLE = "title"
+    STUDIO = "studio"
+    RELEASE = "release"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    FILE_COUNT = "file_count"
+    SCORE = "score"
+
+
+class MediaSortField(StrEnum):
+    NUMBER = "number"
+    PATH = "path"
+    STATUS = "status"
+    SIZE = "size"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class TaskSortField(StrEnum):
+    TYPE = "type"
+    STATUS = "status"
+    PRIORITY = "priority"
+    CREATED_AT = "created_at"
+    STARTED_AT = "started_at"
+    FINISHED_AT = "finished_at"
+
+
+class FacetSortField(StrEnum):
+    NAME = "name"
+    COUNT = "count"
+
+
+class ActorSortField(StrEnum):
+    NAME = "name"
+    COUNT = "count"
+    UPDATED_AT = "updated_at"
+    HAS_IMAGE = "has_image"
+    BIRTHDAY = "birthday"
+    HEIGHT = "height"
+    BUST = "bust"
+    WAIST = "waist"
+    HIP = "hip"
+    CUP = "cup"
+
+
+class FacetKind(StrEnum):
+    ACTOR = "actor"
+    DIRECTOR = "director"
+    TAG = "tag"
+    STUDIO = "studio"
+    PUBLISHER = "publisher"
+    SERIES = "series"
+    USER_TAG = "user_tag"
+
+
+class FacetRuleAction(StrEnum):
+    ALIAS = "alias"
+    BLOCK = "block"
+
+
+# 可写 FacetRule 的 kind (与刮削投影对应; user_tag 硬删, 不进规则表).
+SCRAPE_FACET_KINDS: frozenset[FacetKind] = frozenset(
+    {
+        FacetKind.ACTOR,
+        FacetKind.DIRECTOR,
+        FacetKind.TAG,
+        FacetKind.STUDIO,
+        FacetKind.PUBLISHER,
+        FacetKind.SERIES,
+    }
+)
+
+
+class _HasSubtitleProperty(property):
+    """``MediaFile.has_subtitle`` 的实现, 只允许实例访问.
+
+    类属性访问得到的是描述符本身, 与布尔值比较恒不相等: 该名字写进 SQL 表达式
+    (例如 ``MediaFile.has_subtitle == True``) 不报错, 会静默编译出 ``WHERE false`` 并返回空集.
+    因此比较与真值判断直接报错, 该误用无法静默通过; SQL 判定中字一律用 ``has_subtitle_predicate()``.
+    """
+
+    __hash__ = property.__hash__
+
+    def _reject(self) -> NoReturn:
+        raise TypeError("MediaFile.has_subtitle 只可用于实例; SQL 判定请用 has_subtitle_predicate()")
+
+    def __eq__(self, other: object) -> bool:
+        self._reject()
+
+    def __ne__(self, other: object) -> bool:
+        self._reject()
+
+    def __bool__(self) -> bool:
+        self._reject()
+
+
+class OshashSubmission(SQLModel, table=True):
+    """待向 ThePornDB 提交的场景 OSHASH；失败保留，成功删除。"""
+
+    __tablename__ = "oshash_submissions"  # type: ignore[assignment]
+    __table_args__ = (UniqueConstraint("theporndb_uuid", "oshash", name="uq_oshash_submission_scene_hash"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    theporndb_uuid: str = Field(index=True)
+    oshash: str
+    duration: int
+    title: str | None = None
+    path: str
+    status: OshashSubmissionStatus = Field(
+        default=OshashSubmissionStatus.PENDING,
+        index=True,
+    )
+    created_at: datetime = Field(default_factory=_utcnow)
+    last_error: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+
+
+class MediaFile(SQLModel, table=True):
+    __tablename__ = "media_files"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    # 库内身份为 NFC. 写入与按路径查找只经 Repository (`nfc_path`).
+    path: str = Field(unique=True, nullable=False, index=True)
+    oshash: str | None = Field(default=None, index=True)
+    size: int | None = None
+    duration: float | None = None
+    codec: str | None = None
+    number: str | None = Field(default=None, index=True)
+    status: MediaFileStatus = Field(default=MediaFileStatus.PENDING, index=True)
+    # 文件相位: path 的投影, 随 path 写入/更新; 不进对外 PATCH.
+    mosaic: Mosaic | None = Field(default=None, index=True)
+    #: 文件名带中字标记, 只由 path 派生.
+    has_subtitle_in_name: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, index=True))
+    #: 同目录存在库 `subtitle_extensions` 命中的字幕; 登记 / 换 path / 库扫描时重新检查. 整理落盘时
+    #: 作为 `parse_file_info` 的 `has_external_subtitle` 入参并入文件相位.
+    has_external_subtitle: bool = Field(default=False, index=True)
+    definition: str | None = Field(default=None, index=True)
+    metadata_id: int | None = Field(default=None, foreign_key="metadata.id", index=True)
+    library_id: int = Field(foreign_key="libraries.id", index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+    @_HasSubtitleProperty
+    def has_subtitle(self) -> bool:
+        """文件名标记与同目录字幕命中任一即真."""
+        return self.has_subtitle_in_name or self.has_external_subtitle
+
+
+def has_subtitle_predicate() -> ColumnElement[bool]:
+    """`MediaFile.has_subtitle` 的 SQL 等价式: 文件名标记或同目录字幕命中.
+
+    判定中字的查询与筛选一律走这里, 与实例属性口径必须一致.
+    """
+    return or_(col(MediaFile.has_subtitle_in_name).is_(True), col(MediaFile.has_external_subtitle).is_(True))
+
+
+class _VrProperty(property):
+    """``Metadata.vr`` 的实现, 只允许实例访问.
+
+    类属性访问得到的是描述符本身, 与布尔值比较恒不相等: 该名字写进 SQL 表达式
+    (例如 ``Metadata.vr == True``) 不报错, 会静默编译出 ``WHERE false`` 并返回空集.
+    因此比较与真值判断直接报错, 该误用无法静默通过; SQL 判定一律用 ``metadata_vr_predicate()``.
+    """
+
+    __hash__ = property.__hash__
+
+    def _reject(self) -> NoReturn:
+        raise TypeError("Metadata.vr 只可用于实例; SQL 判定请用 metadata_vr_predicate()")
+
+    def __eq__(self, other: object) -> bool:
+        self._reject()
+
+    def __ne__(self, other: object) -> bool:
+        self._reject()
+
+    def __bool__(self) -> bool:
+        self._reject()
+
+
+class Metadata(SQLModel, table=True):
+    __tablename__ = "metadata"  # type: ignore[assignment]
+    # 非 WESTERN 仍按番号唯一; WESTERN 按 ThePornDB ThePornDB UUID 唯一, 番号允许重复.
+    # 旧 WESTERN 记录在重新刮削前 theporndb_uuid 可为空, 新刮削入口负责保证其非空.
+    __table_args__ = (
+        Index("ix_metadata_number_lookup", text("number COLLATE NOCASE"), unique=False),
+        Index(
+            "ix_metadata_number_non_western",
+            text("number COLLATE NOCASE"),
+            unique=True,
+            sqlite_where=text("content_type != 'WESTERN'"),
+        ),
+        Index(
+            "ix_metadata_western_theporndb_uuid",
+            text("lower(theporndb_uuid)"),
+            unique=True,
+            sqlite_where=text("content_type = 'WESTERN' AND theporndb_uuid IS NOT NULL"),
+        ),
+        # 默认列表排序 ORDER BY updated_at DESC, id ASC; 方向写入索引避免临时排序.
+        Index("ix_metadata_updated_at_id", text("updated_at DESC"), "id"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    number: str = Field(nullable=False)
+    #: ThePornDB ThePornDB UUID; WESTERN 的作品身份. 旧数据允许暂时为空, 新刮削必须补齐.
+    theporndb_uuid: str | None = Field(default=None, index=False)
+    #: 番号类型; 只在条目创建时落定 (契约见 docs/dev/data-model.md), 不随挂载文件或后续刮削变化, 也不进对外 PATCH.
+    content_type: ContentType = Field(default=ContentType.WESTERN, index=True)
+
+    title: str | None = None
+    original_title: str | None = None
+    actors: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    # studio/publisher/series 同时投影到目录表.
+    studio: str | None = Field(default=None, index=True)
+    publisher: str | None = Field(default=None, index=True)
+    release: str | None = None
+    runtime: int | None = None
+    tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    series: str | None = Field(default=None, index=True)
+    # 多系列规范化关联的有序名称投影；series 保留首个系列供旧调用方兼容。
+    series_names: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False, server_default=text("'[]'"))
+    )
+    # 长文本存纯文本, 上游 HTML/实体在入库前经 utils.text 归一, 见 docs/dev/data-model.md.
+    plot: str | None = None
+    original_plot: str | None = None
+    directors: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+
+    poster_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    # 刮削来源的原始海报地址; 与可能被裁剪资源 URL 替换的 poster_urls 分离.
+    original_poster_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    # Python 业务命名统一为 cover; 物理列名保留以兼容既有 SQLite 数据库.
+    cover_urls: list[str] = Field(default_factory=list, sa_column=Column("thumb_urls", JSON))
+    # 刮削来源的原始封面地址; 手动替换后仍保留供 NFO 输出.
+    original_cover_urls: list[str] = Field(default_factory=list, sa_column=Column("original_thumb_urls", JSON))
+    trailer_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+
+    # 按站点分组, 禁止扁平合并.
+    extrafanart_urls: dict[str, list[str]] = Field(default_factory=dict, sa_column=Column(JSON))
+    # 每站独立, 禁止折成单值.
+    scores: dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))
+    external_ids: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    source_urls: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    field_sources: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    # 原始图片 URL 到刮削来源的映射；旧记录为空时沿用全局代理策略。
+    image_sources: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    # 各站原始快照, 供离线重新聚合.
+    raw: dict[str, dict[str, Any]] = Field(default_factory=dict, sa_column=Column(JSON))
+    # 字段级锁定; 契约见 docs/dev/data-model.md.
+    locked_fields: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False, server_default=text("'[]'"))
+    )
+
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+    @property
+    def poster_url(self) -> str | None:
+        return self.poster_urls[0] if self.poster_urls else None
+
+    @property
+    def cover_url(self) -> str | None:
+        return self.cover_urls[0] if self.cover_urls else None
+
+    @property
+    def trailer_url(self) -> str | None:
+        return self.trailer_urls[0] if self.trailer_urls else None
+
+    @property
+    def extrafanart(self) -> list[str]:
+        """最高优先级站点的剧照, 与 poster_url / cover_url 取首项一致."""
+        if not self.extrafanart_urls:
+            return []
+        return list(next(iter(self.extrafanart_urls.values())))
+
+    @property
+    def score(self) -> float | None:
+        if not self.scores:
+            return None
+        return float(next(iter(self.scores.values())))
+
+    @_VrProperty
+    def vr(self) -> bool:
+        """判定口径与词表见 `parsing.is_vr`; 不物化列, 因此重命名 / 合并标签的路径都不需要重算."""
+        return is_vr(self.tags or [])
+
+
+class MediaIdentity(SQLModel, table=True):
+    """独立于文件路径的 WESTERN 稳定身份索引。"""
+
+    __tablename__ = "media_identities"  # type: ignore[assignment]
+    __table_args__ = (
+        Index(
+            "ix_media_identities_type_value",
+            "identity_type",
+            text("lower(identity_value)"),
+        ),
+        Index("ix_media_identities_metadata_id", "metadata_id"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    metadata_id: int = Field(foreign_key="metadata.id", ondelete="CASCADE", nullable=False)
+    identity_type: MediaIdentityType = Field(nullable=False, index=False)
+    identity_value: str = Field(nullable=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+def metadata_vr_predicate() -> ColumnElement[bool]:
+    """`Metadata.vr` 的 SQL 等价式: 标签整体命中 `parsing.VR_TAGS` (忽略大小写与首尾空白).
+
+    谓词在查询时现算而不走物化列: ``tags`` 是真值列, 修改它的路径不止一处, 逐处重算必漏.
+    """
+    tags = func.json_each(col(Metadata.tags)).table_valued("value")
+    return exists(select(1).select_from(tags).where(func.lower(func.trim(tags.c.value)).in_(VR_TAGS)))
+
+
+def metadata_number_predicate(number: str) -> ColumnElement[bool]:
+    """番号相等判定, 大小写不敏感.
+
+    大小写不敏感的番号查找使用 ``ix_metadata_number_lookup``; 非 WESTERN 的唯一性由部分唯一索引
+    ``ix_metadata_number_non_western`` 另行保证. WESTERN 同番号允许多条, 调用方不得仅凭此谓词确定作品身份.
+    """
+    return col(Metadata.number).collate("NOCASE") == number
+
+
+class Task(SQLModel, table=True):
+    __tablename__ = "tasks"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    type: TaskType = Field(index=True)
+    status: TaskStatus = Field(default=TaskStatus.QUEUED, index=True)
+    payload: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    result: dict | None = Field(default=None, sa_column=Column(JSON))
+    error: str | None = None
+    retries: int = Field(default=0)
+    priority: int = Field(default=0)
+    # 链根 id: 根任务指向自己, 裸任务为 None. 按此列一次取出整链.
+    root_task_id: int | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
+class TaskLink(SQLModel, table=True):
+    """后继边的 key 与去重以本表为准. 删除父任务只清理出边, 不删除子任务节点."""
+
+    __tablename__ = "task_links"  # type: ignore[assignment]
+    __table_args__ = (UniqueConstraint("parent_task_id", "key", name="uq_task_links_parent_key"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    parent_task_id: int = Field(foreign_key="tasks.id", index=True)
+    child_task_id: int = Field(foreign_key="tasks.id", index=True)
+    key: str = Field(nullable=False)
+    """父内后继语义键; UNIQUE(parent, key) 保证同父同名一条边."""
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class MetadataLibrary(SQLModel, table=True):
+    """Metadata 的唯一当前媒体库归属; MediaFile 索引清理不影响此关系."""
+
+    __tablename__ = "metadata_library"  # type: ignore[assignment]
+    __table_args__ = (UniqueConstraint("metadata_id", name="uq_metadata_library_metadata"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    metadata_id: int = Field(foreign_key="metadata.id", nullable=False, index=True)
+    library_id: int = Field(foreign_key="libraries.id", nullable=False, index=True)
+    updated_at: datetime = Field(default_factory=_utcnow, nullable=False)
+
+
+class Library(SQLModel, table=True):
+    """每个 MediaFile 必须持久关联到唯一 Library (library_id 非空 FK)."""
+
+    __tablename__ = "libraries"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(nullable=False)
+    path: str = Field(nullable=False)
+    """兼容单根目录调用的首个扫描路径; 新逻辑以 scan_paths 为准."""
+    scan_paths: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    """媒体库扫描根目录列表; Watcher 仅监听这些路径."""
+    organize_path: str | None = Field(default=None)
+    """兼容单整理根目录调用; 新逻辑以 organize_paths 为准."""
+    organize_paths: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    """整理根目录列表; 仅恰好一条时允许整理落盘."""
+    automation: LibraryAutomation = Field(default=LibraryAutomation.SCRAPE)
+    """自动化级别: none 关闭 / watch 仅监控 / refresh 监控并内部刷新关联 / scrape 监控并刮削."""
+    auto_organize: bool = Field(default=False)
+    """刮削成功后为该文件自动入队 ORGANIZE (单文件范围, 随刮削任务成链).
+
+    与 `automation` 正交: none / watch 下手动刮削同样触发. 只影响新后继, 不撤销已入队的整理.
+    """
+    ingest: LibraryIngest = Field(default=LibraryIngest.NATIVE)
+    """文件发现通道. clouddrive 不 schedule Observer, 由 webhook 按 cloud_path 分流."""
+    cloud_path: str | None = None
+    """CloudDrive 虚拟路径 (POSIX, 如 /115open/云下载). ingest=clouddrive 时必填."""
+    recursive: bool = Field(default=True)
+    patterns: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    move_mode: MoveMode = Field(default=MoveMode.MOVE)
+    video_template: PathTemplate = Field(default=VIDEO_TEMPLATE_DEFAULT)
+    link_template: PathTemplate | None = None
+    """空则不创建链接. 非空时 ORGANIZE 在视频就位后按此模板写 strm 或符号链接, 必须在库外."""
+    link_mode: LinkMode = Field(default=LinkMode.STRM)
+    """link_template 非空时: strm 写 .strm 文本; symlink 做文件系统符号链接."""
+    strm_content_template: StrmContentTemplate | None = None
+    """仅 link_mode=strm: .strm 正文模板. 空则写视频绝对路径. 占位符与路径模板相同."""
+    thumb_template: PathTemplate | None = None
+    poster_template: PathTemplate | None = None
+    fanart_template: PathTemplate | None = None
+    extrafanart_template: PathTemplate | None = None
+    nfo_template: PathTemplate | None = None
+    trailer_template: PathTemplate | None = None
+    subtitle_template: PathTemplate | None = None
+    subtitle_extensions: SubtitleExtensions = Field(
+        default_factory=lambda: list(DEFAULT_SUBTITLE_EXTENSIONS), sa_column=Column(JSON, nullable=False)
+    )
+    """ORGANIZE 时在视频同目录发现字幕的扩展名列表; 空列表关闭."""
+    write_nfo: bool = Field(default=True)
+    copy_resources: list[DownloadableResource] = Field(
+        default_factory=lambda: [r for r in DownloadableResource if r != DownloadableResource.trailer],
+        sa_column=Column(JSON, nullable=False),
+    )
+    trailer_pattern: TrailerPattern = Field(default=DEFAULT_TRAILER_PATTERN, sa_column=Column(String, nullable=False))
+    """匹配文件名 (含扩展名) 的正则; 命中则扫描/监控跳过. 空串关闭."""
+    blacklist_patterns: list[BlacklistPattern] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    """文件名正则列表, 命中任一则扫描/监控跳过, 并作为无效文件进入清理清单. 空列表关闭."""
+    min_file_size: MinFileSize = Field(default=0)
+    """最小视频大小 (字节). 小于此值的扫描视频在 REFRESH/监控跳过, 并作为无效文件进入清理清单. 0 关闭.
+
+    只对扫描视频扩展名生效 (与 watcher.media_extensions / MEDIA_EXTENSIONS 同一套);
+    图片、NFO、字幕、`.strm` 指针都不参与.
+    """
+
+
+class Schedule(SQLModel, table=True):
+    __tablename__ = "schedules"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str | None = None
+    cron: str = Field(nullable=False)
+    task_type: RoutineType = Field()
+    payload: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    enabled: bool = Field(default=True)
+    last_run: datetime | None = None
+    next_run: datetime | None = None
+
+
+class Feed(SQLModel, table=True):
+    """远程发现源. 间隔与刮削属性按源绑定, 不写入 HotSettings."""
+
+    __tablename__ = "feeds"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(nullable=False)
+    url: str = Field(unique=True, nullable=False, index=True)
+    group: str = Field(default="", nullable=False)
+    """斜杠伪路径 (如 jav/rsshub). 空串为未分组; 前端据此建树, 库内不存目录实体."""
+    enabled: bool = Field(default=True)
+    """是否纳入定期拉取. 关闭后仍可立即拉取."""
+    auto_enqueue: bool = Field(default=True)
+    """发现新番号时是否入队 SCRAPE. 关闭后仍写 FeedItem, 刮削改由历史表手动选."""
+    interval_seconds: int = Field(default=3600)
+    """拉取间隔 (秒). 范围由 API 校验 60–86400; 表单默认按小时."""
+    number_pattern: str | None = None
+    """可选正则; 设置后只使用该正则, 不回退 extract_number."""
+    content_type: ContentType | None = None
+    """显式内容类型; None 则 infer_content_type."""
+    use_cache: list[str] = Field(default_factory=lambda: ["metadata", "trans"], sa_column=Column(JSON, nullable=False))
+    ignore_keywords: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    """字面量关键词; 标题或番号命中则写入 ignored_at, 不入队 SCRAPE."""
+    etag: str | None = None
+    last_modified: str | None = None
+    next_fetch_at: datetime | None = None
+    last_fetched_at: datetime | None = None
+    last_error: str | None = None
+    last_enqueued: int = Field(default=0)
+
+
+class FeedItem(SQLModel, table=True):
+    """某源曾见过的 RSS/Atom 条目. (feed_id, item_key) 是去重真值."""
+
+    __tablename__ = "feed_items"  # type: ignore[assignment]
+    # 列表 ORDER BY coalesce(published_at, created_at), id; 表达式必须与查询一致才能命中该索引.
+    __table_args__ = (
+        UniqueConstraint("feed_id", "item_key", name="uq_feed_items_feed_id_item_key"),
+        Index("ix_feed_items_list_order", text("coalesce(published_at, created_at)"), "id"),
+        # 默认列表同时过滤 ignored_at IS NULL; 把过滤列放索引前缀可同时满足筛选与排序.
+        Index("ix_feed_items_state_list_order", "ignored_at", text("coalesce(published_at, created_at)"), "id"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    feed_id: int = Field(foreign_key="feeds.id", index=True)
+    item_key: str = Field(nullable=False)
+    title: str | None = None
+    link: str | None = None
+    description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    """条目正文 (RSS description / Atom content), 供阅读器渲染. 首次写入后不随源更新."""
+    number: str | None = None
+    ignored_at: datetime | None = Field(default=None, index=True)
+    read_at: datetime | None = Field(default=None, index=True)
+    """用户已读时间. 与 ignored_at 正交, 不改变去重, 不随源更新."""
+    published_at: datetime | None = None
+    """源给出的发布时间 (RSS pubDate / Atom published, 否则 updated). 列表按此新→旧; 空则回退 created_at."""
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class Resource(SQLModel, table=True):
+    """一等存储 (非 LRU). url 为 locator: 外部图用真实 URL; 裁剪派生用
+    ``derived:{sha256(src_url)}:crop:{args}`` (args 为右侧比或 ``box:L,T,R,B``).
+    """
+
+    __tablename__ = "resources"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    url: str = Field(unique=True, nullable=False, index=True)
+    file_path: str = Field(nullable=False, index=True)
+    """相对 resources 目录的两级散列路径; 按 hash 前缀定位时依赖其索引."""
+    content_hash: str | None = None
+    """文件 SHA-256; 就地超分后必须更新."""
+    size: int | None = None
+    mime_type: str | None = None
+    meta: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    """派生/处理追溯. 裁剪: {'op':'crop','src':源url,'args':str};
+    任意资源被超分后追加 {'sr': {tool,model,scale}}. 原始未处理图为 {}."""
+    downloaded_at: datetime = Field(default_factory=_utcnow)
+
+
+# --- 分类索引 (爬取侧投影) ---
+#
+# Metadata 上 JSON/标量列仍是刮削与 NFO 真值; 下列实体 + 关联表是查询投影.
+# Actor 为一等人物实体 (孤儿保留): name 为展示名, 别名行在 ActorAlias; 跨名屏蔽见 FacetRule(block).
+
+
+class Actor(SQLModel, table=True):
+    """人物元数据宿主; 无影片关联时保留. name 为展示名 (全局唯一); 别名见 ActorAlias."""
+
+    __tablename__ = "actors"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, nullable=False, index=True)
+
+    gender: ActorGender = Field(default=ActorGender.UNKNOWN, index=True)
+    birthday: str | None = None
+    birthplace: str | None = None
+    height: int | None = None
+    bust: int | None = None
+    waist: int | None = None
+    hip: int | None = None
+    cup: str | None = None
+    overview: str | None = None
+    tagline: str | None = None
+    image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    provider_ids: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    source_urls: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    field_sources: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
+    raw: dict[str, dict[str, Any]] = Field(default_factory=dict, sa_column=Column(JSON))
+    # 人物字段级锁定; 契约见 docs/dev/data-model.md.
+    locked_fields: list[str] = Field(
+        default_factory=list, sa_column=Column(JSON, nullable=False, server_default=text("'[]'"))
+    )
+
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class ActorAlias(SQLModel, table=True):
+    """ID→名称一对多. ``(actor_id, name)`` 唯一; ``name`` 列不设全局唯一.
+    不存展示名; 切换展示名须同时交换行 (旧展示名入表, 新展示名出表).
+    """
+
+    __tablename__ = "actor_aliases"  # type: ignore[assignment]
+    __table_args__ = (UniqueConstraint("actor_id", "name", name="uq_actor_aliases_actor_name"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    actor_id: int = Field(foreign_key="actors.id", ondelete="CASCADE", nullable=False, index=True)
+    name: str = Field(nullable=False, index=True)
+    position: int = Field(default=0)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class Director(SQLModel, table=True):
+    """无影片关联时不自动删除."""
+
+    __tablename__ = "directors"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, nullable=False, index=True)
+    is_favorite: bool = Field(default=False, nullable=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class Tag(SQLModel, table=True):
+    """爬取侧标签; 与 UserTag 隔离."""
+
+    __tablename__ = "tags"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, nullable=False, index=True)
+    # 用户手工状态, 与刮削投影正交: 投影重建只按 name get-or-create.
+    is_favorite: bool = Field(default=False, nullable=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class Studio(SQLModel, table=True):
+    __tablename__ = "studios"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, nullable=False, index=True)
+    is_favorite: bool = Field(default=False, nullable=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class Publisher(SQLModel, table=True):
+    __tablename__ = "publishers"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, nullable=False, index=True)
+    is_favorite: bool = Field(default=False, nullable=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class Series(SQLModel, table=True):
+    __tablename__ = "series"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, nullable=False, index=True)
+    is_favorite: bool = Field(default=False, nullable=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+#: 可收藏的分类种类 → 实体模型. 新增可收藏的分类时在此登记, 并在该实体表加 ``is_favorite`` 列;
+#: 路由的 400 判定与 repo 的列表达式一律从这里派生, 不另写 kind 名单.
+FAVORITE_FACET_ENTITIES: dict[FacetKind, type[Director] | type[Tag] | type[Studio] | type[Publisher] | type[Series]] = {
+    FacetKind.DIRECTOR: Director,
+    FacetKind.TAG: Tag,
+    FacetKind.STUDIO: Studio,
+    FacetKind.PUBLISHER: Publisher,
+    FacetKind.SERIES: Series,
+}
+
+FAVORITE_FACET_KINDS: frozenset[FacetKind] = frozenset(FAVORITE_FACET_ENTITIES)
+
+
+class FacetRule(SQLModel, table=True):
+    """爬取侧分类规则: 单跳 alias 或 block; 按 (kind, source_name) 唯一."""
+
+    __tablename__ = "facet_rules"  # type: ignore[assignment]
+    __table_args__ = (UniqueConstraint("kind", "source_name", name="uq_facet_rules_kind_source"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    kind: FacetKind = Field(index=True)
+    source_name: str = Field(nullable=False, index=True)
+    action: FacetRuleAction = Field()
+    target_name: str | None = Field(default=None)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class MetadataActor(SQLModel, table=True):
+    __tablename__ = "metadata_actors"  # type: ignore[assignment]
+    __table_args__ = (Index("ix_metadata_actors_actor_id", "actor_id", "metadata_id"),)
+
+    metadata_id: int = Field(foreign_key="metadata.id", primary_key=True, ondelete="CASCADE")
+    actor_id: int = Field(foreign_key="actors.id", primary_key=True)
+    position: int = Field(default=0)
+
+
+class MetadataDirector(SQLModel, table=True):
+    __tablename__ = "metadata_directors"  # type: ignore[assignment]
+    __table_args__ = (Index("ix_metadata_directors_director_id", "director_id", "metadata_id"),)
+
+    metadata_id: int = Field(foreign_key="metadata.id", primary_key=True, ondelete="CASCADE")
+    director_id: int = Field(foreign_key="directors.id", primary_key=True)
+    position: int = Field(default=0)
+
+
+class MetadataTag(SQLModel, table=True):
+    __tablename__ = "metadata_tags"  # type: ignore[assignment]
+    __table_args__ = (Index("ix_metadata_tags_tag_id", "tag_id", "metadata_id"),)
+
+    metadata_id: int = Field(foreign_key="metadata.id", primary_key=True, ondelete="CASCADE")
+    tag_id: int = Field(foreign_key="tags.id", primary_key=True)
+    position: int = Field(default=0)
+
+
+class MetadataSeries(SQLModel, table=True):
+    """影片与系列的多对多关系；position 保留来源给出的顺序。"""
+
+    __tablename__ = "metadata_series"  # type: ignore[assignment]
+
+    metadata_id: int = Field(foreign_key="metadata.id", primary_key=True, ondelete="CASCADE")
+    series_id: int = Field(foreign_key="series.id", primary_key=True, index=True)
+    position: int = Field(default=0)
+
+
+# --- 用户注解 (与爬取数据隔离) ---
+
+
+class UserTag(SQLModel, table=True):
+    """用户标签; 刮削路径永不触碰."""
+
+    __tablename__ = "user_tags"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, nullable=False, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class MetadataUserTag(SQLModel, table=True):
+    __tablename__ = "metadata_user_tags"  # type: ignore[assignment]
+    __table_args__ = (Index("ix_metadata_user_tags_user_tag_id", "user_tag_id", "metadata_id"),)
+
+    metadata_id: int = Field(foreign_key="metadata.id", primary_key=True, ondelete="CASCADE")
+    user_tag_id: int = Field(foreign_key="user_tags.id", primary_key=True, ondelete="CASCADE")
+
+
+class ActorUserTag(SQLModel, table=True):
+    """演员与用户标签的挂载关系; 与 ``MetadataUserTag`` 同形, 不保序."""
+
+    __tablename__ = "actor_user_tags"  # type: ignore[assignment]
+    __table_args__ = (Index("ix_actor_user_tags_user_tag_id", "user_tag_id", "actor_id"),)
+
+    actor_id: int = Field(foreign_key="actors.id", primary_key=True, ondelete="CASCADE")
+    user_tag_id: int = Field(foreign_key="user_tags.id", primary_key=True, ondelete="CASCADE")
+
+
+class Comment(SQLModel, table=True):
+    """``updated_at`` 晚于 ``created_at`` 表示正文被编辑过; 未编辑时两列相等."""
+
+    __tablename__ = "comments"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    metadata_id: int = Field(foreign_key="metadata.id", index=True, ondelete="CASCADE")
+    body: str = Field(nullable=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class AgentSessionStatus(StrEnum):
+    ACTIVE = "active"
+    AWAITING_APPROVAL = "awaiting_approval"
+    CLOSED = "closed"
+
+
+class SavedQueryEntity(StrEnum):
+    """交付目标, 决定 Browse 深链与主键语义."""
+
+    METADATA = "metadata"
+    ACTOR = "actor"
+    DATA = "data"
+
+
+DEFAULT_SESSION_TITLE = "新会话"
+"""会话标题默认值; 建表、创建请求与标题生成失败的回退共用."""
+
+
+class AgentSession(SQLModel, table=True):
+    """会话索引; 完整 trace 落盘, 不在本表."""
+
+    __tablename__ = "agent_sessions"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str = Field(default=DEFAULT_SESSION_TITLE, nullable=False)
+    status: AgentSessionStatus = Field(default=AgentSessionStatus.ACTIVE, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class SavedQuery(SQLModel, table=True):
+    """查询预设; 权威为 SQL, 结果仅内存缓存."""
+
+    __tablename__ = "saved_queries"  # type: ignore[assignment]
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(nullable=False)
+    description: str = Field(default="", nullable=False)
+    sql: str = Field(nullable=False)
+    entity: SavedQueryEntity = Field(index=True)
+    session_id: int | None = Field(default=None, foreign_key="agent_sessions.id", index=True)
+    persisted: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)

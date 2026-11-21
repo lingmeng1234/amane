@@ -1,0 +1,2005 @@
+"""测试 amane.pipeline - ScrapeHandler 和 RefreshHandler"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
+
+import pytest
+from pydantic import ValidationError
+
+from amane.aggregate import AggregatedMetadata
+from amane.config import HotSettings, ScrapingConfig
+from amane.config.manager import TranslationField
+from amane.crawlers.models import MediaMetadata
+from amane.db.models import MediaFileStatus, Task, TaskStatus, TaskType
+from amane.enums import MetadataField, SiteName
+from amane.handlers import RefreshHandler, RefreshPayload, ScanMode, ScrapeHandler, ScrapePayload
+from amane.handlers.scrape import _release_from_local_number, _scrape_route_key
+from amane.library import CleanupInventory, InventorySource, InventoryStore, LibraryFileKind, LibraryHit, scan_inventory
+from amane.observability import Recorder
+from amane.parsing import ContentType
+from amane.plugins.models import SourceDescriptor
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
+
+    from amane.db.repository import Repository
+
+
+@pytest.mark.parametrize(
+    "number",
+    ["102910_01", "051014_807", "103126-001", "101726_100", "N0001", "HEYZO-1234", "heyzo-1234"],
+)
+def test_uncensored_route_uses_full_number_rules(number: str) -> None:
+    rules = ScrapingConfig().uncensored_streaming_number_rules
+    assert _scrape_route_key(ContentType.UNCENSORED, number, rules) == "uncensored_streaming"
+
+
+@pytest.mark.parametrize("number", ["XHEYZO-1234", "HEYZO-12345", "RED-163", "102910_0123"])
+def test_uncensored_route_defaults_to_dvd_when_full_number_does_not_match(number: str) -> None:
+    rules = ScrapingConfig().uncensored_streaming_number_rules
+    assert _scrape_route_key(ContentType.UNCENSORED, number, rules) == "uncensored_dvd"
+
+
+def test_non_uncensored_route_keeps_content_type_key() -> None:
+    assert _scrape_route_key(ContentType.CENSORED, "MIDV-123", []) == ContentType.CENSORED.value
+
+
+def test_release_date_can_be_recovered_from_local_caribbean_number() -> None:
+    assert _release_from_local_number("103126-001", None) == "2026-10-31"
+    assert _release_from_local_number("HEYZO-1234", "/media/103126-001.mp4") == "2026-10-31"
+    assert _release_from_local_number("HEYZO-1234", None) is None
+
+
+# --- 辅助类 ---
+
+
+class MockCrawler:
+    name = SiteName.JAVDB
+
+    def __init__(self, client=None):
+        self.client = client
+
+    async def fetch(self, query, options=None) -> MediaMetadata | None:
+        return MediaMetadata.model_validate(
+            {
+                "number": "MIDV-123",
+                "title": "Mock Title",
+                "actors": ["Actor A"],
+                "tags": ["Drama"],
+                "studio": "MockStudio",
+            }
+        )
+
+
+class WesternMockCrawler(MockCrawler):
+    name = SiteName.THEPORNDB
+
+    async def fetch(self, query, options=None) -> MediaMetadata | None:
+        return MediaMetadata.model_validate(
+            {
+                "number": query.number,
+                "title": "Mock Western Title",
+                "plot": "Mock Western Plot",
+                "actors": ["Actor A"],
+                "tags": ["Drama"],
+                "studio": "MockStudio",
+                "external_id": "scene-test-1",
+            }
+        )
+
+
+class EmptySearchCrawler:
+    """返回空搜索结果的爬虫"""
+
+    name = SiteName.FC2
+
+    def __init__(self, client=None):
+        self.client = client
+
+    async def fetch(self, query, options=None) -> MediaMetadata | None:
+        return None
+
+
+class FakeFactory:
+    """伪造的 CrawlerFactory, 返回预配置的爬虫实例"""
+
+    def __init__(self, crawlers: dict):
+        self._crawlers = crawlers
+
+    async def get(self, name: str):
+        return self._crawlers.get(name)
+
+    async def get_crawlers(self, names: Iterable[str]) -> dict:
+        result = {}
+        for name in names:
+            crawler = await self.get(name)
+            if crawler is not None:
+                result[name] = crawler
+        return result
+
+
+@pytest.fixture
+def factory():
+    return FakeFactory({"javdb": MockCrawler()})
+
+
+@pytest.fixture
+def handler(repo, factory, resource_store):
+    return ScrapeHandler(
+        repo=repo,
+        factory=factory,
+        resource_store=resource_store,
+        pipeline_config=_config_with({ContentType.CENSORED: [SiteName.JAVDB]}),
+    )
+
+
+# --- ScrapeHandler 测试 ---
+
+
+class TestScrapeHandler:
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_successful_scrape(self, repo: Repository, handler):
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        result = await handler.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+        assert result.success is True
+        # 验证元数据已存储
+        metadata = await repo.get_metadata_by_number("MIDV-123")
+        assert metadata is not None
+        assert metadata.title == "Mock Title"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_hanime1_receives_existing_local_file_path_on_first_scrape(
+        self, repo: Repository, resource_store, tmp_path: Path
+    ):
+        """首次刮削：Hanime1 收到实际存在的本地文件路径，普通 file_path 保持原值。"""
+
+        class RecordingHanime1Crawler:
+            name = SiteName.HANIME1
+
+            def __init__(self):
+                self.queries = []
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                self.queries.append(query)
+                return MediaMetadata(number=query.number, tags=["Hanime1 Tag"])
+
+        video = tmp_path / "MIDV-123.mp4"
+        video.write_bytes(b"\x00" * 100)
+
+        crawler = RecordingHanime1Crawler()
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({str(SiteName.HANIME1): crawler}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.HANIME1]}),
+        )
+
+        media = await repo.create_media_file(library_id=1, path=str(video))
+
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MIDV-123",
+                content_type=ContentType.CENSORED,
+            )
+        )
+
+        assert result.success is True
+        assert len(crawler.queries) == 1
+
+        query = crawler.queries[0]
+        assert query.hanime1_file_path == str(video)
+        assert query.file_path == str(video)
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_hanime1_receives_linked_file_path_on_rescrape(
+        self, repo: Repository, resource_store, tmp_path: Path
+    ):
+        """重新刮削：通过 metadata_id 找到关联文件，并传递 Hanime1 专用路径。"""
+
+        class RecordingHanime1Crawler:
+            name = SiteName.HANIME1
+
+            def __init__(self):
+                self.queries = []
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                self.queries.append(query)
+                return MediaMetadata(number=query.number, tags=["Hanime1 Tag"])
+
+        video = tmp_path / "MIDV-456.mp4"
+        video.write_bytes(b"\x00" * 100)
+
+        metadata = await repo.upsert_metadata(number="MIDV-456")
+        assert metadata.id is not None
+
+        await repo.create_media_file(
+            library_id=1,
+            path=str(video),
+            metadata_id=metadata.id,
+        )
+
+        crawler = RecordingHanime1Crawler()
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({str(SiteName.HANIME1): crawler}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.HANIME1]}),
+        )
+
+        result = await h.handle(
+            ScrapePayload(
+                number="MIDV-456",
+                content_type=ContentType.CENSORED,
+                metadata_id=metadata.id,
+            )
+        )
+
+        assert result.success is True
+        assert len(crawler.queries) == 1
+
+        query = crawler.queries[0]
+        assert query.hanime1_file_path == str(video)
+
+        # 重新刮削没有通过 media_file_id 指定当前文件，
+        # 不应把关联文件路径错误地写入普通 file_path。
+        assert query.file_path is None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_hanime1_file_path_is_none_when_local_file_does_not_exist(
+        self, repo: Repository, resource_store, tmp_path: Path
+    ):
+        """本地文件不存在时，不向 Hanime1 传递无效的专用路径。"""
+
+        class RecordingHanime1Crawler:
+            name = SiteName.HANIME1
+
+            def __init__(self):
+                self.queries = []
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                self.queries.append(query)
+                return MediaMetadata(number=query.number, tags=["Hanime1 Tag"])
+
+        missing_video = tmp_path / "MISSING-001.mp4"
+
+        crawler = RecordingHanime1Crawler()
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({str(SiteName.HANIME1): crawler}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.HANIME1]}),
+        )
+
+        media = await repo.create_media_file(
+            library_id=1,
+            path=str(missing_video),
+        )
+
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MISSING-001",
+                content_type=ContentType.CENSORED,
+            )
+        )
+
+        assert result.success is True
+        assert len(crawler.queries) == 1
+
+        query = crawler.queries[0]
+        assert query.hanime1_file_path is None
+        assert query.file_path == str(missing_video)
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_hanime1_tags_are_persisted_to_metadata(self, repo: Repository, resource_store):
+        """Hanime1 返回的 TAG 经 ScrapeHandler 聚合后，最终写入作品元数据。"""
+
+        class Hanime1TagCrawler:
+            name = SiteName.HANIME1
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata(
+                    number=query.number,
+                    tags=["Hanime1 Tag A", "Hanime1 Tag B"],
+                )
+
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({str(SiteName.HANIME1): Hanime1TagCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.HANIME1]}),
+        )
+
+        media = await repo.create_media_file(
+            library_id=1,
+            path="/media/HANIME1-TAG-001.mp4",
+        )
+
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="HANIME1-TAG-001",
+                content_type=ContentType.CENSORED,
+            )
+        )
+
+        assert result.success is True
+
+        metadata = await repo.get_metadata_by_number("HANIME1-TAG-001")
+        assert metadata is not None
+        assert metadata.tags == ["Hanime1 Tag A", "Hanime1 Tag B"]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_non_tokyo_hot_streaming_uses_western_image_flow(self, repo: Repository, resource_store, monkeypatch):
+        """非 Tokyo-Hot 无码流媒体使用欧美图片流程。"""
+        from types import SimpleNamespace
+
+        from amane.handlers import scrape as scrape_module
+
+        captured = {}
+
+        async def fake_materialize_images(*args, **kwargs):
+            captured["content_type"] = kwargs["content_type"]
+            return SimpleNamespace(
+                poster_urls=[],
+                cover_urls=[],
+                trailer_urls=[],
+            )
+
+        monkeypatch.setattr(scrape_module, "materialize_images", fake_materialize_images)
+
+        class StreamingCrawler:
+            async def fetch(self, query, options=None) -> MediaMetadata:
+                return MediaMetadata(
+                    number=query.number,
+                    title="Streaming Title",
+                    cover_urls=["https://example.com/streaming-cover.jpg"],
+                )
+
+        config = _config_with({"uncensored_streaming": [SiteName.PONDO]})
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({str(SiteName.PONDO): StreamingCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+            web_client=cast(Any, object()),
+        )
+
+        media = await repo.create_media_file(
+            library_id=1,
+            path="/media/HEYZO-1234.mp4",
+        )
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="HEYZO-1234",
+                content_type=ContentType.UNCENSORED,
+            )
+        )
+
+        assert result.success is True
+        assert captured["content_type"] is ContentType.WESTERN
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_tokyo_hot_streaming_keeps_uncensored_image_flow(self, repo: Repository, resource_store, monkeypatch):
+        """Tokyo-Hot streaming 固定使用无码裁剪模式, 不根据 double_page_* 判断。"""
+        from types import SimpleNamespace
+
+        from amane.handlers import scrape as scrape_module
+
+        captured = {}
+
+        async def fake_materialize_images(*args, **kwargs):
+            captured["content_type"] = kwargs["content_type"]
+            return SimpleNamespace(
+                poster_urls=[],
+                cover_urls=[],
+                trailer_urls=[],
+            )
+
+        monkeypatch.setattr(scrape_module, "materialize_images", fake_materialize_images)
+
+        class TokyoHotCrawler:
+            async def fetch(self, query, options=None) -> MediaMetadata:
+                poster = "https://example.com/tokyo-poster.jpg"
+                cover = "https://example.com/tokyo-cover.jpg"
+                return MediaMetadata(
+                    number=query.number,
+                    title="Tokyo Hot Title",
+                    poster_urls=[poster],
+                    original_poster_urls=[poster],
+                    cover_urls=[cover],
+                    double_page_poster_urls=[poster],
+                    double_page_original_poster_urls=[poster],
+                    double_page_cover_urls=[cover],
+                )
+
+        config = _config_with({"uncensored_streaming": [SiteName.TOKYO_HOT]})
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"tokyo_hot": TokyoHotCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+            web_client=cast(Any, object()),
+        )
+
+        media = await repo.create_media_file(
+            library_id=1,
+            path="/media/HEYZO-1234.mp4",
+        )
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="HEYZO-1234",
+                content_type=ContentType.UNCENSORED,
+            )
+        )
+
+        assert result.success is True
+        assert captured["content_type"] is ContentType.UNCENSORED
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_missing_poster_does_not_fall_back_to_thumb_for_japanese_content(
+        self, repo: Repository, resource_store
+    ):
+        class ThumbOnlyCrawler(MockCrawler):
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata.model_validate(
+                    {
+                        "number": "MIDV-123",
+                        "title": "Mock Title",
+                        "cover_urls": ["https://example.com/thumb.jpg"],
+                    }
+                )
+
+        config = _config_with({ContentType.CENSORED: [SiteName.JAVDB]})
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"javdb": ThumbOnlyCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+        assert result.success is True
+        metadata = await repo.get_metadata_by_number("MIDV-123")
+        assert metadata is not None
+        assert metadata.poster_urls == []
+        assert metadata.original_poster_urls == []
+        assert metadata.cover_urls == ["https://example.com/thumb.jpg"]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_payload_content_type_lands_on_new_entry(self, repo: Repository, resource_store):
+        """payload 的条目类型写进新建条目, 不按番号重新推断."""
+        factory = FakeFactory({"theporndb": WesternMockCrawler()})
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        h = ScrapeHandler(repo=repo, factory=factory, resource_store=resource_store, pipeline_config=config)
+
+        media = await repo.create_media_file(library_id=1, path="/media/MD-0123.mp4")
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MD-0123",
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-test-1",
+            )
+        )
+
+        assert result.success is True
+        metadata = await repo.get_metadata_by_theporndb_uuid("scene-test-1")
+        assert metadata is not None
+        assert metadata.content_type is ContentType.WESTERN
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_keeps_original_urls_separate_from_derived_poster(self, repo: Repository, resource_store):
+        class WesternCoverCrawler(WesternMockCrawler):
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata.model_validate(
+                    {
+                        "number": query.number,
+                        "title": "Western Cover",
+                        "external_id": "scene-cover-test",
+                        "theporndb_uuid": "scene-cover-test",
+                        "cover_urls": ["https://example.com/western-cover.jpg"],
+                        "poster_urls": ["https://example.com/old-poster.jpg"],
+                        "original_poster_urls": ["https://example.com/old-original.jpg"],
+                    }
+                )
+
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": WesternCoverCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MD-COVER.mp4")
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MD-COVER",
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-cover-test",
+            )
+        )
+        assert result.success is True
+        metadata = await repo.get_metadata_by_theporndb_uuid("scene-cover-test")
+        assert metadata is not None
+        cover = ["https://example.com/western-cover.jpg"]
+        assert metadata.cover_urls == cover
+        assert metadata.original_cover_urls == cover
+        assert metadata.poster_urls == cover
+        assert metadata.original_poster_urls == cover
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_scrape_updates_all_image_urls_on_rescrape(self, repo: Repository, resource_store):
+        class ChangingWesternCrawler(WesternMockCrawler):
+            cover_url = "https://example.com/first-cover.jpg"
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata.model_validate(
+                    {
+                        "number": query.number,
+                        "title": "Western Rescrape",
+                        "external_id": "scene-rescrape-test",
+                        "theporndb_uuid": "scene-rescrape-test",
+                        "cover_urls": [self.cover_url],
+                    }
+                )
+
+        crawler = ChangingWesternCrawler()
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        handler = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": crawler}),
+            resource_store=resource_store,
+            pipeline_config=config,
+        )
+
+        media = await repo.create_media_file(
+            library_id=1,
+            path="/media/MD-RESCRAPE.mp4",
+        )
+
+        first_result = await handler.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MD-RESCRAPE",
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-rescrape-test",
+            )
+        )
+        assert first_result.success is True
+
+        first_urls = ["https://example.com/first-cover.jpg"]
+        metadata = await repo.get_metadata_by_theporndb_uuid("scene-rescrape-test")
+        assert metadata is not None
+        assert metadata.cover_urls == first_urls
+        assert metadata.original_cover_urls == first_urls
+        assert metadata.poster_urls == first_urls
+        assert metadata.original_poster_urls == first_urls
+
+        # 模拟来源封面 URL 发生变化，再次刮削.
+        crawler.cover_url = "https://example.com/second-cover.jpg"
+
+        second_result = await handler.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MD-RESCRAPE",
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-rescrape-test",
+            )
+        )
+        assert second_result.success is True
+
+        second_urls = ["https://example.com/second-cover.jpg"]
+        metadata = await repo.get_metadata_by_theporndb_uuid("scene-rescrape-test")
+        assert metadata is not None
+        assert metadata.cover_urls == second_urls
+        assert metadata.original_cover_urls == second_urls
+        assert metadata.poster_urls == second_urls
+        assert metadata.original_poster_urls == second_urls
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_multiple_encodings_share_scene_metadata(self, repo: Repository, resource_store):
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        handler = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": WesternMockCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+        )
+        first = await repo.create_media_file(
+            library_id=1, path="/media/Lancelotstylesevolution.26.10.16-1.mp4", oshash="hash-4k"
+        )
+        second = await repo.create_media_file(
+            library_id=1, path="/media/Lancelotstylesevolution.26.10.16-2.mp4", oshash="hash-1080p"
+        )
+
+        assert first.id is not None
+        assert second.id is not None
+
+        first_result = await handler.handle(
+            ScrapePayload(
+                media_file_id=first.id,
+                number="Lancelotstylesevolution.26.10.16",
+                content_type=ContentType.WESTERN,
+            )
+        )
+        second_result = await handler.handle(
+            ScrapePayload(
+                media_file_id=second.id,
+                number="Lancelotstylesevolution.26.10.16",
+                content_type=ContentType.WESTERN,
+            )
+        )
+
+        assert first_result.success is True and second_result.success is True
+        first_saved = await repo.get_media_file(first.id)
+        second_saved = await repo.get_media_file(second.id)
+        assert first_saved is not None and second_saved is not None
+        assert first_saved.metadata_id == second_saved.metadata_id
+        assert await repo.get_metadata_by_theporndb_uuid("scene-test-1") is not None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_oshash_cannot_be_manually_rebound_to_another_scene(self, repo: Repository, resource_store):
+        number = "Lancelotstylesevolution.26.10.16"
+        metadata = await repo.upsert_western_metadata("scene-original", number)
+        media = await repo.create_media_file(
+            library_id=1, path=f"/media/{number}-1.mp4", oshash="hash-bound", metadata_id=metadata.id
+        )
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        handler = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": WesternMockCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+        )
+
+        result = await handler.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number=number,
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-other",
+            )
+        )
+
+        assert result.success is False
+        assert "另一条 WESTERN 作品" in (result.error or "")
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_rescrape_backfills_theporndb_uuid_on_original_metadata(
+        self, repo: Repository, resource_store
+    ):
+        number = "Lancelotstylesevolution.26.10.16"
+        legacy = await repo.upsert_metadata(number=number)
+        media = await repo.create_media_file(
+            library_id=1,
+            path=f"/media/{number}-1.mp4",
+            oshash="hash-legacy",
+            metadata_id=legacy.id,
+        )
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        handler = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": WesternMockCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+        )
+
+        result = await handler.handle(
+            ScrapePayload(number=number, content_type=ContentType.WESTERN, metadata_id=legacy.id)
+        )
+
+        assert result.success is True
+        updated = await repo.get_metadata_by_theporndb_uuid("scene-test-1")
+        assert updated is not None
+        assert updated.id == legacy.id
+        assert updated.number == number
+        assert media.metadata_id == legacy.id
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_skips_locked_fields_end_to_end(self, repo: Repository, handler):
+        """自动刮削跳过锁定字段, 未锁定字段正常更新, 锁定字段的来源标注保留."""
+        seeded = await repo.upsert_metadata(
+            number="MIDV-123", title="Manual", tags=["keep"], field_sources={"title": "manual-src"}
+        )
+        assert seeded.id is not None
+        await repo.set_metadata_locks(seeded.id, [MetadataField.TITLE])
+
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        result = await handler.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+
+        assert result.success is True
+        updated = await repo.get_metadata_by_number("MIDV-123")
+        assert updated is not None
+        assert updated.title == "Manual"
+        assert updated.tags == ["Drama"]
+        assert updated.field_sources["title"] == "manual-src"
+        assert updated.locked_fields == ["title"]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_reports_determinate_progress(self, repo: Repository, handler):
+        """ScrapeHandler 上报 determinate 进度: 字段获取 → materialize → done."""
+        events: list[tuple[int, int, str]] = []
+
+        async def capture(current: int, total: int, message: str = "") -> None:
+            events.append((current, total, message))
+
+        handler.set_progress_callback(capture)
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        result = await handler.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+        assert result.success is True
+
+        assert events
+        total = events[-1][1]
+        assert total > 0
+        assert events[0] == (0, total, "fetch")
+        assert events[-1] == (total, total, "done")
+        assert all(t == total for _, t, _ in events)
+        assert [c for c, _, _ in events] == sorted(c for c, _, _ in events)
+        assert any(m == "materialize" for _, _, m in events)
+        # 获取结束抬到标量满分 (= total - 2, 留给 materialize/persist)
+        assert any(c == total - 2 and m == "fetch" for c, _, m in events)
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_updates_media_file_status(self, repo: Repository, handler):
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        assert media.id is not None
+        await handler.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+        updated = await repo.get_media_file(media.id)
+        assert updated is not None
+        assert updated.status == MediaFileStatus.SCRAPED
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_missing_payload_fields_raises(self, handler):
+        """parse_payload 在字段缺失时抛出异常"""
+        with pytest.raises((TypeError, KeyError, ValidationError)):
+            handler.parse_payload({"media_file_id": 1})
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_no_results_marks_failed(self, repo: Repository, resource_store, tmp_path: Path):
+        """所有爬虫返回空结果时标记失败, 站点明细随失败结果返回"""
+        empty_factory = FakeFactory({"javdb": EmptySearchCrawler()})
+        h = ScrapeHandler(
+            repo=repo,
+            factory=empty_factory,
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.JAVDB]}),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/TEST-001.mp4")
+        # 站点明细来自 `Recorder`, 没有它时失败载荷只有 `failed_sites`.
+        recorder = Recorder.begin(
+            tmp_path, Task(id=91, type=TaskType.SCRAPE, status=TaskStatus.RUNNING, payload={}), HotSettings()
+        )
+        try:
+            result = await h.handle(
+                ScrapePayload(media_file_id=media.id, number="TEST-001", content_type=ContentType.CENSORED)
+            )
+        finally:
+            recorder.close()
+
+        assert result.success is False
+        # 失败也要带结果载荷, 否则界面只剩一句错误, 说不清是哪个站点怎么了.
+        assert result.result is not None
+        assert result.result.metadata_id is None
+        assert result.result.failed_sites == ["javdb"]
+        assert [(row.site, row.outcome, row.reason) for row in result.result.outcomes] == [
+            ("javdb", "failed", "no_usable_metadata")
+        ]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_empty_scalars_with_image_still_succeeds(self, repo: Repository, resource_store):
+        """标量全空但有海报 → 仍算抓到数据, 不整单失败."""
+
+        class PosterOnlyCrawler:
+            name = SiteName.JAVDB
+
+            def __init__(self, client=None):
+                self.client = client
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata(number=query.number, poster_urls=["http://p.jpg"])
+
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"javdb": PosterOnlyCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.JAVDB]}),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/POSTER-001.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="POSTER-001", content_type=ContentType.CENSORED)
+        )
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.field_sources == {}
+        metadata = await repo.get_metadata_by_number("POSTER-001")
+        assert metadata is not None
+        assert metadata.poster_urls == ["http://p.jpg"]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_locked_source_preserved_when_scalars_empty(self, repo: Repository, resource_store):
+        """标量全空的成功刮削也不冲掉锁定字段的来源标注."""
+        seeded = await repo.upsert_metadata(number="POSTER-001", title="Manual", field_sources={"title": "manual-src"})
+        assert seeded.id is not None
+        await repo.set_metadata_locks(seeded.id, [MetadataField.TITLE])
+
+        class PosterOnlyCrawler:
+            name = SiteName.JAVDB
+
+            def __init__(self, client=None):
+                self.client = client
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata(number=query.number, poster_urls=["http://p.jpg"])
+
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"javdb": PosterOnlyCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.JAVDB]}),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/POSTER-001.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="POSTER-001", content_type=ContentType.CENSORED)
+        )
+
+        assert result.success is True
+        metadata = await repo.get_metadata_by_number("POSTER-001")
+        assert metadata is not None
+        assert metadata.title == "Manual"
+        assert metadata.field_sources == {"title": "manual-src"}
+        assert metadata.poster_urls == ["http://p.jpg"]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_declared_source_receives_partial_result(self, repo: Repository, resource_store):
+        """第二段来源收到第一段已定值的标量与已抓到的图片地址, 第一段来源收到 None."""
+
+        class RecordingFetcher:
+            def __init__(self, metadata: MediaMetadata) -> None:
+                self._metadata = metadata
+                self.partials: list[AggregatedMetadata | None] = []
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                self.partials.append(query.partial_result)
+                return self._metadata
+
+        declared = RecordingFetcher(
+            MediaMetadata(number="PHASE-001", title="FromDeclared", poster_urls=["http://p2.jpg"])
+        )
+        first_phase = RecordingFetcher(
+            MediaMetadata(number="PHASE-001", title="FromPhase1", poster_urls=["http://p1.jpg"])
+        )
+        catalog = (SourceDescriptor(id="javdb", name="javdb", traits=frozenset({"needs_partial"})),)
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"dmm": first_phase, "javdb": declared}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.DMM, SiteName.JAVDB]}),
+            source_catalog=catalog,
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/PHASE-001.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="PHASE-001", content_type=ContentType.CENSORED)
+        )
+
+        assert result.success is True
+        assert first_phase.partials == [None]
+        assert len(declared.partials) == 1
+        # dmm 是默认路由里各标量字段的链首且在第一段已返回, 其取值必须出现在第二段的入参上.
+        assert declared.partials[0] is not None
+        assert declared.partials[0].title == "FromPhase1"
+        assert declared.partials[0].poster_urls == ["http://p1.jpg"]
+        # 段间只作参考: 入库列表仍按字段链拼接两段贡献.
+        metadata = await repo.get_metadata_by_number("PHASE-001")
+        assert metadata is not None
+        assert metadata.poster_urls == ["http://p1.jpg", "http://p2.jpg"]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_builtin_trait_defers_without_injected_catalog(self, repo: Repository, resource_store):
+        """未注入来源目录时, 内置来源的 traits 由 profile 合成的 descriptor 提供."""
+
+        class RecordingFetcher:
+            def __init__(self, metadata: MediaMetadata) -> None:
+                self._metadata = metadata
+                self.partials: list[AggregatedMetadata | None] = []
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                self.partials.append(query.partial_result)
+                return self._metadata
+
+        declared = RecordingFetcher(MediaMetadata(number="PHASE-002", title="FromOfficial"))
+        first_phase = RecordingFetcher(MediaMetadata(number="PHASE-002", title="FromDMM"))
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"dmm": first_phase, "official": declared}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.DMM, SiteName.OFFICIAL]}),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/PHASE-002.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="PHASE-002", content_type=ContentType.CENSORED)
+        )
+
+        assert result.success is True
+        assert first_phase.partials == [None]
+        assert declared.partials[0] is not None
+        assert declared.partials[0].title == "FromDMM"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_materializes_cropped_poster(self, repo: Repository, resource_store):
+        """有 web_client 时, scrape 物化: poster 候选偏矮 → 裁剪 → metadata 记内部 URL."""
+        from typing import ClassVar, cast
+
+        from PIL import Image
+
+        from amane.media.pipeline import RESOURCE_URL_PREFIX
+        from amane.net.http import WebClient
+
+        class ImgCrawler:
+            name = SiteName.JAVDB
+
+            def __init__(self, client=None):
+                pass
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata(
+                    number="MIDV-123",
+                    title="T",
+                    cover_urls=["https://s/t.jpg"],
+                    poster_urls=["https://s/p.jpg"],
+                )
+
+        class FakeWebClient:
+            sizes: ClassVar = {"https://s/t.jpg": (800, 538), "https://s/p.jpg": (300, 420)}
+
+            async def download(self, url, dest, **kwargs) -> bool:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", self.sizes[url], "blue").save(dest)
+                return True
+
+            async def get_filesize(self, url, **kwargs):
+                return None
+
+            async def resolve_final_url(self, url, **kwargs) -> str:
+                return url
+
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"javdb": ImgCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=_config_with({ContentType.CENSORED: [SiteName.JAVDB]}),
+            web_client=cast("WebClient", FakeWebClient()),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+        assert result.success is True
+        metadata = await repo.get_metadata_by_number("MIDV-123")
+        assert metadata is not None
+        assert metadata.poster_urls is not None and len(metadata.poster_urls) == 1
+        assert metadata.poster_urls[0].startswith(RESOURCE_URL_PREFIX)  # 内部派生 (裁剪)
+        assert metadata.cover_urls == ["https://s/t.jpg"]  # 外部原样
+        assert metadata.original_poster_urls == ["https://s/p.jpg"]  # 保留来源海报 URL
+        assert metadata.original_cover_urls == ["https://s/t.jpg"]  # 保留来源封面 URL
+
+
+# --- content_routes 资格真值 + 有序路由 ---
+
+
+class RecordingFactory:
+    """记录被请求的站点名, 返回这些名字对应的 MockCrawler."""
+
+    def __init__(self, available: dict):
+        self._available = available
+        self.requested: list[str] = []
+
+    async def get_crawlers(self, names):
+        self.requested = list(names)
+        return {n: self._available[n] for n in names if n in self._available}
+
+
+def _config_with(routes, field_priority=None, field_blacklist=None):
+    scraping = ScrapingConfig(
+        content_routes=routes,
+        field_priority=field_priority or {},
+        field_blacklist=field_blacklist or {},
+    )
+    return HotSettings(scraping=scraping)
+
+
+class TestContentRoutesFiltering:
+    def test_default_content_routes_preserve_all_routes(self):
+        """默认来源路由: 动漫为 DMM → Hanime1, 其他类型保持原有配置."""
+        routes = ScrapingConfig().content_routes
+
+        assert routes[ContentType.CENSORED.value] == [
+            str(SiteName.DMM),
+            str(SiteName.MGSTAGE),
+            str(SiteName.AVSOX),
+            str(SiteName.AVBASE),
+            str(SiteName.JAVBUS),
+            str(SiteName.HANIME1),
+        ]
+        assert routes["uncensored_dvd"] == [
+            str(SiteName.AVENTERTAINMENTS),
+            str(SiteName.CARIBBEANCOM_INDEX),
+            str(SiteName.AVSOX),
+        ]
+        assert routes["uncensored_streaming"] == [
+            str(SiteName.TENMUSUME),
+            str(SiteName.PONDO),
+            str(SiteName.CARIBBEANCOM),
+            str(SiteName.PACOPACOMAMA),
+            str(SiteName.TOKYO_HOT),
+            str(SiteName.CARIBBEANCOMPR),
+            str(SiteName.D2PASS),
+            str(SiteName.AVSOX),
+        ]
+        assert routes[ContentType.CHINESE.value] == []
+        assert routes[ContentType.WESTERN.value] == [str(SiteName.THEPORNDB)]
+        assert routes[ContentType.FC2.value] == [str(SiteName.FC2)]
+        assert routes[ContentType.AMATEUR.value] == [
+            str(SiteName.MGSTAGE),
+            str(SiteName.DMM),
+        ]
+        assert routes[ContentType.HENTAI.value] == [
+            str(SiteName.DMM),
+            str(SiteName.HANIME1),
+        ]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_only_routed_sites_requested(self, repo: Repository, resource_store):
+        """content_routes 决定 content_type 下哪些站点被请求."""
+        available = {
+            "javdb": MockCrawler(),
+            "dmm": MockCrawler(),
+            "javbus": MockCrawler(),
+        }
+        factory = RecordingFactory(available)
+        config = _config_with({ContentType.CENSORED: [SiteName.JAVDB, SiteName.DMM]})
+        h = ScrapeHandler(repo=repo, factory=factory, resource_store=resource_store, pipeline_config=config)
+
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        await h.handle(ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED))
+
+        assert set(factory.requested) == {SiteName.JAVDB, SiteName.DMM}
+        assert SiteName.JAVBUS not in factory.requested
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_empty_route_returns_error(self, repo: Repository, resource_store):
+        """content_routes 对应项为空列表时该类型刮削失败."""
+        factory = RecordingFactory({"javbus": MockCrawler()})
+        config = _config_with({ContentType.CENSORED: [SiteName.JAVBUS], ContentType.FC2: []})
+        h = ScrapeHandler(repo=repo, factory=factory, resource_store=resource_store, pipeline_config=config)
+
+        media = await repo.create_media_file(library_id=1, path="/media/FC2-1.mp4")
+        result = await h.handle(ScrapePayload(media_file_id=media.id, number="FC2-1", content_type=ContentType.FC2))
+
+        assert result.success is False
+        assert result.error is not None
+        assert "没有可用来源" in result.error
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_prefer_outside_route_not_requested(self, repo: Repository, resource_store):
+        """prefer 不在 route 内的站不会被 get_crawlers 请求."""
+        available = {
+            "javdb": MockCrawler(),
+            "iqqtv": MockCrawler(),
+        }
+        factory = RecordingFactory(available)
+        config = _config_with(
+            {ContentType.CENSORED: [SiteName.JAVDB]}, {MetadataField.TITLE: [SiteName.IQQTV, SiteName.JAVDB]}
+        )
+        h = ScrapeHandler(repo=repo, factory=factory, resource_store=resource_store, pipeline_config=config)
+
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        await h.handle(ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED))
+
+        assert list(factory.requested) == [SiteName.JAVDB]
+        assert SiteName.IQQTV not in factory.requested
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_title_blacklist_uses_next_site(self, repo: Repository, resource_store):
+        """title 排除 javdb 后取 dmm; studio 仍可用 javdb."""
+
+        class TitledCrawler:
+            def __init__(self, title: str, studio: str):
+                self._title = title
+                self._studio = studio
+
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                return MediaMetadata.model_validate(
+                    {"number": "MIDV-123", "title": self._title, "studio": self._studio}
+                )
+
+        factory = RecordingFactory(
+            {
+                "javdb": TitledCrawler("FromJavDB", "StudioJavDB"),
+                "dmm": TitledCrawler("FromDMM", "StudioDMM"),
+            }
+        )
+        config = _config_with(
+            {ContentType.CENSORED: [SiteName.JAVDB, SiteName.DMM]},
+            field_blacklist={MetadataField.TITLE: [SiteName.JAVDB]},
+        )
+        h = ScrapeHandler(repo=repo, factory=factory, resource_store=resource_store, pipeline_config=config)
+
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+        assert result.success is True
+
+        metadata = await repo.get_metadata_by_number("MIDV-123")
+        assert metadata is not None
+        assert metadata.title == "FromDMM"
+        assert metadata.studio == "StudioJavDB"
+        assert set(factory.requested) == {SiteName.JAVDB, SiteName.DMM}
+
+
+# --- 翻译集成测试 ---
+
+
+class TestScrapeTranslation:
+    @pytest.mark.parametrize(
+        ("translate_japanese_title", "expected_title"),
+        [(True, "[zh_cn]Mock Title"), (False, "Mock Title")],
+    )
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_japanese_title_translation_switch(
+        self, repo: Repository, factory, resource_store, translate_japanese_title: bool, expected_title: str
+    ):
+        """配置 translator + field_language 时, 标题被翻译后再持久化."""
+        from amane.enums import Language, MetadataField
+
+        class StubTranslator:
+            async def translate(self, text, target, field, *, use_cache=True):
+                return f"[{target}]{text}"
+
+            async def translate_actor(self, text: str, field: MetadataField, *, use_cache: bool = True) -> str | None:
+                return None
+
+        config = _config_with({ContentType.CENSORED: [SiteName.JAVDB]})
+        config.scraping.field_language = {MetadataField.TITLE: Language.ZH_CN}
+        config.llm.translate_japanese_title = translate_japanese_title
+        h = ScrapeHandler(
+            repo=repo,
+            factory=factory,
+            resource_store=resource_store,
+            pipeline_config=config,
+            translator=StubTranslator(),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        await h.handle(ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED))
+
+        metadata = await repo.get_metadata_by_number("MIDV-123")
+        assert metadata is not None
+        assert metadata.title == expected_title
+        assert metadata.original_title == "Mock Title"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_skips_translation_and_keeps_original_title(self, repo: Repository, resource_store):
+        from amane.enums import Language, MetadataField
+
+        class MustNotTranslate:
+            async def translate(self, text, target, field, *, use_cache=True):
+                raise AssertionError("WESTERN metadata must not be translated")
+
+            async def translate_actor(self, text: str, field: MetadataField, *, use_cache: bool = True) -> str | None:
+                raise AssertionError("WESTERN metadata must not be translated")
+
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        config.scraping.field_language = {MetadataField.TITLE: Language.ZH_CN}
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": WesternMockCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+            translator=MustNotTranslate(),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MD-0123.mp4")
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MD-0123",
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-test-1",
+            )
+        )
+        assert result.success is True
+        metadata = await repo.get_metadata_by_theporndb_uuid("scene-test-1")
+        assert metadata is not None
+        assert metadata.title == "Mock Western Title"
+        assert metadata.original_title == "Mock Western Title"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_title_and_plot_translate_when_western_title_enabled(self, repo: Repository, resource_store):
+        from amane.enums import Language, MetadataField
+
+        class StubTranslator:
+            async def translate(self, text, target, field, *, use_cache=True):
+                return f"[{target}]{text}"
+
+            async def translate_actor(self, text: str, field: MetadataField, *, use_cache: bool = True) -> str | None:
+                return None
+
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        config.scraping.field_language = {
+            MetadataField.TITLE: Language.ZH_CN,
+            MetadataField.PLOT: Language.ZH_CN,
+        }
+        config.llm.translate_western_title = True
+        config.llm.translate_fields = [TranslationField.PLOT]
+
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": WesternMockCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+            translator=StubTranslator(),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MD-0124.mp4")
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MD-0124",
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-test-1",
+            )
+        )
+
+        assert result.success is True
+        metadata = await repo.get_metadata_by_theporndb_uuid("scene-test-1")
+        assert metadata is not None
+        assert metadata.title == "[zh_cn]Mock Western Title"
+        assert metadata.original_title == "Mock Western Title"
+        assert metadata.plot == "[zh_cn]Mock Western Plot"
+        assert metadata.original_plot == "Mock Western Plot"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_without_plot_does_not_translate_or_generate_plot(self, repo: Repository, resource_store):
+        from amane.enums import Language, MetadataField
+
+        class WesternWithoutPlotCrawler(WesternMockCrawler):
+            async def fetch(self, query, options=None) -> MediaMetadata | None:
+                metadata = await super().fetch(query, options)
+                if metadata is not None:
+                    metadata.plot = None
+                return metadata
+
+        class TrackingTranslator:
+            def __init__(self):
+                self.calls = []
+
+            async def translate(self, text, target, field, *, use_cache=True):
+                self.calls.append((text, target, field))
+                return f"[{target}]{text}"
+
+            async def translate_actor(self, text: str, field: MetadataField, *, use_cache: bool = True) -> str | None:
+                return None
+
+        translator = TrackingTranslator()
+        config = _config_with({ContentType.WESTERN: [SiteName.THEPORNDB]})
+        config.scraping.field_language = {MetadataField.PLOT: Language.ZH_CN}
+        config.llm.translate_fields = [TranslationField.PLOT]
+
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({"theporndb": WesternWithoutPlotCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+            translator=translator,
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MD-0125.mp4")
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="MD-0125",
+                content_type=ContentType.WESTERN,
+                theporndb_uuid="scene-test-1",
+            )
+        )
+
+        assert result.success is True
+        assert translator.calls == []
+
+        metadata = await repo.get_metadata_by_theporndb_uuid("scene-test-1")
+        assert metadata is not None
+        assert metadata.plot is None
+        assert metadata.original_plot is None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_translator_failure_keeps_original(self, repo: Repository, factory, resource_store):
+        """translator 抛异常时降级保留原值, 刮削不失败 (失败即跳过)."""
+        from amane.enums import Language, MetadataField
+
+        class BrokenTranslator:
+            async def translate(self, text, target, field, *, use_cache=True):
+                raise RuntimeError("llm down")
+
+            async def translate_actor(self, text: str, field: MetadataField, *, use_cache: bool = True) -> str | None:
+                raise RuntimeError("llm down")
+
+        config = _config_with({ContentType.CENSORED: [SiteName.JAVDB]})
+        config.scraping.field_language = {MetadataField.TITLE: Language.ZH_CN}
+        h = ScrapeHandler(
+            repo=repo,
+            factory=factory,
+            resource_store=resource_store,
+            pipeline_config=config,
+            translator=BrokenTranslator(),
+        )
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123.mp4")
+        result = await h.handle(
+            ScrapePayload(media_file_id=media.id, number="MIDV-123", content_type=ContentType.CENSORED)
+        )
+
+        assert result.success is True
+        metadata = await repo.get_metadata_by_number("MIDV-123")
+        assert metadata is not None
+        assert metadata.title == "Mock Title"
+
+
+# --- RefreshHandler 测试 ---
+
+
+class TestRefreshHandler:
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_scan_and_add_files(self, repo: Repository, tmp_path):
+        """扫描目录, 注册新文件"""
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+        (tmp_path / "SSIS-456.mkv").write_bytes(b"\x00" * 100)
+        (tmp_path / "readme.txt").write_text("not a media file")
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(RefreshPayload(library_id=1, path=str(tmp_path)))
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 2
+        assert result.result.removed == 0
+        assert result.result.scrape == 2
+
+    @pytest.mark.asyncio(loop_scope="function")
+    @pytest.mark.parametrize(
+        ("subtitle_extensions", "subtitle_name", "stored", "expected"),
+        [
+            pytest.param([".srt"], "MIDV-771.srt", False, True, id="命中置真"),
+            pytest.param([".srt"], None, True, False, id="同目录无字幕置假"),
+            pytest.param([], "MIDV-771.srt", True, False, id="库关闭字幕发现置假"),
+        ],
+    )
+    async def test_scan_syncs_external_subtitle(
+        self,
+        repo: Repository,
+        tmp_path: Path,
+        subtitle_extensions: list[str],
+        subtitle_name: str | None,
+        stored: bool,
+        expected: bool,
+    ):
+        """存量行的外挂字幕标记只在库扫描时补齐: 迁移不回填, 登记与改 path 都不覆盖既有行."""
+        video = tmp_path / "MIDV-771.mp4"
+        video.write_bytes(b"\x00" * 100)
+        if subtitle_name is not None:
+            (tmp_path / subtitle_name).touch()
+        lib = await repo.create_library(
+            name="t", path=str(tmp_path), write_nfo=False, subtitle_extensions=subtitle_extensions
+        )
+        assert lib.id is not None
+        media = await repo.create_media_file(library_id=lib.id, path=str(video), has_external_subtitle=stored)
+        assert media.id is not None
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(library_id=lib.id, path=str(tmp_path), scrape=set())
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 0
+        synced = await repo.get_media_file(media.id)
+        assert synced is not None
+        assert synced.has_external_subtitle is expected
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_scan_syncs_only_walked_rows(self, repo: Repository, tmp_path: Path):
+        """按遍历所见回写: 范围外的行不动, 已一致的行不写库."""
+        lib_root = tmp_path / "lib"
+        (lib_root / "hit").mkdir(parents=True)
+        (lib_root / "hit" / "MIDV-772.mp4").write_bytes(b"\x00" * 100)
+        (lib_root / "kept").mkdir()
+        (lib_root / "kept" / "MIDV-773.mp4").write_bytes(b"\x00" * 100)
+        (lib_root / "kept" / "MIDV-773.srt").touch()
+        (lib_root / "outside").mkdir()
+        (lib_root / "outside" / "MIDV-774.mp4").write_bytes(b"\x00" * 100)
+        (lib_root / "outside" / "MIDV-774.srt").touch()
+        lib = await repo.create_library(name="t", path=str(lib_root), write_nfo=False, subtitle_extensions=[".srt"])
+        assert lib.id is not None
+        stale = await repo.create_media_file(
+            library_id=lib.id, path=str(lib_root / "hit" / "MIDV-772.mp4"), has_external_subtitle=True
+        )
+        kept = await repo.create_media_file(
+            library_id=lib.id, path=str(lib_root / "kept" / "MIDV-773.mp4"), has_external_subtitle=True
+        )
+        outside = await repo.create_media_file(
+            library_id=lib.id, path=str(lib_root / "outside" / "MIDV-774.mp4"), has_external_subtitle=False
+        )
+        assert stale.id is not None and kept.id is not None and outside.id is not None
+        kept_before = await repo.get_media_file(kept.id)
+        assert kept_before is not None
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(library_id=lib.id, path=str(lib_root / "hit"), scrape=set())
+        )
+
+        assert result.success is True
+        synced = await repo.get_media_file(stale.id)
+        assert synced is not None
+        assert synced.has_external_subtitle is False
+        untouched_by_scope = await repo.get_media_file(outside.id)
+        assert untouched_by_scope is not None
+        assert untouched_by_scope.has_external_subtitle is False
+        # 范围内已一致的行不写库: 写库会刷新 updated_at.
+        kept_after = await repo.get_media_file(kept.id)
+        assert kept_after is not None
+        assert kept_after.has_external_subtitle is True
+        assert kept_after.updated_at == kept_before.updated_at
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_unscoped_scan_writes_cleanup_inventory(self, repo: Repository, tmp_path: Path):
+        """整库范围的入库扫描顺带产出清单: 无效文件与空目录都在里面, 面板不必再扫一次."""
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+        (tmp_path / "ad.mp4").write_bytes(b"\x00" * 10)
+        (tmp_path / "empty").mkdir()
+        lib = await repo.create_library(name="t", path=str(tmp_path), write_nfo=False, blacklist_patterns=["ad"])
+        assert lib.id is not None
+        store = InventoryStore()
+
+        result = await RefreshHandler(repo=repo, inventory_store=store).handle(
+            RefreshPayload(library_id=lib.id, path=str(tmp_path), scrape=set())
+        )
+
+        assert result.success is True
+        inventory = store.latest(lib.id, InventorySource.RULES)
+        assert inventory is not None
+        assert inventory.scope_path is None
+        assert {entry.path.name for entry in inventory.entries} == {"ad.mp4", "empty"}
+        assert [hit.path.name for hit in inventory.media_hits] == ["MIDV-123.mp4"]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_scoped_scan_leaves_inventory_alone(self, repo: Repository, tmp_path: Path):
+        """子目录巡检不代表整库, 不覆盖面板用的清单."""
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "ad.mp4").write_bytes(b"\x00" * 10)
+        lib = await repo.create_library(name="t", path=str(tmp_path), write_nfo=False, blacklist_patterns=["ad"])
+        assert lib.id is not None
+        store = InventoryStore()
+
+        result = await RefreshHandler(repo=repo, inventory_store=store).handle(
+            RefreshPayload(library_id=lib.id, path=str(sub), scrape=set())
+        )
+
+        assert result.success is True
+        assert store.latest(lib.id, InventorySource.RULES) is None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_truncated_inventory_keeps_media_complete(
+        self,
+        repo: Repository,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        candidates_first_scandir: None,
+    ):
+        """清单触顶不影响入库扫描的媒体收集: add+remove 据此判定存在性, 缺项会删掉磁盘上还在的索引行."""
+        for index in range(20):
+            (tmp_path / f"NSFS-{index:03d}.mp4").write_bytes(b"\x00" * 100)
+        for index in range(3):
+            (tmp_path / f"ad-{index}.mp4").write_bytes(b"\x00" * 10)
+        lib = await repo.create_library(name="t", path=str(tmp_path), write_nfo=False, blacklist_patterns=["ad-"])
+        assert lib.id is not None
+        rows = []
+        for index in range(20):
+            row = await repo.create_media_file(lib.id, path=str(tmp_path / f"NSFS-{index:03d}.mp4"))
+            assert row.id is not None
+            rows.append(row)
+
+        real_scan = scan_inventory
+
+        async def small_limit(scope_dir, **kwargs):
+            kwargs["limit"] = 1
+            return await real_scan(scope_dir, **kwargs)
+
+        monkeypatch.setattr("amane.handlers.refresh.scan_inventory", small_limit)
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(
+                library_id=lib.id,
+                path=str(tmp_path),
+                scan={ScanMode.add, ScanMode.remove},
+                scrape=set(),
+            )
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.removed == 0
+        for row in rows:
+            assert row.id is not None
+            assert await repo.get_media_file(row.id) is not None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_handle_files(self, repo: Repository, tmp_path):
+        """新文件被注册; PENDING 状态的文件被刮削; SKIP 状态的文件不被刮削."""
+
+        async def new_file(name, db: bool, status: MediaFileStatus = MediaFileStatus.PENDING):
+            path = tmp_path / name
+            path.write_bytes(b"\x00" * 100)
+            if db:
+                return await repo.create_media_file(library_id=1, path=str(path), status=status)
+            return None
+
+        await new_file("MIDV-123.mp4", db=True, status=MediaFileStatus.PENDING)  # 已注册 PENDING -> 刮削
+        await new_file("MIDV-124.mp4", db=False)  # 未注册 -> 注册并刮削 (PENDING)
+        await new_file("MIDV-125.mp4", db=True, status=MediaFileStatus.SKIP)  # SKIP -> 不刮削
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(RefreshPayload(library_id=1, path=str(tmp_path)))
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 1  # 仅 MIDV-124 是新文件
+        assert result.result.removed == 0
+        assert result.result.scrape == 2  # MIDV-123 + MIDV-124 (MIDV-125 是 SKIP 不刮削)
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_recursive_scan(self, repo: Repository, tmp_path):
+        """递归扫描子目录"""
+        subdir = tmp_path / "season1"
+        subdir.mkdir()
+        (subdir / "EP01.mp4").write_bytes(b"\x00" * 100)
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(RefreshPayload(library_id=1, path=str(tmp_path), recursive=True))
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 2
+        assert result.result.removed == 0
+        assert result.result.scrape == 2
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_non_recursive_scan(self, repo: Repository, tmp_path):
+        """非递归扫描不进入子目录"""
+        subdir = tmp_path / "season1"
+        subdir.mkdir()
+        (subdir / "EP01.mp4").write_bytes(b"\x00" * 100)
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(RefreshPayload(library_id=1, path=str(tmp_path), recursive=False))
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 1
+        assert result.result.removed == 0
+        assert result.result.scrape == 1
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_custom_patterns(self, repo: Repository, tmp_path):
+        """自定义 glob 模式过滤"""
+        (tmp_path / "video.mp4").write_bytes(b"\x00" * 100)
+        (tmp_path / "video.mkv").write_bytes(b"\x00" * 100)
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(RefreshPayload(library_id=1, path=str(tmp_path), patterns=["*.mp4"]))
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 1
+        assert result.result.removed == 0
+        assert result.result.scrape == 1
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_blacklisted_files_skipped_and_records_removed(self, repo: Repository, tmp_path):
+        """黑名单命中的文件不进扫描; ScanMode.remove 时旧记录被当作失效清除."""
+        lib = await repo.create_library(name="t", path=str(tmp_path), blacklist_patterns=["广告", "(?i)ads"])
+        assert lib.id is not None
+        ad = tmp_path / "新片广告.mp4"
+        ad.write_bytes(b"\x00" * 100)
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+        old = await repo.create_media_file(lib.id, path=str(ad), status=MediaFileStatus.SCRAPED, metadata_id=42)
+        assert old.id is not None
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(
+            RefreshPayload(
+                library_id=lib.id,
+                path=str(tmp_path),
+                scan={ScanMode.add, ScanMode.remove},
+                scrape=set(),
+            )
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 1
+        assert result.result.removed == 1
+        # 旧记录已被清除; 注意 id 会被 SQLite 复用, 断言用路径而不是 id
+        assert await repo.get_media_file_by_path(str(ad)) is None
+        assert await repo.get_media_file_by_path(str(tmp_path / "MIDV-123.mp4")) is not None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_undersized_videos_skipped_and_records_removed(self, repo: Repository, tmp_path):
+        """低于 min_file_size 的视频不进扫描; nfo 即使很小也不当视频过滤; ScanMode.remove 清旧记录."""
+        lib = await repo.create_library(name="t", path=str(tmp_path), min_file_size=50)
+        assert lib.id is not None
+        ad = tmp_path / "ad.mp4"
+        ad.write_bytes(b"tiny")
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"x" * 100)
+        (tmp_path / "note.nfo").write_bytes(b"nfo")
+        old = await repo.create_media_file(lib.id, path=str(ad), status=MediaFileStatus.SCRAPED, metadata_id=42)
+        assert old.id is not None
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(
+            RefreshPayload(
+                library_id=lib.id,
+                path=str(tmp_path),
+                scan={ScanMode.add, ScanMode.remove},
+                scrape=set(),
+            )
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 1
+        assert result.result.removed == 1
+        assert await repo.get_media_file_by_path(str(ad)) is None
+        assert await repo.get_media_file_by_path(str(tmp_path / "MIDV-123.mp4")) is not None
+        assert await repo.get_media_file_by_path(str(tmp_path / "note.nfo")) is None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_remove_only_checks_db_paths(self, repo: Repository, tmp_path):
+        """仅 remove 不对整树 glob, 对库内路径 exists: 磁盘上没有的记录删掉, 还在的保留."""
+        lib = await repo.create_library(name="t", path=str(tmp_path))
+        assert lib.id is not None
+        keep = tmp_path / "MIDV-123.mp4"
+        keep.write_bytes(b"\x00" * 100)
+        await repo.create_media_file(lib.id, path=str(keep))
+        gone = await repo.create_media_file(lib.id, path=str(tmp_path / "missing.mp4"))
+        assert gone.id is not None
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(library_id=lib.id, path=str(tmp_path), scan={ScanMode.remove}, scrape=set())
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 0
+        assert result.result.removed == 1
+        assert await repo.get_media_file_by_path(str(keep)) is not None
+        assert await repo.get_media_file_by_path(str(tmp_path / "missing.mp4")) is None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_remove_only_keeps_nfd_file_indexed_as_nfc(self, repo: Repository, tmp_path):
+        """仅 remove 用库内 NFC 判断存在时, 磁盘 NFD 文件不得当作缺失."""
+        nfd = tmp_path / "\u3057\u3099.mp4"
+        nfd.write_bytes(b"\x00" * 100)
+        lib = await repo.create_library(name="t", path=str(tmp_path))
+        assert lib.id is not None
+        media = await repo.create_media_file(lib.id, path=str(nfd))
+        assert media.id is not None
+        assert media.path == str(tmp_path / "\u3058.mp4")
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(library_id=lib.id, path=str(tmp_path), scan={ScanMode.remove}, scrape=set())
+        )
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.removed == 0
+        assert await repo.get_media_file(media.id) is not None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_scan_nfc_identity_does_not_add_or_remove(
+        self, repo: Repository, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """目录列出 NFD、库内已是 NFC 时, add+remove 不新增也不删除."""
+        nfc = "\u3058"
+        nfd = "\u3057\u3099"
+        lib = await repo.create_library(name="t", path=str(tmp_path))
+        assert lib.id is not None
+        stored = tmp_path / f"{nfc}.mp4"
+        stored.write_bytes(b"\x00" * 100)
+        media = await repo.create_media_file(lib.id, path=str(stored))
+        assert media.path == str(stored)
+
+        listed = tmp_path / f"{nfd}.mp4"
+        library_id = lib.id
+        assert library_id is not None
+
+        async def fake_scan(*_args: object, **_kwargs: object) -> CleanupInventory:
+            return CleanupInventory(
+                inventory_id="test",
+                library_id=library_id,
+                root=tmp_path,
+                scope_path=None,
+                recursive=True,
+                patterns=(),
+                source=InventorySource.RULES,
+                created_at=datetime.now(UTC),
+                media_hits=[LibraryHit(listed, LibraryFileKind.MEDIA)],
+            )
+
+        monkeypatch.setattr("amane.handlers.refresh.scan_inventory", fake_scan)
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(
+                library_id=lib.id,
+                path=str(tmp_path),
+                scan={ScanMode.add, ScanMode.remove},
+                scrape=set(),
+            )
+        )
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 0
+        assert result.result.removed == 0
+        files = await repo.list_media_files(library_id=lib.id, limit=None)
+        assert [f.id for f in files] == [media.id]
+        assert files[0].path == str(stored)
+
+    @pytest.mark.parametrize(
+        ("scan_modes", "scrape_statuses", "expected_scrape_tasks"),
+        [
+            ({ScanMode.add}, set(), 0),
+            ({ScanMode.add}, {MediaFileStatus.PENDING}, 1),
+        ],
+    )
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_scan_mode_controls_scrape(
+        self,
+        repo: Repository,
+        tmp_path,
+        scan_modes: set[ScanMode],
+        scrape_statuses: set[MediaFileStatus],
+        expected_scrape_tasks: int,
+    ):
+        """scan + scrape 决定是否注册文件、是否派生 SCRAPE; REFRESH 不整理文件."""
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(
+            RefreshPayload(
+                library_id=1,
+                path=str(tmp_path),
+                scan=scan_modes,
+                scrape=scrape_statuses,
+            )
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.added == 1
+        assert result.result.scrape == expected_scrape_tasks
+
+        scrapes = [f for f in (result.followups or []) if f.task_type == TaskType.SCRAPE]
+        assert len(scrapes) == expected_scrape_tasks
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_invalid_directory_fails(self, repo: Repository, tmp_path):
+        """不存在的目录返回失败"""
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(RefreshPayload(library_id=1, path=str(tmp_path / "nonexistent")))
+
+        assert result.success is False
+        assert result.error is not None
+        assert "不是目录" in result.error
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_submits_scrape_tasks_with_correct_payload(self, repo: Repository, tmp_path):
+        """验证派生 SCRAPE followup payload 正确 (use_cache 透传)"""
+        (tmp_path / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(RefreshPayload(library_id=1, path=str(tmp_path), use_cache=set()))
+
+        scrapes = [f for f in (result.followups or []) if f.task_type == TaskType.SCRAPE]
+        assert len(scrapes) == 1
+        assert scrapes[0].payload["number"] == "MIDV-123"
+        assert scrapes[0].payload["use_cache"] == []  # 空集透传 = 全部强制刷新
+        assert scrapes[0].key == f"scrape:{scrapes[0].payload['media_file_id']}"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_scrape_fanout_not_capped_by_list_page_size(self, repo: Repository, tmp_path):
+        """list_media_files 默认 50 是 GET /media 分页; REFRESH fan-out 必须全量入队."""
+        n = 51
+        for i in range(n):
+            await repo.create_media_file(
+                library_id=1, path=str(tmp_path / f"MIDV-{i:03d}.mp4"), status=MediaFileStatus.PENDING
+            )
+
+        handler = RefreshHandler(repo=repo)
+        result = await handler.handle(
+            RefreshPayload(library_id=1, path=str(tmp_path), scan=set(), scrape={MediaFileStatus.PENDING})
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.scrape == n
+        scrapes = [f for f in (result.followups or []) if f.task_type == TaskType.SCRAPE]
+        assert len(scrapes) == n
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_identity_match_skips_scrape(
+        self, repo: Repository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """WESTERN 命中本地身份时恢复关联，不创建 SCRAPE 任务。"""
+        media = await repo.create_media_file(
+            library_id=1,
+            path=str(tmp_path / "western.mp4"),
+            status=MediaFileStatus.PENDING,
+        )
+        assert media.id is not None
+
+        monkeypatch.setattr(
+            "amane.handlers.refresh.parse_file_info",
+            lambda _path: SimpleNamespace(
+                number="VIXEN-230415",
+                content_type=ContentType.WESTERN,
+            ),
+        )
+
+        matched_ids = []
+
+        async def fake_refresh_media_association(_repo, current_media):
+            matched_ids.append(current_media.id)
+            return True
+
+        monkeypatch.setattr(
+            "amane.handlers.refresh.refresh_media_association",
+            fake_refresh_media_association,
+        )
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(
+                library_id=1,
+                path=str(tmp_path),
+                scan=set(),
+                scrape={MediaFileStatus.PENDING},
+            )
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.associated == 1
+        assert result.result.scrape == 0
+        assert matched_ids == [media.id]
+        assert not [task for task in (result.followups or []) if task.task_type == TaskType.SCRAPE]
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_identity_miss_creates_scrape_task(
+        self, repo: Repository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """WESTERN 未命中本地身份时正常创建 SCRAPE 任务。"""
+        media = await repo.create_media_file(
+            library_id=1,
+            path=str(tmp_path / "western.mp4"),
+            status=MediaFileStatus.PENDING,
+        )
+        assert media.id is not None
+
+        monkeypatch.setattr(
+            "amane.handlers.refresh.parse_file_info",
+            lambda _path: SimpleNamespace(
+                number="VIXEN-230415",
+                content_type=ContentType.WESTERN,
+            ),
+        )
+
+        checked_ids = []
+
+        async def fake_refresh_media_association(_repo, current_media):
+            checked_ids.append(current_media.id)
+            return False
+
+        monkeypatch.setattr(
+            "amane.handlers.refresh.refresh_media_association",
+            fake_refresh_media_association,
+        )
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(
+                library_id=1,
+                path=str(tmp_path),
+                scan=set(),
+                scrape={MediaFileStatus.PENDING},
+            )
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.associated == 0
+        assert result.result.scrape == 1
+        assert checked_ids == [media.id]
+
+        scrapes = [task for task in (result.followups or []) if task.task_type == TaskType.SCRAPE]
+        assert len(scrapes) == 1
+        assert scrapes[0].payload["media_file_id"] == media.id
+        assert scrapes[0].payload["number"] == "VIXEN-230415"
+        assert scrapes[0].payload["content_type"] == ContentType.WESTERN.value
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_non_western_skips_identity_precheck(
+        self, repo: Repository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """非 WESTERN 保持原有行为，不调用 WESTERN 本地身份预检查。"""
+        media = await repo.create_media_file(
+            library_id=1,
+            path=str(tmp_path / "MIDV-123.mp4"),
+            status=MediaFileStatus.PENDING,
+        )
+        assert media.id is not None
+
+        monkeypatch.setattr(
+            "amane.handlers.refresh.parse_file_info",
+            lambda _path: SimpleNamespace(
+                number="MIDV-123",
+                content_type=ContentType.CENSORED,
+            ),
+        )
+
+        async def unexpected_precheck(_repo, _media):
+            raise AssertionError("非 WESTERN 不应调用本地身份预检查")
+
+        monkeypatch.setattr(
+            "amane.handlers.refresh.refresh_media_association",
+            unexpected_precheck,
+        )
+
+        result = await RefreshHandler(repo=repo).handle(
+            RefreshPayload(
+                library_id=1,
+                path=str(tmp_path),
+                scan=set(),
+                scrape={MediaFileStatus.PENDING},
+            )
+        )
+
+        assert result.success is True
+        assert result.result is not None
+        assert result.result.associated == 0
+        assert result.result.scrape == 1
+
+        scrapes = [task for task in (result.followups or []) if task.task_type == TaskType.SCRAPE]
+        assert len(scrapes) == 1
+        assert scrapes[0].payload["media_file_id"] == media.id
+
+
+def test_number_mapping_requires_full_match_and_applies_capture_replacement():
+    from amane.handlers.scrape import _map_search_number
+
+    rules = [r"^(RED)-([0-9]+)$ => PRED-\\2"]
+    assert _map_search_number("RED-163", rules) == "PRED-163"
+    assert _map_search_number("red-163", rules) == "PRED-163"
+    assert _map_search_number("PRED-163", rules) == "PRED-163"
+    assert _map_search_number("XRED-163", rules) == "XRED-163"

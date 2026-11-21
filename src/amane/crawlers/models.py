@@ -1,0 +1,120 @@
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
+
+from ..enums import ActorGender
+from ..utils.dates import normalize_calendar_date
+
+if TYPE_CHECKING:
+    from ..aggregate import AggregatedMetadata
+    from ..enums import Language
+    from ..parsing.file_info import ContentType
+
+
+@dataclass
+class SearchQuery:
+    number: str
+    file_path: str | None = None
+    file_hash: str | None = None
+    content_type: ContentType | None = None
+    # WESTERN 手动指定或重新刮削时的 ThePornDB UUID.
+    theporndb_uuid: str | None = None
+    # 仅自动刮削允许来源按预定义规则尝试番号变体; 手动指定番号保持精确查询.
+    allow_number_variants: bool = True
+    # 前序聚合结果 (已定值单源标量 + 第一段已抓到的图片地址), 只读; 仅 ``SourceTrait.NEEDS_PARTIAL`` 来源非空.
+    # 为 ``None`` 当且仅当本次来源不在第二段; 单源路由下是空对象而非 ``None``.
+    partial_result: AggregatedMetadata | None = None
+    # 原始刮削身份番号; 与可能经过设置映射规则改写的搜索番号分离.
+    original_number: str | None = None
+    # Hanime1 专用本地文件路径，仅用于提取标题搜索词，不影响其他来源.
+    hanime1_file_path: str | None = None
+
+
+@dataclass
+class FetchOptions:
+    language: Language | None = None
+
+
+class ResponseModel(BaseModel):
+    """外部 API 响应模型的基类: null 与字段缺失等价, 校验前丢弃 null, 落到字段默认值.
+
+    默认值必须表达缺省: 集合用空集合, 可选对象与可空标量用 ``None``;
+    数值字段的 ``0`` 若本身是合法取值 (如评分), 默认值必须改用 ``None``.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_null(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        return {key: item for key, item in value.items() if item is not None}
+
+
+class FilmActor(BaseModel):
+    """影片出演者. ``gender`` 缺省 ``unknown``; 名单语义能判定时爬虫必须写出 ``female`` / ``male``."""
+
+    name: str
+    gender: ActorGender = ActorGender.UNKNOWN
+
+
+def film_actors(names: Iterable[str], *, gender: ActorGender = ActorGender.FEMALE) -> list[FilmActor]:
+    """按同一性别构造出演者列表; 空名丢弃. 缺省女优, 与多数 JAV 出演栏语义一致."""
+    return [FilmActor(name=name, gender=gender) for name in names if name]
+
+
+class MediaMetadata(BaseModel):
+    number: str
+    title: str | None = None
+    actors: list[FilmActor] = Field(default_factory=list)
+    studio: str | None = None
+    publisher: str | None = None
+    release: str | None = None
+    # 分钟. 外部 API 多以秒计时, 爬虫负责换算.
+    runtime: int | None = None
+    tags: list[str] = Field(default_factory=list)
+    series: str | None = None
+    series_names: list[str] = Field(default_factory=list)
+    plot: str | None = None
+    poster_urls: list[str] = Field(default_factory=list)
+    # None 表示旧爬虫未区分原始海报, 可兼容使用 poster_urls; 空列表表示明确没有独立海报.
+    original_poster_urls: list[str] | None = None
+    cover_urls: list[str] = Field(default_factory=list, validation_alias=AliasChoices("cover_urls", "thumb_urls"))
+    # 只有爬虫确认这三组图片分别代表原海报与双页封面时才填写.
+    # 不允许聚合层仅凭 original_poster_urls + cover_urls 推断, 因为它们可能只是同图不同尺寸.
+    double_page_poster_urls: list[str] = Field(default_factory=list)
+    double_page_original_poster_urls: list[str] = Field(default_factory=list)
+    double_page_cover_urls: list[str] = Field(default_factory=list)
+    trailer_urls: list[str] = Field(default_factory=list)
+    score: float | None = None
+    external_id: str | None = None
+    theporndb_uuid: str | None = None
+    source_url: str | None = None
+    directors: list[str] = Field(default_factory=list)
+    extrafanart: list[str] = Field(default_factory=list)
+
+    @field_validator("actors", mode="before")
+    @classmethod
+    def _coerce_actors(cls, value: object) -> object:
+        # 旧 raw / 插件 / 单测的 list[str] 收成 FilmActor, 性别 unknown.
+        if not isinstance(value, list):
+            return value
+        out: list[object] = []
+        for item in value:
+            if isinstance(item, str):
+                out.append({"name": item})
+            else:
+                out.append(item)
+        return out
+
+    @field_validator("release", mode="before")
+    @classmethod
+    def _normalize_release(cls, value: object) -> str | None:
+        # 存库为 YYYY-MM-DD; ISO 日期时间只取日; 无法解析视为缺省.
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str):
+            msg = "release must be a string"
+            raise TypeError(msg)
+        return normalize_calendar_date(value)

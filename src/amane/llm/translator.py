@@ -1,0 +1,334 @@
+"""跨语系经缓存后经 pydantic-ai ``Model`` 翻译; 简繁经 ``zhconv``, 不经 LLM、不写入缓存.
+
+已是目标语言返回 ``None``. ``build_translator`` 在 enabled=False 或缺 api_key 时返回 ``None``.
+"""
+
+import re
+from collections.abc import Mapping
+
+import structlog
+from aiolimiter import AsyncLimiter
+from httpx2 import AsyncClient, Timeout
+from pydantic_ai.direct import model_request
+from pydantic_ai.messages import ModelMessage, ModelRequest, SystemPromptPart, UserPromptPart
+from pydantic_ai.models import Model
+
+from ..enums import ApiType, Language, MetadataField
+from ..utils import zhconv
+from ..utils.language import needs_llm_translation
+from .cache import TranslationCache
+from .coalescer import TranslationCoalescer
+from .model import build_model
+
+logger = structlog.get_logger()
+
+_TIMEOUT = 60.0
+"""LLM 请求超时 (秒). 重试由 SDK 按其默认策略承担, 翻译器不配置次数."""
+
+_PLOT_PARAGRAPH_THRESHOLD = 1000
+"""简介达到此字符数时，按自然段逐段翻译。仅控制翻译模式，不截断文本。"""
+
+_THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
+"""去除提供商写进正文的思维链, 仅保留最终答案. ``ModelResponse.text`` 已排除 ``ThinkingPart``."""
+
+# Language 枚举 → zhconv locale 代码 (仅中文变体).
+_ZHCONV_LOCALE: dict[Language, str] = {
+    Language.ZH_CN: "zh-cn",
+    Language.ZH_TW: "zh-tw",
+}
+
+_LANG_NAME: dict[Language, str] = {
+    Language.ZH_CN: "简体中文",
+    Language.ZH_TW: "繁體中文",
+    Language.JP: "日本語",
+    Language.EN: "English",
+}
+
+_FIELD_HINT: dict[MetadataField, str] = {
+    MetadataField.TITLE: "这是一部影片的标题, 翻译应简洁自然, 保留专有名词与番号.",
+    MetadataField.PLOT: "这是一部影片的简介, 完整通顺地翻译全部内容.",
+    MetadataField.ACTOR_BIRTHPLACE: (
+        "这是演员的出生地. 请翻译为简体中文地名, 国家或地区名称放在城市名称之前. "
+        "保留原文地名的准确含义, 不要添加解释或其他信息."
+    ),
+    MetadataField.ACTOR_OVERVIEW: (
+        "这是演员的个人简介. 请完整、准确、自然地翻译为简体中文, "
+        "保留原文中的事实、人物信息和语气, 不要删减或自行补充内容."
+    ),
+}
+
+_PLOT_FORMAT_HINT = (
+    "翻译时必须严格保留原文的段落结构和换行位置. "
+    "原文有几个自然段, 译文就保留对应的自然段; "
+    "段落内部的换行也必须保留. 不得合并段落、删除换行或改变段落顺序."
+)
+
+TARGET_LANG_PLACEHOLDER = "{target_lang}"
+"""自定义提示词中引用目标语言名的占位符."""
+
+_DEFAULT_SYSTEM_PROMPT = f"你是专业的影视元数据翻译. 将用户提供的文本翻译为{TARGET_LANG_PLACEHOLDER}."
+
+_ACTOR_SYSTEM_PROMPT = "你是专业的演员资料翻译. 将用户提供的文本翻译为简体中文."
+
+_OUTPUT_CONSTRAINT = "只输出译文本身, 不要解释、不要引号、不要附加任何内容."
+
+_ACTOR_FIELDS = frozenset(
+    {
+        MetadataField.ACTOR_BIRTHPLACE,
+        MetadataField.ACTOR_OVERVIEW,
+    }
+)
+
+
+def build_system_prompt(
+    target: Language,
+    field: MetadataField,
+    *,
+    system_prompt: str | None = None,
+    field_prompts: Mapping[MetadataField, str] | None = None,
+) -> str:
+    """组装 system 提示词 = 指令 + 字段说明 + 固定输出约束.
+
+    ``system_prompt`` 覆盖内置指令, 空白时回退内置; ``field_prompts`` 逐字段覆盖内置说明,
+    无覆盖或覆盖值为空白时回退内置. 输出约束不允许配置: 译文写入标量字段, 附加解释会污染元数据.
+    占位符仅替换 ``{target_lang}``, 其余花括号按字面保留.
+    """
+    instruction = (system_prompt or "").strip() or _DEFAULT_SYSTEM_PROMPT
+    override = (field_prompts or {}).get(field, "")
+    hint = override.strip() or _FIELD_HINT.get(field, "")
+    parts = [_render_placeholders(instruction, target)]
+    if hint:
+        parts.append(_render_placeholders(hint, target))
+    if field == MetadataField.PLOT:
+        parts.append(_PLOT_FORMAT_HINT)
+    parts.append(_OUTPUT_CONSTRAINT)
+    return " ".join(parts)
+
+
+def build_actor_system_prompt(field: MetadataField) -> str:
+    """组装演员专用提示词, 不继承影片翻译的任何用户自定义提示词."""
+    if field not in _ACTOR_FIELDS:
+        raise ValueError(f"Unsupported actor translation field: {field}")
+
+    hint = _FIELD_HINT[field]
+    return f"{_ACTOR_SYSTEM_PROMPT} {hint} {_OUTPUT_CONSTRAINT}"
+
+
+def _render_placeholders(template: str, target: Language) -> str:
+    """不使用 ``str.format``: 提示词允许出现 JSON 示例等花括号."""
+    return template.replace(TARGET_LANG_PLACEHOLDER, _LANG_NAME[target])
+
+
+class LLMTranslator:
+    def __init__(
+        self,
+        model: Model,
+        cache: TranslationCache | None = None,
+        *,
+        coalescer: TranslationCoalescer | None = None,
+        rate_limit: float = 2.0,
+        system_prompt: str | None = None,
+        field_prompts: Mapping[MetadataField, str] | None = None,
+    ) -> None:
+        self._model = model
+        self._cache = cache
+        # 热重载会重建 translator; 生产环境传入会话级实例, 使过渡期内旧、新 worker 共用请求.
+        self._coalescer = coalescer if coalescer is not None else TranslationCoalescer()
+        # LLM 端点独立限速, 与站点 host 限速隔离: 桶容量 1, 严格平滑.
+        # 包住一次翻译调用; 该调用内部的重试由 SDK 客户端承担.
+        self._limiter = AsyncLimiter(1, 1 / rate_limit)
+        self._system_prompt = system_prompt
+        self._field_prompts: Mapping[MetadataField, str] = field_prompts or {}
+
+    async def translate(
+        self, text: str, target: Language, field: MetadataField, *, use_cache: bool = True
+    ) -> str | None:
+        text = text.strip()
+        if not text:
+            return None
+
+        if needs_llm_translation(text, target):
+            system = build_system_prompt(
+                target,
+                field,
+                system_prompt=self._system_prompt,
+                field_prompts=self._field_prompts,
+            )
+            # 同一文本的并发翻译合并为一次请求: 分集并发刮削时各任务拿到同一译文, 不因采样漂移.
+            # 缓存读取也放在合并范围内: 若在登记之外读取, 命中与登记之间仍可能各自请求一次.
+            if field == MetadataField.PLOT:
+                return await self._coalescer.run(
+                    (text, target, field, system),
+                    lambda: self._translate_plot_llm(text, target, system, use_cache=use_cache),
+                )
+            return await self._coalescer.run(
+                (text, target, field, system),
+                lambda: self._translate_llm(text, target, field, system, use_cache=use_cache),
+            )
+
+        # 中文文本: 已是目标变体直接返回, 否则做字形与地区词转换; 转换后等于原文同样返回 None.
+        locale = _ZHCONV_LOCALE.get(target)
+        if locale is not None:
+            if zhconv.issimp(text, full=True) is (target == Language.ZH_CN):
+                return None
+            converted = zhconv.convert(text, locale)
+            return converted if converted != text else None
+
+        return None
+
+    async def translate_actor(self, text: str, field: MetadataField, *, use_cache: bool = True) -> str | None:
+        """演员专用翻译: 固定简体中文, 不受影片翻译配置影响."""
+        if field not in _ACTOR_FIELDS:
+            raise ValueError(f"Unsupported actor translation field: {field}")
+
+        text = text.strip()
+        if not text:
+            return None
+
+        target = Language.ZH_CN
+
+        if needs_llm_translation(text, target):
+            system = build_actor_system_prompt(field)
+            # 与普通翻译共用缓存、请求合并器和限速器, 但提示词及缓存键独立.
+            return await self._coalescer.run(
+                (text, target, field, system),
+                lambda: self._translate_llm(text, target, field, system, use_cache=use_cache),
+            )
+
+        # 原文已经是简体中文时不重复翻译; 繁体中文转换为简体中文.
+        locale = _ZHCONV_LOCALE[target]
+        if zhconv.issimp(text, full=True):
+            return None
+        converted = zhconv.convert(text, locale)
+        return converted if converted != text else None
+
+    async def _translate_plot_llm(
+        self,
+        text: str,
+        target: Language,
+        system_prompt: str,
+        *,
+        use_cache: bool,
+    ) -> str | None:
+        """翻译简介. 短简介整篇翻译, 长简介按自然段翻译; 全部成功后才缓存."""
+        if self._cache is not None and use_cache:
+            cached = await self._cache.get(text, target, MetadataField.PLOT, system_prompt)
+            if cached is not None:
+                return cached
+
+        # 短简介仍然一次性翻译, 并检查译文是否保留原文换行结构.
+        if len(text) < _PLOT_PARAGRAPH_THRESHOLD:
+            result = await self._ask(
+                system_prompt=system_prompt,
+                user_prompt=text,
+            )
+            if not result:
+                return None
+            if re.findall(r"\n+", result) != re.findall(r"\n+", text):
+                logger.warning("Plot translation changed line-break structure")
+                return None
+        else:
+            # 长简介按空行分隔自然段, 保留原文段落之间的分隔符.
+            parts = re.split(r"(\n{2,})", text)
+            translated_parts: list[str] = []
+            previous_context: list[str] = []
+
+            for index, part in enumerate(parts):
+                if index % 2 == 1:
+                    translated_parts.append(part)
+                    continue
+
+                if not part.strip():
+                    translated_parts.append(part)
+                    continue
+
+                user_prompt = part
+                if previous_context:
+                    context = "\n\n".join(previous_context)
+                    user_prompt = (
+                        "以下是此前已经翻译的段落, 仅用于理解上下文, 不要重复翻译:\n"
+                        f"{context}\n\n"
+                        "请只翻译下面这一段, 并保留段落内部原有的换行:\n"
+                        f"{part}"
+                    )
+
+                translated = await self._ask(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                )
+                if not translated:
+                    return None
+
+                if re.findall(r"\n+", translated) != re.findall(r"\n+", part):
+                    logger.warning("Plot paragraph translation changed line-break structure")
+                    return None
+
+                translated_parts.append(translated)
+                previous_context.append(f"原文:\n{part}\n译文:\n{translated}")
+
+            result = "".join(translated_parts)
+
+        if self._cache is not None:
+            await self._cache.put(text, target, MetadataField.PLOT, system_prompt, result)
+        return result
+
+    async def _translate_llm(
+        self, text: str, target: Language, field: MetadataField, system_prompt: str, *, use_cache: bool
+    ) -> str | None:
+        """合并键内的一次完整翻译: 读缓存, 请求模型, 回写缓存."""
+        # 缓存命中即跳过 LLM: 全缓存重刮, 配置不变时不重复翻译, 也避免 temperature 漂移.
+        # 键含 system 提示词, 改提示词后旧译文不再命中. use_cache=False 时跳过读取
+        # (强制重译), 但仍回写以刷新缓存.
+        if self._cache is not None and use_cache:
+            cached = await self._cache.get(text, target, field, system_prompt)
+            if cached is not None:
+                return cached
+        result = await self._ask(system_prompt=system_prompt, user_prompt=text)
+        if not result:
+            return None
+        if self._cache is not None:
+            await self._cache.put(text, target, field, system_prompt, result)
+        return result
+
+    async def _ask(self, *, system_prompt: str, user_prompt: str) -> str | None:
+        """单轮请求. 重试由 SDK 客户端承担; 无内容或抛异常时返回 ``None``, 不抛异常."""
+        messages: list[ModelMessage] = [
+            ModelRequest(parts=[SystemPromptPart(content=system_prompt), UserPromptPart(content=user_prompt)])
+        ]
+        async with self._limiter:
+            try:
+                response = await model_request(self._model, messages)
+            except Exception as e:
+                logger.warning("LLM request failed, retries exhausted", error=str(e))
+                return None
+        text = response.text
+        return _THINK.sub("", text).strip() if text else None
+
+
+def build_translator(
+    *,
+    enabled: bool,
+    api_type: ApiType,
+    api_key: str | None,
+    base_url: str,
+    model: str,
+    rate_limit: float,
+    proxy: str | None = None,
+    system_prompt: str | None = None,
+    field_prompts: Mapping[MetadataField, str] | None = None,
+    cache: TranslationCache | None = None,
+    coalescer: TranslationCoalescer | None = None,
+) -> LLMTranslator | None:
+    """未启用或缺密钥时返回 ``None``. ``cache`` 与 ``coalescer`` 热重载时复用同一实例."""
+    if not enabled or not api_key:
+        return None
+    # 翻译路径自建传输客户端 (proxy + 超时) 并交给 provider; 助理不传, 由 pydantic-ai 构造默认客户端.
+    http_client = AsyncClient(proxy=proxy, timeout=Timeout(_TIMEOUT), follow_redirects=True)
+    return LLMTranslator(
+        build_model(api_type, base_url=base_url, api_key=api_key, model=model, http_client=http_client),
+        cache,
+        coalescer=coalescer,
+        rate_limit=rate_limit,
+        system_prompt=system_prompt,
+        field_prompts=field_prompts,
+    )

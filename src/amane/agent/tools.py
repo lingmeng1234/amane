@@ -1,0 +1,359 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
+from pydantic import BaseModel
+from pydantic_ai import ApprovalRequired, RunContext
+from pydantic_ai.toolsets import FunctionToolset
+
+from ..db.embeddings import EmbeddingKind
+from ..db.models import SavedQueryEntity
+from ..db.repository import Repository
+from .bridge import AgentRuntimeBridge
+from .cache import CachedResult
+from .executor import QueryExecutor, extract_entity_ids
+from .sql import SqlNeedsApproval, SqlResult, SqlSandboxError, SqlTimeoutError, as_id_subquery_sql
+
+TOOL_OK = "OK"
+"""成功回执: 模型下一步不需要任何观测的写操作只回它. 见 docs/dev/agent.md 返回值契约."""
+
+
+def unknown_field_error(unknown: Iterable[str], allowed: Iterable[str]) -> dict[str, Any]:
+    """patch 拒绝未知字段时一并回可写字段, 省掉一轮试探."""
+    return {"error": f"不允许的字段: {', '.join(sorted(unknown))}; 可写字段: {', '.join(sorted(allowed))}"}
+
+
+class ExploreResult(BaseModel):
+    columns: list[str]
+    sample_rows: list[list[Any]]
+    row_count: int
+    truncated: bool = False
+    saved_query_id: int | None = None
+    """create_view 时物化的会话视图 id."""
+
+
+class DeliverResult(BaseModel):
+    saved_query_id: int
+    name: str
+    row_count: int
+
+
+class InspectResult(BaseModel):
+    columns: list[str]
+    rows: list[list[Any]]
+    total: int
+
+
+class SemanticHitItem(BaseModel):
+    id: int
+    number: str
+    title: str | None
+    release: str | None
+    kind: str
+    resource_url: str
+    similarity: float
+
+
+class SemanticSearchResult(BaseModel):
+    total: int
+    items: list[SemanticHitItem]
+
+
+@dataclass
+class AgentDeps:
+    repo: Repository
+    executor: QueryExecutor
+    session_id: int | None
+    """None = 外部派发: 交付的查询预设与会话解耦, 直接进入预设列表."""
+    sql_timeout_ms: int
+    sample_limit: int = 20
+    bridge: AgentRuntimeBridge = field(default_factory=AgentRuntimeBridge)
+
+
+def require_approval(
+    ctx: RunContext[AgentDeps],
+    *,
+    sql: str,
+    tool: str,
+    entity: SavedQueryEntity | None = None,
+    name: str | None = None,
+    create_view: bool = False,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    """未批准时 raise ApprovalRequired. metadata 供 UI 确认文案; approval 键为 tool_call_id."""
+    if ctx.tool_call_approved:
+        return
+    tool_call_id = ctx.tool_call_id or ""
+    if not tool_call_id:
+        raise RuntimeError("require_approval 需要 tool_call_id")
+    meta: dict[str, Any] = {
+        "sql": sql,
+        "tool": tool,
+        "entity": entity if entity is not None else None,
+        "name": name,
+        "create_view": create_view,
+        "extra": dict(extra or {}),
+        "reason": "allow_slow",
+    }
+    raise ApprovalRequired(metadata=meta)
+
+
+async def materialize_saved_query(
+    deps: AgentDeps,
+    *,
+    sql: str,
+    entity: SavedQueryEntity | None,
+    name: str | None,
+    description: str | None = None,
+    persisted: bool = False,
+    result: SqlResult,
+) -> tuple[int, str, list[int]]:
+    """把全量 SQL 结果写成会话 SavedQuery 并入缓存.
+
+    ``entity`` 省略按 ``DATA`` 落库: 不校验/不抽取 id, 只作数据表交付或探查视图.
+
+    外部派发没有会话 (``deps.session_id is None``). ``sql_deliver`` 因此在无会话时传
+    ``persisted=True``; 探查视图这条路径没有传, 行落在 ``session_id=NULL, persisted=false``,
+    既不属于任何会话 (删会话时不会被回收), 也不在预设页 (那里只列 persisted). 结果是每次
+    外部 ``create_view`` 都留下一行, 且用户看不见、删不掉. 清理需要一个大于结果缓存存活窗口
+    的截止时间, 单独处理.
+
+    ``entity`` 为 metadata/actor 时按交付契约抽取 ``id`` 列 (缺失抛 ValueError).
+    """
+    entity = entity or SavedQueryEntity.DATA
+    entity_ids: list[int] = []
+    if entity is not SavedQueryEntity.DATA:
+        entity_ids = extract_entity_ids(result.columns, result.rows)
+    display_name = (name or "").strip() or ("数据查询" if entity is SavedQueryEntity.DATA else f"查询 ({entity})")
+    saved = await deps.repo.create_saved_query(
+        name=display_name,
+        description=(description or "").strip(),
+        sql=sql,
+        entity=entity,
+        session_id=deps.session_id,
+        persisted=persisted,
+    )
+    assert saved.id is not None
+    deps.executor.cache.put(CachedResult(saved_query_id=saved.id, sql=sql, columns=result.columns, rows=result.rows))
+    return saved.id, saved.name, entity_ids
+
+
+def build_explore_toolset() -> FunctionToolset[AgentDeps]:
+    toolset: FunctionToolset[AgentDeps] = FunctionToolset()
+
+    @toolset.tool
+    async def sql_explore(
+        ctx: RunContext[AgentDeps],
+        sql: str,
+        allow_slow: bool = False,
+        create_view: bool = False,
+        name: str | None = None,
+    ) -> dict[str, Any]:
+        """Exploratory read-only SQL. Sample rows by default.
+
+        Set create_view=True to materialize a session view for inspect_result pagination
+        instead of hand-written LIMIT/OFFSET probes. Views are just row arrays — no entity
+        or `id` column requirement. Views are not shown as UI chips.
+        """
+        try:
+            result = await ctx.deps.executor.run_sql(
+                sql,
+                timeout_ms=ctx.deps.sql_timeout_ms,
+                allow_slow=allow_slow,
+                approved=ctx.tool_call_approved,
+                max_rows=None if create_view else ctx.deps.sample_limit,
+            )
+        except SqlNeedsApproval:
+            require_approval(
+                ctx,
+                sql=sql,
+                tool="sql_explore",
+                name=name,
+                create_view=create_view,
+            )
+            raise  # pragma: no cover - require_approval 必 raise
+        except (SqlSandboxError, SqlTimeoutError) as exc:
+            return {"error": str(exc)}
+
+        if create_view:
+            try:
+                view_id, _view_name, _entity_ids = await materialize_saved_query(
+                    ctx.deps,
+                    sql=sql,
+                    entity=None,
+                    name=name,
+                    result=result,
+                )
+            except ValueError as exc:
+                return {"error": str(exc)}
+            out = ExploreResult(
+                columns=result.columns,
+                sample_rows=result.rows[: ctx.deps.sample_limit],
+                row_count=len(result.rows),
+                truncated=False,
+                saved_query_id=view_id,
+            )
+        else:
+            out = ExploreResult(
+                columns=result.columns,
+                sample_rows=result.rows[: ctx.deps.sample_limit],
+                row_count=result.row_count if result.row_count >= 0 else len(result.rows),
+                truncated=result.row_count < 0,
+            )
+        return out.model_dump(mode="json")
+
+    @toolset.tool
+    async def sql_deliver(
+        ctx: RunContext[AgentDeps],
+        sql: str,
+        entity: SavedQueryEntity | None = None,
+        name: str | None = None,
+        description: str | None = None,
+        allow_slow: bool = False,
+    ) -> dict[str, Any]:
+        """Deliver a final result set for humans. Creates a saved_query.
+
+        name / description: short human-readable label and note, shown in the preset list
+        and on the data page.
+        entity=metadata|actor: SQL MUST return a column named `id`; the preset becomes a
+        filter in /meta or /actors AND can be opened as a data table.
+        Omit entity (or use data): any read-only result, rendered only as a data table.
+        """
+        try:
+            result = await ctx.deps.executor.run_sql(
+                sql,
+                timeout_ms=ctx.deps.sql_timeout_ms,
+                allow_slow=allow_slow,
+                approved=ctx.tool_call_approved,
+            )
+        except SqlNeedsApproval:
+            require_approval(ctx, sql=sql, tool="sql_deliver", entity=entity, name=name)
+            raise  # pragma: no cover
+        except (SqlSandboxError, SqlTimeoutError) as exc:
+            return {"error": str(exc)}
+
+        try:
+            view_id, display_name, _ = await materialize_saved_query(
+                ctx.deps,
+                sql=sql,
+                entity=entity,
+                name=name,
+                description=description,
+                persisted=ctx.deps.session_id is None,
+                result=result,
+            )
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        out = DeliverResult(
+            saved_query_id=view_id,
+            name=display_name,
+            row_count=len(result.rows),
+        )
+        return out.model_dump(mode="json")
+
+    @toolset.tool
+    async def semantic_search(
+        ctx: RunContext[AgentDeps],
+        query: str,
+        limit: int = 20,
+        kind: Literal["all", "cover", "still"] = "all",
+        saved_query_id: int | None = None,
+        sql: str | None = None,
+    ) -> dict[str, Any]:
+        """Search covers and stills by one natural-language description of the image.
+
+        The whole query is encoded once; do not split it into words. Pass saved_query_id or a
+        read-only sql returning an `id` column to rank only inside that result set.
+        """
+        text = query.strip()
+        if not text:
+            return {"error": "query 不能为空"}
+        limit = max(1, min(limit, 60))
+        if saved_query_id is not None and sql is not None:
+            return {"error": "saved_query_id 与 sql 只能传一个"}
+        search = ctx.deps.bridge.semantic_search
+        if search is None:
+            return {"error": "语义检索未启用"}
+
+        allowed_ids: list[int] | None = None
+        if sql is not None:
+            try:
+                result = await ctx.deps.executor.run_sql(
+                    sql,
+                    timeout_ms=ctx.deps.sql_timeout_ms,
+                    approved=ctx.tool_call_approved,
+                )
+            except SqlNeedsApproval:
+                require_approval(
+                    ctx,
+                    sql=sql,
+                    tool="semantic_search",
+                    extra={"query": text, "limit": limit, "kind": kind},
+                )
+                raise  # pragma: no cover - require_approval 必 raise
+            except (SqlSandboxError, SqlTimeoutError) as exc:
+                return {"error": str(exc)}
+            try:
+                allowed_ids = extract_entity_ids(result.columns, result.rows)
+            except ValueError as exc:
+                return {"error": str(exc)}
+        elif saved_query_id is not None:
+            saved = await ctx.deps.repo.get_saved_query(saved_query_id)
+            if saved is None:
+                return {"error": f"saved_query {saved_query_id} 不存在"}
+            if saved.entity is not SavedQueryEntity.METADATA:
+                return {"error": f"查询预设实体为 {saved.entity}, 需要 metadata"}
+            allowed_ids = await ctx.deps.repo.list_metadata_ids(id_subquery_sql=as_id_subquery_sql(saved.sql))
+
+        hits = await search(
+            text,
+            limit,
+            None if kind == "all" else EmbeddingKind(kind),
+            allowed_ids,
+        )
+        items, _ = await ctx.deps.repo.list_metadata(ids=[hit.metadata_id for hit in hits], limit=max(1, len(hits)))
+        by_id = {item.id: item for item in items}
+        rows = [
+            SemanticHitItem(
+                id=hit.metadata_id,
+                number=by_id[hit.metadata_id].number,
+                title=by_id[hit.metadata_id].title,
+                release=str(by_id[hit.metadata_id].release) if by_id[hit.metadata_id].release else None,
+                kind=hit.kind.value,
+                resource_url=hit.resource_url,
+                similarity=round(hit.score, 4),
+            )
+            for hit in hits
+            if hit.metadata_id in by_id
+        ]
+        return SemanticSearchResult(total=len(rows), items=rows).model_dump(mode="json")
+
+    @toolset.tool
+    async def inspect_result(
+        ctx: RunContext[AgentDeps],
+        saved_query_id: int,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Inspect rows of a saved_query / explore view by id (uses cache or re-runs SQL)."""
+        limit = max(1, min(limit, 100))
+        offset = max(0, offset)
+        query = await ctx.deps.repo.get_saved_query(saved_query_id)
+        if query is None:
+            return {"error": f"saved_query {saved_query_id} 不存在"}
+        try:
+            cached = await ctx.deps.executor.ensure_cached(query, timeout_ms=ctx.deps.sql_timeout_ms)
+        except (SqlSandboxError, SqlTimeoutError) as exc:
+            return {"error": str(exc)}
+
+        out = InspectResult(
+            columns=cached.columns,
+            rows=cached.rows[offset : offset + limit],
+            total=len(cached.rows),
+        )
+        return out.model_dump(mode="json")
+
+    return toolset

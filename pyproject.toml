@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "amane"
 version = "0.28.1"
-description = "Amane â€?media metadata management service"
+description = "Amane â€”media metadata management service"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [

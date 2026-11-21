@@ -93,9 +93,7 @@ async def save_dmm_mapping_exception(req: ExceptionUpdate, runtime: RuntimeDep):
         raise HTTPException(400, "冲突记录的原文字和修正文字必须是字符串")
 
     try:
-        return store(runtime).save_conflict_entry(
-            req.group_id, req.side, source, target
-        )
+        return store(runtime).save_conflict_entry(req.group_id, req.side, source, target)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

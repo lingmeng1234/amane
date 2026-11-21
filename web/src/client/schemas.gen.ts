@@ -805,6 +805,7 @@ export const ActorUserTagsRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Ids',
             description: '演员 ID 列表'
@@ -814,6 +815,7 @@ export const ActorUserTagsRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'User Tag Ids',
             description: '用户标签 ID 列表'
@@ -2258,6 +2260,7 @@ export const FacetBatchRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Facet Ids',
             description: '分类 ID 列表'
@@ -2351,6 +2354,7 @@ export const FacetMergeRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Source Ids',
             description: '待合并的来源 facet id 列表'
@@ -2625,6 +2629,7 @@ export const FeedItemBatchRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Ids'
         }
@@ -3101,7 +3106,8 @@ export const FeedUpdateRequestSchema = {
         }
     },
     type: 'object',
-    title: 'FeedUpdateRequest'
+    title: 'FeedUpdateRequest',
+    description: 'PATCH 的字段校验与 POST 使用同一规则; 显式 null 由 partial 模型拒绝非空列.'
 } as const;
 
 export const FileItemSchema = {
@@ -5812,6 +5818,12 @@ export const MetadataBatchDeleteResponseSchema = {
             type: 'integer',
             title: 'Missing',
             description: '不存在的 id 数量'
+        },
+        skipped: {
+            type: 'integer',
+            title: 'Skipped',
+            description: '请求内重复的 id 数量; 已去重',
+            default: 0
         }
     },
     type: 'object',
@@ -5829,6 +5841,7 @@ export const MetadataBatchIdsRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Ids',
             description: 'Metadata ID 列表'
@@ -5848,6 +5861,7 @@ export const MetadataBatchScrapeRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Ids',
             description: 'Metadata ID 列表'
@@ -5899,6 +5913,12 @@ export const MetadataBatchScrapeResponseSchema = {
             type: 'array',
             title: 'Task Ids',
             description: '提交的任务 id 列表'
+        },
+        skipped: {
+            type: 'integer',
+            title: 'Skipped',
+            description: '请求内重复的 id 数量; 已去重',
+            default: 0
         }
     },
     type: 'object',
@@ -6017,30 +6037,6 @@ export const MetadataDetailResponseSchema = {
         'files'
     ],
     title: 'MetadataDetailResponse'
-} as const;
-
-export const TranslationFieldSchema = {
-    type: 'string',
-    enum: [
-        'plot',
-        'original_plot',
-        'actors',
-        'directors',
-        'tags',
-        'series',
-        'release',
-        'runtime',
-        'publisher',
-        'studio',
-        'poster_urls',
-        'cover_urls',
-        'trailer_urls',
-        'extrafanart',
-        'score',
-        'actor_birthplace',
-        'actor_overview'
-    ],
-    title: 'TranslationField'
 } as const;
 
 export const MetadataFieldSchema = {
@@ -6789,6 +6785,7 @@ export const MetadataUserTagsRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Ids',
             description: 'Metadata ID 列表'
@@ -6798,6 +6795,7 @@ export const MetadataUserTagsRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'User Tag Ids',
             description: '用户标签 ID 列表'
@@ -6819,6 +6817,39 @@ export const MetadataUserTagsRequestSchema = {
         'action'
     ],
     title: 'MetadataUserTagsRequest'
+} as const;
+
+export const MetadataUserTagsResponseSchema = {
+    properties: {
+        changed: {
+            type: 'integer',
+            title: 'Changed',
+            description: '至少一处挂载关系发生变更的条目数'
+        },
+        unchanged: {
+            type: 'integer',
+            title: 'Unchanged',
+            description: '已处于目标态、未修改的条目数'
+        },
+        missing: {
+            type: 'integer',
+            title: 'Missing',
+            description: '不存在的条目 id 数'
+        },
+        skipped: {
+            type: 'integer',
+            title: 'Skipped',
+            description: '请求内重复的条目 id 数量; 已去重',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: [
+        'changed',
+        'unchanged',
+        'missing'
+    ],
+    title: 'MetadataUserTagsResponse'
 } as const;
 
 export const MosaicSchema = {
@@ -9333,6 +9364,7 @@ export const SelectionRequestSchema = {
                 type: 'integer'
             },
             type: 'array',
+            maxItems: 1000,
             minItems: 1,
             title: 'Media File Ids',
             description: '选中的媒体文件 ID; 必须属于该库'
@@ -10237,6 +10269,7 @@ export const TaskBatchRequestSchema = {
                         type: 'integer'
                     },
                     type: 'array',
+                    maxItems: 1000,
                     minItems: 1
                 },
                 {
@@ -11256,6 +11289,31 @@ export const ToolSummarySchema = {
     description: '目录索引里的一条: 够选工具, 不够直接构造复杂入参.'
 } as const;
 
+export const TranslationFieldSchema = {
+    type: 'string',
+    enum: [
+        'plot',
+        'original_plot',
+        'actors',
+        'directors',
+        'tags',
+        'series',
+        'release',
+        'runtime',
+        'publisher',
+        'studio',
+        'poster_urls',
+        'cover_urls',
+        'trailer_urls',
+        'extrafanart',
+        'score',
+        'actor_birthplace',
+        'actor_overview'
+    ],
+    title: 'TranslationField',
+    description: 'LLM 通用翻译字段; 标题按作品类型由独立开关控制.'
+} as const;
+
 export const TrashSummaryResponseSchema = {
     properties: {
         exists: {
@@ -11809,6 +11867,58 @@ export const amane__api__routes__actor_mappings__EntryUpdateSchema = {
     required: [
         'id',
         'name'
+    ],
+    title: 'EntryUpdate'
+} as const;
+
+export const amane__api__routes__dmm_mappings__BatchDeleteRequestSchema = {
+    properties: {
+        sources: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Sources'
+        }
+    },
+    type: 'object',
+    required: [
+        'sources'
+    ],
+    title: 'BatchDeleteRequest'
+} as const;
+
+export const amane__api__routes__dmm_mappings__EntryUpdateSchema = {
+    properties: {
+        source: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Source'
+        },
+        target: {
+            type: 'string',
+            maxLength: 500,
+            minLength: 1,
+            title: 'Target'
+        },
+        original_source: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Original Source'
+        }
+    },
+    type: 'object',
+    required: [
+        'source',
+        'target'
     ],
     title: 'EntryUpdate'
 } as const;

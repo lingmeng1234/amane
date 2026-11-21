@@ -37,6 +37,7 @@ from ..handlers import (
 from ..library import InventoryStore
 from ..llm import TranslationCache, TranslationCoalescer, build_translator
 from ..mappings.actor_store import ActorMappingStore
+from ..mappings.dmm_text_store import DmmTextMappingStore
 from ..mappings.store import NumberMappingStore
 from ..media.watermarks import user_watermark_dir
 from ..net.browser import BrowserPool
@@ -244,6 +245,7 @@ class AppRuntime:
     tag_mappings: TagMappingStore = field(init=False)
     number_mappings: NumberMappingStore = field(init=False)
     actor_mappings: ActorMappingStore = field(init=False)
+    dmm_text_mappings: DmmTextMappingStore = field(init=False)
     semantic: SemanticService | None = None
     browser: BrowserPool | None = None
     r18_handle: R18Handle | None = None
@@ -267,6 +269,7 @@ class AppRuntime:
         self.number_mappings = NumberMappingStore(self.config.cold.data_dir, mapping_seed_dir)
         actor_mapping_seed = Path(__file__).resolve().parents[1] / "resources" / "minnano_actress_map.json"
         self.actor_mappings = ActorMappingStore(self.config.cold.data_dir, actor_mapping_seed)
+        self.dmm_text_mappings = DmmTextMappingStore(self.config.cold.data_dir)
         if self.semantic is None:
             self.semantic = SemanticService(
                 self.repo, self.resource_store, self.config.cold.data_dir, self.config.hot.semantic

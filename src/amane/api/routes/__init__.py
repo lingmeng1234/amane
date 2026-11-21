@@ -8,6 +8,7 @@ from .bootstrap import router as bootstrap_router
 from .cleanup import router as cleanup_router
 from .comments import router as comments_router
 from .config import router as config_router
+from .dmm_mappings import router as dmm_mappings_router
 from .facets import router as facets_router
 from .feeds import router as feeds_router
 from .files import router as files_router
@@ -58,6 +59,7 @@ router.include_router(tasks_router)
 router.include_router(tag_mappings_router)
 router.include_router(number_mappings_router)
 router.include_router(actor_mappings_router)
+router.include_router(dmm_mappings_router)
 router.include_router(tools_router)
 router.include_router(libraries_router)
 router.include_router(webhooks_router)

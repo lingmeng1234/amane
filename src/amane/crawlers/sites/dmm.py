@@ -4,11 +4,13 @@ import json
 import re
 from collections.abc import Sequence
 from enum import StrEnum
+from pathlib import Path
 
 from parsel import Selector
 from pydantic import ValidationError
 
 from ...enums import ActorGender, SiteName
+from ...mappings.dmm_text_store import DmmTextMappingStore
 from ...net.errors import FailureReason, SourceError, parse_detail
 from ...utils.text import normalize_long_text
 from ..base import Crawler, CrawlerProfile
@@ -115,6 +117,10 @@ def _digital_extrafanart(images: Sequence[_DigitalSampleImage]) -> list[str]:
 
 
 class DmmCrawler(Crawler):
+    def __init__(self, client, config=None, *, mapping_path: Path | None = None):
+        super().__init__(client=client, config=config)
+        self._text_mappings = DmmTextMappingStore(mapping_path.parent.parent) if mapping_path is not None else None
+
     @classmethod
     def profile(cls) -> CrawlerProfile:
         return CrawlerProfile(
@@ -225,17 +231,20 @@ class DmmCrawler(Crawler):
         category = _parse_category(url)
         match category:
             case Category.FANZA_TV:
-                return await self._scrape_fanza_tv(url)
+                result = await self._scrape_fanza_tv(url)
             case Category.DMM_TV:
-                return await self._scrape_dmm_tv(url)
+                result = await self._scrape_dmm_tv(url)
             case Category.DIGITAL:
-                return await self._scrape_digital(url, self.cookies)
+                result = await self._scrape_digital(url, self.cookies)
             case Category.MONO | Category.PRIME | Category.MONTHLY:
-                return await self._scrape_mono(url, self.cookies)
+                result = await self._scrape_mono(url, self.cookies)
             case Category.RENTAL:
-                return await self._scrape_rental(url, self.cookies)
+                result = await self._scrape_rental(url, self.cookies)
             case _:
                 return None
+        if result is not None and self._text_mappings is not None:
+            self._text_mappings.apply_metadata(result)
+        return result
 
     async def _scrape_digital(self, url: str, cookies: dict[str, str]) -> MediaMetadata | None:
         cid_match = re.search(r"(?:cid|id)=([^/&?]+)", url)

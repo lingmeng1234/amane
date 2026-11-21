@@ -1031,15 +1031,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by actor facet id(s); AND",
-              "title": "Actor Id",
-              "maxItems": 100
+              "title": "Actor Id"
             },
             "description": "Filter by actor facet id(s); AND"
           },
@@ -1053,15 +1053,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by director facet id(s); AND",
-              "title": "Director Id",
-              "maxItems": 100
+              "title": "Director Id"
             },
             "description": "Filter by director facet id(s); AND"
           },
@@ -1075,15 +1075,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by scraped tag facet id(s); AND",
-              "title": "Tag Id",
-              "maxItems": 100
+              "title": "Tag Id"
             },
             "description": "Filter by scraped tag facet id(s); AND"
           },
@@ -1097,15 +1097,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by studio facet id(s); OR",
-              "title": "Studio Id",
-              "maxItems": 100
+              "title": "Studio Id"
             },
             "description": "Filter by studio facet id(s); OR"
           },
@@ -1119,15 +1119,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by publisher facet id(s); OR",
-              "title": "Publisher Id",
-              "maxItems": 100
+              "title": "Publisher Id"
             },
             "description": "Filter by publisher facet id(s); OR"
           },
@@ -1141,15 +1141,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by series facet id(s); OR",
-              "title": "Series Id",
-              "maxItems": 100
+              "title": "Series Id"
             },
             "description": "Filter by series facet id(s); OR"
           },
@@ -1163,15 +1163,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by user tag id(s); AND",
-              "title": "User Tag Id",
-              "maxItems": 100
+              "title": "User Tag Id"
             },
             "description": "Filter by user tag id(s); AND"
           },
@@ -1185,15 +1185,15 @@
                   "type": "array",
                   "items": {
                     "type": "integer"
-                  }
+                  },
+                  "maxItems": 100
                 },
                 {
                   "type": "null"
                 }
               ],
               "description": "Filter by current media library id(s)",
-              "title": "Library Id",
-              "maxItems": 100
+              "title": "Library Id"
             },
             "description": "Filter by current media library id(s)"
           },
@@ -5126,6 +5126,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "pattern": "^[0-9a-f]{16}$",
               "title": "Url Hash"
             }
           },
@@ -7567,6 +7568,356 @@
         }
       }
     },
+    "/api/dmm-mappings": {
+      "get": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "List Dmm Mappings",
+        "operationId": "list_dmm_mappings",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Search"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Save Dmm Mapping",
+        "operationId": "save_dmm_mapping",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/amane__api__routes__dmm_mappings__EntryUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dmm-mappings/item": {
+      "delete": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Delete Dmm Mapping",
+        "operationId": "delete_dmm_mapping",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dmm-mappings/batch-delete": {
+      "post": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Batch Delete Dmm Mappings",
+        "operationId": "batch_delete_dmm_mappings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/amane__api__routes__dmm_mappings__BatchDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dmm-mappings/exceptions": {
+      "get": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "List Dmm Mapping Exceptions",
+        "operationId": "list_dmm_mapping_exceptions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Update Dmm Mapping Exception",
+        "operationId": "update_dmm_mapping_exception",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExceptionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dmm-mappings/exceptions/save": {
+      "post": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Save Dmm Mapping Exception",
+        "operationId": "save_dmm_mapping_exception",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExceptionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dmm-mappings/exceptions/clear": {
+      "post": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Clear Dmm Mapping Exceptions",
+        "operationId": "clear_dmm_mapping_exceptions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dmm-mappings/export": {
+      "get": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Export Dmm Mappings",
+        "operationId": "export_dmm_mappings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dmm-mappings/import": {
+      "post": {
+        "tags": [
+          "dmm-mappings"
+        ],
+        "summary": "Import Dmm Mappings",
+        "operationId": "import_dmm_mappings",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "merge",
+                "replace"
+              ],
+              "type": "string",
+              "default": "merge",
+              "title": "Mode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tools": {
       "get": {
         "tags": [
@@ -9488,20 +9839,20 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "演员 ID 列表",
-            "maxItems": 1000
+            "description": "演员 ID 列表"
           },
           "user_tag_ids": {
             "items": {
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "User Tag Ids",
-            "description": "用户标签 ID 列表",
-            "maxItems": 1000
+            "description": "用户标签 ID 列表"
           },
           "action": {
             "type": "string",
@@ -10893,10 +11244,10 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Facet Ids",
-            "description": "分类 ID 列表",
-            "maxItems": 1000
+            "description": "分类 ID 列表"
           },
           "action": {
             "$ref": "#/components/schemas/FacetBatchAction",
@@ -10983,10 +11334,10 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Source Ids",
-            "description": "待合并的来源 facet id 列表",
-            "maxItems": 1000
+            "description": "待合并的来源 facet id 列表"
           }
         },
         "type": "object",
@@ -11249,9 +11600,9 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
-            "title": "Ids",
-            "maxItems": 1000
+            "title": "Ids"
           }
         },
         "type": "object",
@@ -11659,9 +12010,7 @@
           "interval_seconds": {
             "anyOf": [
               {
-                "type": "integer",
-                "minimum": 60,
-                "maximum": 86400
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -11694,11 +12043,7 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string",
-                  "enum": [
-                    "metadata",
-                    "trans"
-                  ]
+                  "type": "string"
                 },
                 "type": "array"
               },
@@ -11724,7 +12069,8 @@
           }
         },
         "type": "object",
-        "title": "FeedUpdateRequest"
+        "title": "FeedUpdateRequest",
+        "description": "PATCH 的字段校验与 POST 使用同一规则; 显式 null 由 partial 模型拒绝非空列."
       },
       "FileItem": {
         "properties": {
@@ -12538,6 +12884,8 @@
             "$ref": "#/components/schemas/LLMConfig",
             "default": {
               "enabled": false,
+              "translate_japanese_title": true,
+              "translate_western_title": false,
               "translate_fields": [
                 "plot"
               ],
@@ -12545,9 +12893,7 @@
               "api_type": "chat",
               "base_url": "https://api.openai.com/v1",
               "model": "",
-              "rate_limit": 2.0,
-              "translate_japanese_title": true,
-              "translate_western_title": false
+              "rate_limit": 2.0
             }
           },
           "r18": {
@@ -14418,10 +14764,10 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "Metadata ID 列表",
-            "maxItems": 1000
+            "description": "Metadata ID 列表"
           }
         },
         "type": "object",
@@ -14437,10 +14783,10 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "Metadata ID 列表",
-            "maxItems": 1000
+            "description": "Metadata ID 列表"
           },
           "content_type": {
             "anyOf": [
@@ -15352,20 +15698,20 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "Metadata ID 列表",
-            "maxItems": 1000
+            "description": "Metadata ID 列表"
           },
           "user_tag_ids": {
             "items": {
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "User Tag Ids",
-            "description": "用户标签 ID 列表",
-            "maxItems": 1000
+            "description": "用户标签 ID 列表"
           },
           "action": {
             "type": "string",
@@ -15384,6 +15730,38 @@
           "action"
         ],
         "title": "MetadataUserTagsRequest"
+      },
+      "MetadataUserTagsResponse": {
+        "properties": {
+          "changed": {
+            "type": "integer",
+            "title": "Changed",
+            "description": "至少一处挂载关系发生变更的条目数"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged",
+            "description": "已处于目标态、未修改的条目数"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing",
+            "description": "不存在的条目 id 数"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped",
+            "description": "请求内重复的条目 id 数量; 已去重",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "changed",
+          "unchanged",
+          "missing"
+        ],
+        "title": "MetadataUserTagsResponse"
       },
       "Mosaic": {
         "type": "string",
@@ -17835,10 +18213,10 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Media File Ids",
-            "description": "选中的媒体文件 ID; 必须属于该库",
-            "maxItems": 1000
+            "description": "选中的媒体文件 ID; 必须属于该库"
           },
           "include_work_dir": {
             "type": "boolean",
@@ -18717,8 +19095,8 @@
                   "type": "integer"
                 },
                 "type": "array",
-                "minItems": 1,
-                "maxItems": 1000
+                "maxItems": 1000,
+                "minItems": 1
               },
               {
                 "type": "null"
@@ -19714,6 +20092,30 @@
         "title": "ToolSummary",
         "description": "目录索引里的一条: 够选工具, 不够直接构造复杂入参."
       },
+      "TranslationField": {
+        "type": "string",
+        "enum": [
+          "plot",
+          "original_plot",
+          "actors",
+          "directors",
+          "tags",
+          "series",
+          "release",
+          "runtime",
+          "publisher",
+          "studio",
+          "poster_urls",
+          "cover_urls",
+          "trailer_urls",
+          "extrafanart",
+          "score",
+          "actor_birthplace",
+          "actor_overview"
+        ],
+        "title": "TranslationField",
+        "description": "LLM 通用翻译字段; 标题按作品类型由独立开关控制."
+      },
       "TrashSummaryResponse": {
         "properties": {
           "exists": {
@@ -20253,6 +20655,56 @@
         ],
         "title": "EntryUpdate"
       },
+      "amane__api__routes__dmm_mappings__BatchDeleteRequest": {
+        "properties": {
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sources"
+        ],
+        "title": "BatchDeleteRequest"
+      },
+      "amane__api__routes__dmm_mappings__EntryUpdate": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Target"
+          },
+          "original_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "EntryUpdate"
+      },
       "amane__api__routes__number_mappings__BatchDeleteRequest": {
         "properties": {
           "keys": {
@@ -20343,62 +20795,6 @@
           "id"
         ],
         "title": "EntryUpdate"
-      },
-      "MetadataUserTagsResponse": {
-        "properties": {
-          "changed": {
-            "type": "integer",
-            "title": "Changed",
-            "description": "至少一处挂载关系发生变更的条目数"
-          },
-          "unchanged": {
-            "type": "integer",
-            "title": "Unchanged",
-            "description": "已处于目标态、未修改的条目数"
-          },
-          "missing": {
-            "type": "integer",
-            "title": "Missing",
-            "description": "不存在的条目 id 数"
-          },
-          "skipped": {
-            "type": "integer",
-            "title": "Skipped",
-            "description": "请求内重复的条目 id 数量; 已去重",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "changed",
-          "unchanged",
-          "missing"
-        ],
-        "title": "MetadataUserTagsResponse",
-        "description": "用户标签挂载/卸载的结果计数; 三个字段均以条目 id 为单位, 之和等于去重后的条目数."
-      },
-      "TranslationField": {
-        "type": "string",
-        "enum": [
-          "plot",
-          "original_plot",
-          "actors",
-          "directors",
-          "tags",
-          "series",
-          "release",
-          "runtime",
-          "publisher",
-          "studio",
-          "poster_urls",
-          "cover_urls",
-          "trailer_urls",
-          "extrafanart",
-          "score",
-          "actor_birthplace",
-          "actor_overview"
-        ],
-        "title": "TranslationField"
       }
     }
   }

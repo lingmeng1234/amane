@@ -486,6 +486,13 @@ export function AppShellLayout(): ReactNode {
         />
         <NavLink
           component={Link}
+          to="/dmm-mappings"
+          label="DMM和谐映射表"
+          leftSection={<IconListDetails size={18} />}
+          onClick={closeMobile}
+        />
+        <NavLink
+          component={Link}
           to="/oshash-submissions"
           label="OSHASH 提交管理"
           leftSection={<IconCloudUpload size={18} />}

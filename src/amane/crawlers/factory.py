@@ -15,7 +15,7 @@ from ..plugins.models import PluginConfig, SourceDescriptor
 from .actor import ActorCrawler, ActorFetcher, GFriendsActorCrawler, actor_registry
 from .base import Crawler
 from .registry import registry
-from .sites import R18DevCrawler
+from .sites import DmmCrawler, R18DevCrawler
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -112,6 +112,13 @@ class CrawlerFactory:
             # R18DevCrawler 额外注入只读 DB.
             if cls is R18DevCrawler:
                 instance: Crawler = R18DevCrawler(client=client, config=site_config, db=self._r18_db)
+            elif cls is DmmCrawler and self._data_dir is not None:
+                mapping_dir = self._data_dir / "mappings"
+                mapping_dir.mkdir(parents=True, exist_ok=True)
+                mapping_path = mapping_dir / "dmm_text_map.json"
+                if not mapping_path.exists():
+                    mapping_path.write_text("{}\n", encoding="utf-8")
+                instance = DmmCrawler(client=client, config=site_config, mapping_path=mapping_path)
             elif self._data_dir is not None and name in {"caribbeancompr", "d2pass", "caribbeancom_index"}:
                 mapping_names = {
                     "caribbeancompr": "caribbeancompr_heyzo_index.json",

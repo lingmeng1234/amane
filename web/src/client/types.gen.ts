@@ -1758,6 +1758,8 @@ export type FeedResponse = {
 
 /**
  * FeedUpdateRequest
+ *
+ * PATCH 的字段校验与 POST 使用同一规则; 显式 null 由 partial 模型拒绝非空列.
  */
 export type FeedUpdateRequest = {
     /**
@@ -2847,7 +2849,7 @@ export type MetadataBatchDeleteResponse = {
      *
      * 请求内重复的 id 数量; 已去重
      */
-    skipped: number;
+    skipped?: number;
 };
 
 /**
@@ -2911,7 +2913,7 @@ export type MetadataBatchScrapeResponse = {
      *
      * 请求内重复的 id 数量; 已去重
      */
-    skipped: number;
+    skipped?: number;
 };
 
 /**
@@ -2979,11 +2981,6 @@ export type MetadataDetailResponse = {
  * MetadataField
  */
 export type MetadataField = 'title' | 'original_title' | 'plot' | 'original_plot' | 'actors' | 'directors' | 'tags' | 'series' | 'release' | 'runtime' | 'publisher' | 'studio' | 'poster_urls' | 'cover_urls' | 'trailer_urls' | 'extrafanart' | 'score' | 'actor_birthplace' | 'actor_overview';
-
-/**
- * TranslationField
- */
-export type TranslationField = 'plot' | 'original_plot' | 'actors' | 'directors' | 'tags' | 'series' | 'release' | 'runtime' | 'publisher' | 'studio' | 'poster_urls' | 'cover_urls' | 'trailer_urls' | 'extrafanart' | 'score' | 'actor_birthplace' | 'actor_overview';
 
 /**
  * MetadataListResponse
@@ -3307,15 +3304,6 @@ export type MetadataSortField = 'number' | 'title' | 'studio' | 'release' | 'cre
 /**
  * MetadataUserTagsRequest
  */
-export type MetadataUserTagsResponse = UserTagLinksResponse & {
-    /**
-     * Skipped
-     *
-     * 请求内重复的条目 id 数量; 已去重
-     */
-    skipped: number;
-};
-
 export type MetadataUserTagsRequest = {
     /**
      * Ids
@@ -3335,6 +3323,36 @@ export type MetadataUserTagsRequest = {
      * attach 为并入, detach 为移除; 两者均幂等
      */
     action: 'attach' | 'detach';
+};
+
+/**
+ * MetadataUserTagsResponse
+ */
+export type MetadataUserTagsResponse = {
+    /**
+     * Changed
+     *
+     * 至少一处挂载关系发生变更的条目数
+     */
+    changed: number;
+    /**
+     * Unchanged
+     *
+     * 已处于目标态、未修改的条目数
+     */
+    unchanged: number;
+    /**
+     * Missing
+     *
+     * 不存在的条目 id 数
+     */
+    missing: number;
+    /**
+     * Skipped
+     *
+     * 请求内重复的条目 id 数量; 已去重
+     */
+    skipped?: number;
 };
 
 /**
@@ -5938,6 +5956,13 @@ export type ToolSummary = {
 };
 
 /**
+ * TranslationField
+ *
+ * LLM 通用翻译字段; 标题按作品类型由独立开关控制.
+ */
+export type TranslationField = 'plot' | 'original_plot' | 'actors' | 'directors' | 'tags' | 'series' | 'release' | 'runtime' | 'publisher' | 'studio' | 'poster_urls' | 'cover_urls' | 'trailer_urls' | 'extrafanart' | 'score' | 'actor_birthplace' | 'actor_overview';
+
+/**
  * TrashSummaryResponse
  *
  * 回收目录历史内容: 展开即产出清单, 面板套用同一套审查与删除.
@@ -6299,6 +6324,34 @@ export type AmaneApiRoutesActorMappingsEntryUpdate = {
      * Original Id
      */
     original_id?: string | null;
+};
+
+/**
+ * BatchDeleteRequest
+ */
+export type AmaneApiRoutesDmmMappingsBatchDeleteRequest = {
+    /**
+     * Sources
+     */
+    sources: Array<string>;
+};
+
+/**
+ * EntryUpdate
+ */
+export type AmaneApiRoutesDmmMappingsEntryUpdate = {
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * Original Source
+     */
+    original_source?: string | null;
 };
 
 /**
@@ -10684,6 +10737,234 @@ export type ImportActorMappingTableErrors = {
 export type ImportActorMappingTableError = ImportActorMappingTableErrors[keyof ImportActorMappingTableErrors];
 
 export type ImportActorMappingTableResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ListDmmMappingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Search
+         */
+        search?: string;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/dmm-mappings';
+};
+
+export type ListDmmMappingsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListDmmMappingsError = ListDmmMappingsErrors[keyof ListDmmMappingsErrors];
+
+export type ListDmmMappingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type SaveDmmMappingData = {
+    body: AmaneApiRoutesDmmMappingsEntryUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/dmm-mappings';
+};
+
+export type SaveDmmMappingErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SaveDmmMappingError = SaveDmmMappingErrors[keyof SaveDmmMappingErrors];
+
+export type SaveDmmMappingResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DeleteDmmMappingData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Source
+         */
+        source: string;
+    };
+    url: '/api/dmm-mappings/item';
+};
+
+export type DeleteDmmMappingErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteDmmMappingError = DeleteDmmMappingErrors[keyof DeleteDmmMappingErrors];
+
+export type DeleteDmmMappingResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteDmmMappingResponse = DeleteDmmMappingResponses[keyof DeleteDmmMappingResponses];
+
+export type BatchDeleteDmmMappingsData = {
+    body: AmaneApiRoutesDmmMappingsBatchDeleteRequest;
+    path?: never;
+    query?: never;
+    url: '/api/dmm-mappings/batch-delete';
+};
+
+export type BatchDeleteDmmMappingsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BatchDeleteDmmMappingsError = BatchDeleteDmmMappingsErrors[keyof BatchDeleteDmmMappingsErrors];
+
+export type BatchDeleteDmmMappingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ListDmmMappingExceptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/dmm-mappings/exceptions';
+};
+
+export type ListDmmMappingExceptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type UpdateDmmMappingExceptionData = {
+    body: ExceptionUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/dmm-mappings/exceptions';
+};
+
+export type UpdateDmmMappingExceptionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateDmmMappingExceptionError = UpdateDmmMappingExceptionErrors[keyof UpdateDmmMappingExceptionErrors];
+
+export type UpdateDmmMappingExceptionResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type SaveDmmMappingExceptionData = {
+    body: ExceptionUpdate;
+    path?: never;
+    query?: never;
+    url: '/api/dmm-mappings/exceptions/save';
+};
+
+export type SaveDmmMappingExceptionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SaveDmmMappingExceptionError = SaveDmmMappingExceptionErrors[keyof SaveDmmMappingExceptionErrors];
+
+export type SaveDmmMappingExceptionResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ClearDmmMappingExceptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/dmm-mappings/exceptions/clear';
+};
+
+export type ClearDmmMappingExceptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ExportDmmMappingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/dmm-mappings/export';
+};
+
+export type ExportDmmMappingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type ImportDmmMappingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Mode
+         */
+        mode?: 'merge' | 'replace';
+    };
+    url: '/api/dmm-mappings/import';
+};
+
+export type ImportDmmMappingsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportDmmMappingsError = ImportDmmMappingsErrors[keyof ImportDmmMappingsErrors];
+
+export type ImportDmmMappingsResponses = {
     /**
      * Successful Response
      */

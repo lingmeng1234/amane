@@ -466,7 +466,11 @@ def summarize_file_phases(phases: Iterable[FilePhase], content_type: ContentType
     """有码/无码和里番按文件属性聚合; 没有文件时回退条目类型."""
     items = list(phases)
     mosaic_present = {phase["mosaic"] for phase in items if phase["mosaic"] is not None}
-    if any(phase.get("number_content_type") is ContentType.WESTERN for phase in items):
+    if (
+        any((phase.get("number_content_type") or content_type) is ContentType.WESTERN for phase in items)
+        if items
+        else content_type is ContentType.WESTERN
+    ):
         mosaic_present.add(Mosaic.WESTERN)
     if items:
         censored = any(

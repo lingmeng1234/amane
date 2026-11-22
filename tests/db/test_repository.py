@@ -325,6 +325,28 @@ class TestMediaFileRepo:
         assert await repo.count_media_files(has_subtitle=False) == 1
 
     @pytest.mark.asyncio(loop_scope="function")
+    async def test_metadata_hentai_and_western_file_filters(self, repo: Repository):
+        hentai_metadata = await repo.upsert_metadata(number="MIDV-001")
+        normal_metadata = await repo.upsert_metadata(number="MIDV-002")
+        western_metadata = await repo.upsert_western_metadata("western-filter", "Studio.26.10.16")
+        assert hentai_metadata.id and normal_metadata.id and western_metadata.id
+
+        hentai_file = await repo.create_media_file(library_id=1, path="/v/里番/MIDV-001.mp4")
+        normal_file = await repo.create_media_file(library_id=1, path="/v/MIDV-002.mp4")
+        western_file = await repo.create_media_file(library_id=1, path="/v/欧美/Studio.26.10.16.mp4")
+        assert hentai_file.id and normal_file.id and western_file.id
+        await repo.update_media_file(hentai_file.id, metadata_id=hentai_metadata.id)
+        await repo.update_media_file(normal_file.id, metadata_id=normal_metadata.id)
+        await repo.update_media_file(western_file.id, metadata_id=western_metadata.id)
+
+        hentai_items, _ = await repo.list_metadata(hentai=True)
+        assert {item.number for item in hentai_items} == {"MIDV-001"}
+        no_hentai_items, _ = await repo.list_metadata(hentai=False)
+        assert {item.number for item in no_hentai_items} == {"MIDV-002", "Studio.26.10.16"}
+        western_items, _ = await repo.list_metadata(mosaic=Mosaic.WESTERN)
+        assert {item.number for item in western_items} == {"Studio.26.10.16"}
+
+    @pytest.mark.asyncio(loop_scope="function")
     async def test_list_metadata_has_subtitle_filter_unions_both_sources(self, repo: Repository):
         by_name = await repo.upsert_metadata(number="SUB-NAME")
         by_file = await repo.upsert_metadata(number="SUB-FILE")

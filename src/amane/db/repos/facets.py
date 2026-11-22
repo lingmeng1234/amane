@@ -255,17 +255,42 @@ class FacetsRepoMixin(RepositoryMixinBase):
                 order=order,
             )
 
-    async def list_tag_metadata_links(self, tag_ids: Sequence[int] | None = None) -> list[tuple[int, int]]:
-        """返回指定标签与影片的关联对；展示标签合并时可按影片 ID 去重计数。"""
-        ids = unique_ids(tag_ids)
-        if tag_ids is not None and not ids:
+    async def list_facet_metadata_links(
+        self, kind: FacetKind, facet_ids: Sequence[int] | None = None
+    ) -> list[tuple[int, int]]:
+        """返回分类实体与影片的关联对; 中文映射分组时按影片 ID 去重计数."""
+        ids = unique_ids(facet_ids)
+        if facet_ids is not None and not ids:
             return []
         async with self._session() as session:
-            stmt = select(MetadataTag.tag_id, MetadataTag.metadata_id)
+            if kind == FacetKind.DIRECTOR:
+                stmt = select(MetadataDirector.director_id, MetadataDirector.metadata_id)
+                id_col = MetadataDirector.director_id
+            elif kind == FacetKind.TAG:
+                stmt = select(MetadataTag.tag_id, MetadataTag.metadata_id)
+                id_col = MetadataTag.tag_id
+            elif kind == FacetKind.SERIES:
+                stmt = select(MetadataSeries.series_id, MetadataSeries.metadata_id)
+                id_col = MetadataSeries.series_id
+            elif kind == FacetKind.STUDIO:
+                stmt = select(Studio.id, Metadata.id).join(Metadata, col(Metadata.studio) == col(Studio.name))
+                id_col = Studio.id
+            elif kind == FacetKind.PUBLISHER:
+                stmt = select(Publisher.id, Metadata.id).join(Metadata, col(Metadata.publisher) == col(Publisher.name))
+                id_col = Publisher.id
+            elif kind == FacetKind.USER_TAG:
+                stmt = select(MetadataUserTag.user_tag_id, MetadataUserTag.metadata_id)
+                id_col = MetadataUserTag.user_tag_id
+            else:
+                raise ValueError(f"facet kind {kind} has no metadata links")
             if ids:
-                stmt = stmt.where(col(MetadataTag.tag_id).in_(ids))
+                stmt = stmt.where(col(id_col).in_(ids))
             rows = await session.exec(stmt)
-            return [(int(tag_id), int(metadata_id)) for tag_id, metadata_id in rows.all()]
+            return [(int(facet_id), int(metadata_id)) for facet_id, metadata_id in rows.all()]
+
+    async def list_tag_metadata_links(self, tag_ids: Sequence[int] | None = None) -> list[tuple[int, int]]:
+        """兼容旧调用方; 返回指定标签与影片的关联对."""
+        return await self.list_facet_metadata_links(FacetKind.TAG, tag_ids)
 
     async def set_facets_favorite(
         self, kind: FacetKind, facet_ids: Sequence[int], is_favorite: bool

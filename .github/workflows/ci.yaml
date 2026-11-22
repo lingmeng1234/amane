@@ -75,6 +75,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p "$RUNNER_TEMP/generated-api"
+          cp web/openapi.json "$RUNNER_TEMP/generated-api/openapi.json"
+          cp -R web/src/client "$RUNNER_TEMP/generated-api/client"
+          git fetch origin "$GITHUB_HEAD_REF"
+          git checkout -B generated-api-sync "origin/$GITHUB_HEAD_REF"
+          cp "$RUNNER_TEMP/generated-api/openapi.json" web/openapi.json
+          rm -rf web/src/client
+          cp -R "$RUNNER_TEMP/generated-api/client" web/src/client
           git add web/openapi.json web/src/client
           if git diff --cached --quiet; then
             echo "Generated API files are already up to date."

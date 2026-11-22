@@ -1880,6 +1880,10 @@ export type FilePhaseSummary = {
      */
     uncensored?: boolean;
     /**
+     * Hentai
+     */
+    hentai?: boolean;
+    /**
      * Mosaics
      */
     mosaics?: Array<Mosaic>;
@@ -2718,6 +2722,10 @@ export type MediaFileResponse = {
      */
     uncensored?: boolean;
     /**
+     * Hentai
+     */
+    hentai?: boolean;
+    /**
      * Has Subtitle
      */
     has_subtitle?: boolean;
@@ -3360,7 +3368,7 @@ export type MetadataUserTagsResponse = {
  *
  * 马赛克标记; 有码是条目类型, 不在此列.
  */
-export type Mosaic = 'uncensored' | 'cracked' | 'leaked';
+export type Mosaic = 'uncensored' | 'cracked' | 'leaked' | 'ltx' | 'western';
 
 /**
  * MoveMode
@@ -3451,24 +3459,21 @@ export type NfoBasicInfoConfig = {
  *
  * NFO 分类与系列输出选项.
  */
+export type NfoCategorySourcesConfig = {
+    cover_attributes?: boolean;
+    tags?: boolean;
+    studio?: boolean;
+    publisher?: boolean;
+};
+
+/**
+ * NfoCategoriesConfig
+ *
+ * NFO 分类与系列输出选项.
+ */
 export type NfoCategoriesConfig = {
-    /**
-     * Genre
-     *
-     * 分类
-     */
-    genre?: boolean;
-    /**
-     * Tag
-     *
-     * 类型
-     */
-    tag?: boolean;
-    /**
-     * Series
-     *
-     * 系列
-     */
+    genre?: NfoCategorySourcesConfig;
+    tag?: NfoCategorySourcesConfig;
     series?: boolean;
 };
 
@@ -4780,6 +4785,14 @@ export type ScrapeSubmission = {
 /**
  * ScrapingConfig
  */
+export type MosaicRulesConfig = {
+    cracked?: string;
+    leaked?: string;
+};
+
+/**
+ * ScrapingConfig
+ */
 export type ScrapingConfig = {
     /**
      * Download Resources
@@ -4825,6 +4838,7 @@ export type ScrapingConfig = {
      * 通用番号映射规则; 每行格式为完整匹配正则表达式 => 替换表达式, 仅自动非欧美非无码流媒体刮削使用.
      */
     number_mapping_rules?: Array<string>;
+    mosaic_rules?: MosaicRulesConfig;
     /**
      * Field Priority
      */
@@ -7037,6 +7051,12 @@ export type ListMetadataData = {
          * Filter by linked file subtitle marker
          */
         has_subtitle?: boolean | null;
+        /**
+         * Hentai
+         *
+         * Filter by linked file hentai directory attribute
+         */
+        hentai?: boolean | null;
         /**
          * Vr
          *

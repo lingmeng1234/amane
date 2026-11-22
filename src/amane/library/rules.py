@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import AfterValidator
 
-
 if TYPE_CHECKING:
     from re import Pattern
 

@@ -292,7 +292,15 @@ class MetadataRepoMixin(RepositoryMixinBase):
             conditions.append(_metadata_linked_file_exists(has_subtitle_predicate()))
         elif has_subtitle is False:
             conditions.append(~_metadata_linked_file_exists(has_subtitle_predicate()))
-        if mosaic is not None:
+        if hentai is True:
+            conditions.append(_metadata_linked_file_exists(col(MediaFile.hentai).is_(True)))
+        elif hentai is False:
+            conditions.append(~_metadata_linked_file_exists(col(MediaFile.hentai).is_(True)))
+        if mosaic is Mosaic.WESTERN:
+            conditions.append(
+                _metadata_linked_file_exists(col(MediaFile.number_content_type).is_(ContentType.WESTERN))
+            )
+        elif mosaic is not None:
             conditions.append(_metadata_linked_file_exists(col(MediaFile.mosaic) == mosaic))
         if uncensored is not None:
             flag = _metadata_uncensored_predicate()

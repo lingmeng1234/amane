@@ -413,10 +413,10 @@ async def test_write_nfo_uses_typed_chinese_mappings_for_tags_and_merchants(tmp_
     assert root.findtext("series") == "中文系列"
     assert [node.findtext("name") for node in root.findall("set")] == ["中文系列"]
     # 独立 NFO 字段沿用原有行为, 不受 Genre/Tag 中文映射开关影响.
-    assert root.findtext("studio") == "Same"
-    assert root.findtext("maker") == "Same"
-    assert root.findtext("publisher") == "Same"
-    assert root.findtext("label") == "Same"
+    assert root.findtext("studio") == "中文制作商"
+    assert root.findtext("maker") == "中文制作商"
+    assert root.findtext("publisher") == "中文发行商"
+    assert root.findtext("label") == "中文发行商"
 
 
 @pytest.mark.asyncio(loop_scope="function")

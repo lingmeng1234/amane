@@ -332,10 +332,19 @@ def _build_variables(
     prefix, suffix = split_number(metadata.number) if metadata.number else ("", "")
     raw_prefix = ""
     if prefix:
-        upper_number = metadata.number.upper()
-        upper_prefix = prefix.upper()
-        prefix_index = 0 if upper_number.startswith(upper_prefix) else upper_number.find(upper_prefix)
-        raw_prefix = metadata.number[prefix_index : prefix_index + len(prefix)] if prefix_index >= 0 else prefix
+        # 欧美日期番号的识别前缀可能包含空格 (True Anal.26.10.21);
+        # raw_prefix 应取日期前的完整前缀, 而不是 split_number 返回的首个字母段.
+        western_number = metadata.number
+        if re.match(r"^[A-Za-z]{2,}\d{2,}-", western_number):
+            western_number = western_number.split("-", 1)[1]
+        western_match = re.match(r"^(.+?)[-_.]2?0?\d{2}[-.]\d{2}[-.]\d{2}", western_number)
+        if western_match:
+            raw_prefix = western_match.group(1).rstrip("-_. ")
+        else:
+            upper_number = metadata.number.upper()
+            upper_prefix = prefix.upper()
+            prefix_index = 0 if upper_number.startswith(upper_prefix) else upper_number.find(upper_prefix)
+            raw_prefix = metadata.number[prefix_index : prefix_index + len(prefix)] if prefix_index >= 0 else prefix
 
     return {
         "number": metadata.number,

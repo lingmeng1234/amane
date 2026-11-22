@@ -488,7 +488,7 @@ class Library(SQLModel, table=True):
     auto_organize: bool = Field(default=False)
     """刮削成功后为该文件自动入队 ORGANIZE (单文件范围, 随刮削任务成链).
 
-    与 `automation` 正交: none / watch 下手动刮削同样触发. 只影响新后继, 不撤销已入队的整理.
+    仅 automation=scrape 时允许开启并创建自动整理后继; 切换到其它模式时由媒体库更新逻辑持久化关闭.
     """
     ingest: LibraryIngest = Field(default=LibraryIngest.NATIVE)
     """文件发现通道. clouddrive 不 schedule Observer, 由 webhook 按 cloud_path 分流."""

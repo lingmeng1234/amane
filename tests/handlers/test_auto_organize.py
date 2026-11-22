@@ -16,7 +16,7 @@ from amane.crawlers.base import Crawler, CrawlerProfile
 from amane.crawlers.factory import CrawlerFactory
 from amane.crawlers.models import MediaMetadata
 from amane.db.models import MediaFileStatus, TaskType
-from amane.enums import SiteName
+from amane.enums import LibraryAutomation, SiteName
 from amane.handlers import (
     FollowupTask,
     OrganizeHandler,
@@ -104,6 +104,31 @@ async def test_auto_organize_disabled_chains_nothing(repo: Repository, tmp_path:
 
     assert result.success is True
     assert _organize_followups(result) == []
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_auto_organize_does_not_chain_outside_scrape_mode(repo: Repository, tmp_path: Path) -> None:
+    """即使数据库状态异常地保留 auto_organize=True, 非 scrape 模式也不能派生整理."""
+    lib_id, media_id = await _library_with_file(repo, tmp_path, auto_organize=True)
+    await repo.update_library(lib_id, automation=LibraryAutomation.REFRESH)
+
+    result = await _handler(repo).handle(ScrapePayload(number="MIDV-123", media_file_id=media_id))
+
+    assert result.success is True
+    assert _organize_followups(result) == []
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_manual_organize_handler_rejects_non_scrape_mode(
+    repo: Repository, resource_store: ResourceStore, tmp_path: Path
+) -> None:
+    lib_id, _ = await _library_with_file(repo, tmp_path, auto_organize=False)
+    await repo.update_library(lib_id, automation=LibraryAutomation.WATCH)
+
+    result = await OrganizeHandler(repo, HotSettings(), resource_store).handle(OrganizePayload(library_id=lib_id))
+
+    assert result.success is False
+    assert result.error == "整理落盘仅在监控 + 刮削模式下允许执行"
 
 
 @pytest.mark.asyncio(loop_scope="function")

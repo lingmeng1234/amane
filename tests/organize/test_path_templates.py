@@ -1314,6 +1314,19 @@ def test_raw_prefix_placeholder_preserves_original_case(media: Path) -> None:
     assert result.video == media / "LancelotStylesEvolution" / f"{number}.mp4"
 
 
+@pytest.mark.parametrize(
+    "number",
+    [
+        "True Anal.26.10.21",
+        "DL892-True Anal.26.10.21",
+    ],
+)
+def test_raw_prefix_western_date_number_keeps_full_prefix_and_case(media: Path, number: str) -> None:
+    wp = Library(name="t", path=str(media), video_template="{raw_prefix}/{number}.{ext}")
+    result = resolve_paths(wp, _meta(number=number), ext="mp4")
+    assert result.video == media / "True Anal" / f"{number}.mp4"
+
+
 def test_resolve_paths_uses_actress_placeholder(media: Path) -> None:
     wp = Library(name="t", path=str(media), video_template="{actresses}/{number}.{ext}")
     result = resolve_paths(

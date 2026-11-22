@@ -5,6 +5,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Response
 
 from ...db.models import TaskType
+from ...enums import LibraryAutomation
 from ...handlers import RefreshPayload, ScanMode
 from ...utils.model import to_resp
 from ..deps import RepoDep, RuntimeDep
@@ -65,7 +66,7 @@ async def create_library(req: LibraryCreateRequest, repo: RepoDep, runtime: Runt
             organize_path=organize_paths[0] if len(organize_paths) == 1 else None,
             organize_paths=organize_paths,
             automation=req.automation,
-            auto_organize=req.auto_organize,
+            auto_organize=req.auto_organize and req.automation == LibraryAutomation.SCRAPE,
             ingest=req.ingest,
             cloud_path=req.cloud_path,
             recursive=req.recursive,
@@ -139,6 +140,9 @@ async def update_library(
     repo: RepoDep,
     runtime: RuntimeDep,
 ) -> LibraryResponse:
+    existing = await repo.get_library(library_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="媒体库不存在")
     updates = cast("LibraryUpdates", req.model_dump(exclude_unset=True))
     if not updates:
         raise HTTPException(status_code=422, detail="没有需要修改的字段")
@@ -157,6 +161,11 @@ async def update_library(
             await validate_directory_path(path, runtime.safe_dirs)
     elif organize_path := updates.get("organize_path"):
         await validate_directory_path(organize_path, runtime.safe_dirs)
+
+    effective_automation = updates.get("automation", existing.automation)
+    if effective_automation != LibraryAutomation.SCRAPE:
+        # 离开监控 + 刮削模式时立即持久化关闭自动整理; 整理路径与模板配置保持不变.
+        updates["auto_organize"] = False
 
     try:
         lib = await repo.update_library(library_id, **updates)

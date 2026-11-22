@@ -578,6 +578,8 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
         library = await self._repo.get_library(payload.library_id)
         if library is None:
             return TaskResult(success=False, error=f"媒体库 {payload.library_id} 不存在")
+        if library.automation != "scrape":
+            return TaskResult(success=False, error="整理落盘仅在监控 + 刮削模式下允许执行")
         assert library.id is not None
         organize_paths = library.organize_paths or ([library.organize_path] if library.organize_path else [])
         if len(organize_paths) > 1:

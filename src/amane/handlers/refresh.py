@@ -53,6 +53,9 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
             return await self._handle_locked(payload)
 
     async def _handle_locked(self, payload: RefreshPayload) -> TaskResult[RefreshResult]:
+        library = await self._repo.get_library(payload.library_id)
+        if library is not None and library.automation != "scrape" and payload.scrape:
+            return TaskResult(success=False, error="当前媒体库自动化模式不允许扫描新文件并刮削")
         # 一个媒体库的一次扫描请求只创建一个 REFRESH 任务；多个根目录在该任务内串行执行。
         # 只有最后一个根目录负责扇出 SCRAPE，避免前面的目录重复提交全库待刮削文件。
         if payload.paths:
@@ -96,7 +99,6 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
         if not await path_is_dir(scan_dir):
             return TaskResult(success=False, error=f"不是目录: {payload.path}")
 
-        library = await self._repo.get_library(payload.library_id)
         scan = LibraryScan(
             patterns=payload.patterns,
             trailer_pattern=library.trailer_pattern if library is not None else None,

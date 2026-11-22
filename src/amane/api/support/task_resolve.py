@@ -2,7 +2,10 @@
 
 from typing import TYPE_CHECKING, assert_never
 
+from fastapi import HTTPException
+
 from ...db.models import TaskType
+from ...enums import LibraryAutomation
 from ...handlers import (
     ActorPushPayload,
     ActorScrapePayload,
@@ -59,11 +62,19 @@ async def resolve_submission(req: TaskSubmission, repo: Repository) -> tuple[Tas
     match req:
         case RefreshSubmission():
             await req.resolve(repo)
+            library = await repo.get_library(req.library_id)
+            if library is not None and library.automation != LibraryAutomation.SCRAPE:
+                if req.scrape and "scrape" in req.model_fields_set:
+                    raise HTTPException(status_code=403, detail="当前媒体库自动化模式不允许扫描新文件并刮削")
+                req.scrape = set()
             return TaskType.REFRESH, req
         case OrganizeSubmission():
             # 提交阶段只解析媒体库与请求范围; 唯一整理路径检查在执行阶段由
             # OrganizeHandler 负责, 使任务可入队并以明确失败结果反馈配置问题。
             await req.resolve(repo)
+            library = await repo.get_library(req.library_id)
+            if library is not None and library.automation != LibraryAutomation.SCRAPE:
+                raise HTTPException(status_code=403, detail="整理落盘仅在监控 + 刮削模式下允许执行")
             return TaskType.ORGANIZE, req
         case DeleteSubmission():
             return TaskType.DELETE, req

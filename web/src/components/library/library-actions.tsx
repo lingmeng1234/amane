@@ -38,6 +38,7 @@ export function LibraryActionButtons({
   const { t } = useTranslation(["library", "common"]);
   const queryClient = useQueryClient();
   const [cleanupOpen, setCleanupOpen] = useState(false);
+  const supportsScrapeOrganize = library.automation === "scrape";
 
   const invalidate = () =>
     void queryClient.invalidateQueries({ queryKey: listLibrariesQueryKey() });
@@ -121,23 +122,25 @@ export function LibraryActionButtons({
               {t("scan.modes.associate.desc")}
             </Text>
           </Menu.Item>
-          <Menu.Item
-            onClick={() =>
-              scanMutation.mutate({
-                body: {
-                  type: "refresh",
-                  library_id: library.id,
-                  scan: ["add"],
-                  scrape: ["pending"],
-                },
-              })
-            }
-          >
-            <Text size="sm">{t("scan.modes.add.label")}</Text>
-            <Text size="xs" c="dimmed">
-              {t("scan.modes.add.desc")}
-            </Text>
-          </Menu.Item>
+          {supportsScrapeOrganize && (
+            <Menu.Item
+              onClick={() =>
+                scanMutation.mutate({
+                  body: {
+                    type: "refresh",
+                    library_id: library.id,
+                    scan: ["add"],
+                    scrape: ["pending"],
+                  },
+                })
+              }
+            >
+              <Text size="sm">{t("scan.modes.add.label")}</Text>
+              <Text size="xs" c="dimmed">
+                {t("scan.modes.add.desc")}
+              </Text>
+            </Menu.Item>
+          )}
           <Menu.Item
             onClick={() =>
               scanMutation.mutate({
@@ -155,6 +158,7 @@ export function LibraryActionButtons({
       <HintedActionIcon
         variant="light"
         loading={organizeMutation.isPending}
+        disabled={!supportsScrapeOrganize}
         label={t("organize.tooltip")}
         onClick={() => void organizeMutation.mutate()}
       >

@@ -9,7 +9,13 @@ from ..library import MEDIA_EXTENSIONS, InventoryStore, LibraryScan, OrphanScan,
 from ..parsing import ContentType, parse_file_info
 from ..utils.path import is_descendant, nfc_path
 from ..utils.threads import path_exists, path_is_dir
-from ._common import LibraryTaskLocks, refresh_external_subtitle, refresh_file_phase, refresh_media_association, register_media_file
+from ._common import (
+    LibraryTaskLocks,
+    refresh_external_subtitle,
+    refresh_file_phase,
+    refresh_media_association,
+    register_media_file,
+)
 from .models import RefreshPayload, RefreshResult, ScanMode, ScrapePayload
 from .protocol import FollowupTask, TaskHandler, TaskResult
 

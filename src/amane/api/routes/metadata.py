@@ -161,11 +161,12 @@ async def _mapped_facet_ids(
     """把展示用代表 ID 扩展为该中文名称下的全部原始分类 ID."""
     if not selected_ids:
         return None
-    mapping_kind: MappingKind | None = {
+    mapping_kinds: dict[FacetKind, MappingKind] = {
         FacetKind.STUDIO: "maker",
         FacetKind.PUBLISHER: "publisher",
         FacetKind.SERIES: "series",
-    }.get(kind)
+    }
+    mapping_kind = mapping_kinds.get(kind)
     if mapping_kind is None or not runtime.tag_mappings.enabled:
         return selected_ids
 

@@ -348,6 +348,7 @@ function RawSiteSummary({ site, payload }: { site: string; payload: unknown }) {
   };
   push(t("browse.person.birthday"), data.birthday);
   push(t("browse.person.birthplace"), data.birthplace);
+  push(t("browse.person.bloodType"), data.blood_type);
   push(t("browse.person.height"), data.height);
   push(t("browse.person.cup"), data.cup);
   push(t("browse.person.tagline"), data.tagline);

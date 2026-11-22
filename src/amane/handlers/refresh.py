@@ -1,20 +1,26 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import structlog
 
 from ..db import TaskType
-from ..library import MEDIA_EXTENSIONS, InventoryStore, LibraryHit, LibraryScan, OrphanScan, scan_inventory
+from ..library import MEDIA_EXTENSIONS, InventoryStore, LibraryScan, OrphanScan, scan_inventory
 from ..parsing import ContentType, parse_file_info
 from ..utils.path import is_descendant, nfc_path
 from ..utils.threads import path_exists, path_is_dir
-from ._common import LibraryTaskLocks, refresh_media_association, register_media_file
+from ._common import (
+    LibraryTaskLocks,
+    refresh_external_subtitle,
+    refresh_file_phase,
+    refresh_media_association,
+    register_media_file,
+)
 from .models import RefreshPayload, RefreshResult, ScanMode, ScrapePayload
 from .protocol import FollowupTask, TaskHandler, TaskResult
 
 if TYPE_CHECKING:
-    from ..db.models import MediaFile
+    from ..db.models import Library, MediaFile
     from ..db.repository import Repository
 
 logger = structlog.get_logger()
@@ -31,12 +37,14 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
         media_extensions: Sequence[str] | None = None,
         inventory_store: InventoryStore | None = None,
         library_locks: LibraryTaskLocks | None = None,
+        mosaic_rules: Mapping[str, str] | None = None,
     ):
         super().__init__(payload_t=RefreshPayload, result_t=RefreshResult)
         self._repo = repo
         self._media_extensions = frozenset(media_extensions) if media_extensions else MEDIA_EXTENSIONS
         self._inventory_store = inventory_store
         self._library_locks = library_locks if library_locks is not None else LibraryTaskLocks()
+        self._mosaic_rules = mosaic_rules
 
     async def handle(self, payload: RefreshPayload) -> TaskResult[RefreshResult]:
         # 同一媒体库的全量/单目录扫描共用锁，避免多个 REFRESH worker 同时遍历同一库的不同磁盘。
@@ -167,7 +175,13 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
                                 requested_library_id=payload.library_id,
                             )
                             continue
-                        media = await register_media_file(self._repo, payload.library_id, file_path, library=library)
+                        media = await register_media_file(
+                            self._repo,
+                            payload.library_id,
+                            file_path,
+                            library=library,
+                            mosaic_rules=self._mosaic_rules,
+                        )
                         if media is None:
                             continue
                         existing_by_path[path_key] = media
@@ -176,7 +190,8 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
                             associated += 1
                     else:
                         existing_media = existing_by_path[path_key]
-                        subtitles += await self._sync_external_subtitle(existing_media, hit)
+                        if library is not None:
+                            subtitles += await self._sync_external_subtitle(existing_media, library)
                         if payload.associate and await refresh_media_association(self._repo, existing_media):
                             associated += 1
                 if added:
@@ -214,8 +229,10 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
             assert f.id is not None
             assert parsed.number is not None
 
+            # 使用番号识别出的真实类型; HENTAI 目录属性不能改变 Metadata 的番号类型。
+            number_content_type = getattr(parsed, "number_content_type", None) or parsed.content_type
             # WESTERN 先执行只读本地身份预检查；命中则恢复关联，不再创建刮削任务。
-            if parsed.content_type == ContentType.WESTERN and await refresh_media_association(self._repo, f):
+            if number_content_type == ContentType.WESTERN and await refresh_media_association(self._repo, f):
                 associated += 1
                 continue
 
@@ -226,7 +243,7 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
                     payload=ScrapePayload(
                         media_file_id=f.id,
                         number=parsed.number,
-                        content_type=parsed.content_type,
+                        content_type=number_content_type,
                         use_cache=payload.use_cache,
                     ).model_dump(mode="json"),
                 )
@@ -249,13 +266,9 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
             followups=followups,
         )
 
-    async def _sync_external_subtitle(self, media: MediaFile, hit: LibraryHit) -> int:
-        """按本次遍历所见回写已登记行的外挂字幕标记; 未变化返回 0.
-
-        标记的其它写入点是视频登记与换 path, 二者都不覆盖存量行, 因此库扫描是存量行唯一的补齐途径.
-        """
-        if media.has_external_subtitle == hit.has_companion_subtitle:
-            return 0
-        assert media.id is not None
-        await self._repo.update_media_file(media.id, has_external_subtitle=hit.has_companion_subtitle)
-        return 1
+    async def _sync_external_subtitle(self, media: MediaFile, library: Library) -> int:
+        """按视频番号、Metadata 与同目录字幕重新计算外挂字幕标记."""
+        before = media.has_external_subtitle
+        await refresh_file_phase(self._repo, media, self._mosaic_rules)
+        await refresh_external_subtitle(self._repo, media, library)
+        return int(before != media.has_external_subtitle)

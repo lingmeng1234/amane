@@ -1,3 +1,5 @@
+import pytest
+
 from amane.tags.mapping import TagMappingStore, detect_language
 
 
@@ -24,7 +26,19 @@ def test_mapping_deduplicates_after_translation_and_persists(tmp_path) -> None:
 def test_import_export_keeps_original_entries(tmp_path) -> None:
     store = TagMappingStore(tmp_path)
     store.import_data({"entries": {"Creampie": {"translation": "内射"}}})
-    assert store.export()["entries"]["Creampie"]["translation"] == "内射"
+    exported = store.export()
+    assert exported["version"] == 2
+    assert exported["entries"] == [
+        {
+            "original": "Creampie",
+            "translation": "内射",
+            "language": "en",
+            "usage_count": 0,
+            "sources": [],
+            "archived": False,
+            "type": "tag",
+        }
+    ]
 
 
 def test_mapped_label_keeps_a_clickable_facet_id(tmp_path) -> None:
@@ -108,10 +122,10 @@ def test_batch_archive_skips_entries_with_translations_and_export_filters_pendin
     store.upsert("mapped", "已翻译")
     archived, skipped = store.archive_many(["mapped", "pending", "archive", "missing"])
     assert (archived, skipped) == (2, 2)
-    exported = store.export()["entries"]
+    exported = {entry["original"]: entry for entry in store.export()["entries"]}
     assert set(exported) == {"mapped", "pending", "archive"}  # pending was archived by this batch
     store.seed([("new-pending", 1)])
-    assert "new-pending" not in store.export()["entries"]
+    assert "new-pending" not in {entry["original"] for entry in store.export()["entries"]}
     assert exported["archive"]["archived"] is True
 
 
@@ -121,3 +135,43 @@ def test_import_restores_archived_state(tmp_path) -> None:
     assert store.list(status="archived")[1] == 1
     restored = TagMappingStore(tmp_path)
     assert restored.list(status="archived")[1] == 1
+
+
+def test_mapping_types_are_independent_and_exported_together(tmp_path) -> None:
+    store = TagMappingStore(tmp_path)
+    store.seed([("Same", 3)])
+    store.seed_facets("maker", [("Same", 2)])
+    store.seed_facets("publisher", [("Same", 1)])
+    store.seed_facets("series", [("Same", 4)])
+    store.upsert("Same", "中文标签", kind="tag")
+    store.upsert("Same", "中文制作商", kind="maker")
+    store.upsert("Same", "中文发行商", kind="publisher")
+    store.upsert("Same", "中文系列", kind="series")
+
+    assert store.map_values("tag", ["Same"]) == ["中文标签"]
+    assert store.map_values("maker", ["Same"]) == ["中文制作商"]
+    assert store.map_values("publisher", ["Same"]) == ["中文发行商"]
+    assert store.map_values("series", ["Same"]) == ["中文系列"]
+
+    exported = store.export()
+    assert {(entry["original"], entry["type"], entry["translation"]) for entry in exported["entries"]} == {
+        ("Same", "tag", "中文标签"),
+        ("Same", "maker", "中文制作商"),
+        ("Same", "publisher", "中文发行商"),
+        ("Same", "series", "中文系列"),
+    }
+
+    restored = TagMappingStore(tmp_path / "restored")
+    assert restored.import_data(exported) == 4
+    assert restored.display_name("Same", "tag") == "中文标签"
+    assert restored.display_name("Same", "maker") == "中文制作商"
+    assert restored.display_name("Same", "publisher") == "中文发行商"
+    assert restored.display_name("Same", "series") == "中文系列"
+
+
+def test_import_rejects_unknown_or_missing_mapping_type(tmp_path) -> None:
+    store = TagMappingStore(tmp_path)
+    with pytest.raises(ValueError, match="归属类型"):
+        store.import_data({"version": 2, "entries": [{"original": "X", "type": "producer"}]})
+    with pytest.raises(ValueError, match="归属类型"):
+        store.import_data({"version": 2, "entries": [{"original": "X", "translation": "Y"}]})

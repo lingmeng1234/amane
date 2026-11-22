@@ -84,14 +84,18 @@ function DmmMappingsPage() {
   const pageCount = Math.max(1, Math.ceil((query.data?.total ?? 0) / pageSize));
   const visibleItems = query.data?.items ?? [];
   const visibleSources = visibleItems.map((item) => item.source);
-  const allVisibleSelected = visibleSources.length > 0 && visibleSources.every((source) => selected.includes(source));
+  const allVisibleSelected =
+    visibleSources.length > 0 && visibleSources.every((source) => selected.includes(source));
   const someVisibleSelected = visibleSources.some((source) => selected.includes(source));
   const filteredConflicts = conflicts.filter((item) =>
     !conflictSearch.trim()
       ? true
-      : [item.old?.source ?? "", item.old?.target ?? "", item.new?.source ?? "", item.new?.target ?? ""].some(
-          (value) => value === conflictSearch.trim(),
-        ),
+      : [
+          item.old?.source ?? "",
+          item.old?.target ?? "",
+          item.new?.source ?? "",
+          item.new?.target ?? "",
+        ].some((value) => value === conflictSearch.trim()),
   );
   const conflictPageCount = Math.max(1, Math.ceil(filteredConflicts.length / conflictPageSize));
   const visibleConflicts = filteredConflicts.slice(
@@ -172,10 +176,12 @@ function DmmMappingsPage() {
   async function importJson(file: File) {
     try {
       const raw = await file.text();
-      const result = await request<{ added?: string[]; unchanged?: string[]; conflicts?: Conflict[]; replaced?: number }>(
-        `/api/dmm-mappings/import?mode=${mode}`,
-        { method: "POST", body: raw },
-      );
+      const result = await request<{
+        added?: string[];
+        unchanged?: string[];
+        conflicts?: Conflict[];
+        replaced?: number;
+      }>(`/api/dmm-mappings/import?mode=${mode}`, { method: "POST", body: raw });
       await reloadConflicts();
       setConflictPage(1);
       setSelected([]);
@@ -191,7 +197,12 @@ function DmmMappingsPage() {
       setMessage(`JSON 导入失败：${errorText(error)}`);
     }
   }
-  function updateConflictDraft(groupId: number, side: "old" | "new", entry: Entry, patch: Partial<Entry>) {
+  function updateConflictDraft(
+    groupId: number,
+    side: "old" | "new",
+    entry: Entry,
+    patch: Partial<Entry>,
+  ) {
     const key = `${groupId}:${side}`;
     setConflictDrafts((current) => ({
       ...current,
@@ -220,7 +231,8 @@ function DmmMappingsPage() {
       <div>
         <Title order={2}>DMM和谐映射表</Title>
         <Text c="dimmed" size="sm">
-          将 DMM 标题、剧情中的和谐词替换为修正文字；原和谐词必须唯一，修正后的文字允许重复。搜索按原和谐词或修正后文字完整精确匹配。
+          将 DMM
+          标题、剧情中的和谐词替换为修正文字；原和谐词必须唯一，修正后的文字允许重复。搜索按原和谐词或修正后文字完整精确匹配。
         </Text>
       </div>
       <Paper p="md" withBorder>
@@ -255,7 +267,11 @@ function DmmMappingsPage() {
               color={mode === "replace" ? "orange" : "blue"}
               variant="light"
               onClick={() => {
-                if (mode === "replace" && !window.confirm("整体替换会覆盖全部 DMM和谐映射，确定继续？")) return;
+                if (
+                  mode === "replace" &&
+                  !window.confirm("整体替换会覆盖全部 DMM和谐映射，确定继续？")
+                )
+                  return;
                 jsonRef.current?.click();
               }}
             >
@@ -331,7 +347,10 @@ function DmmMappingsPage() {
                     disabled={selected.length === 0}
                     loading={batchRemove.isPending}
                     onClick={() => {
-                      if (selected.length > 0 && window.confirm(`确定删除选中的 ${selected.length} 条映射？`)) {
+                      if (
+                        selected.length > 0 &&
+                        window.confirm(`确定删除选中的 ${selected.length} 条映射？`)
+                      ) {
                         batchRemove.mutate();
                       }
                     }}
@@ -391,14 +410,24 @@ function DmmMappingsPage() {
                                 <TextInput
                                   size="xs"
                                   value={editDraft.source}
-                                  onChange={(event) => setEditDraft({ ...editDraft, source: event.currentTarget.value })}
+                                  onChange={(event) =>
+                                    setEditDraft({
+                                      ...editDraft,
+                                      source: event.currentTarget.value,
+                                    })
+                                  }
                                 />
                               </Table.Td>
                               <Table.Td>
                                 <TextInput
                                   size="xs"
                                   value={editDraft.target}
-                                  onChange={(event) => setEditDraft({ ...editDraft, target: event.currentTarget.value })}
+                                  onChange={(event) =>
+                                    setEditDraft({
+                                      ...editDraft,
+                                      target: event.currentTarget.value,
+                                    })
+                                  }
                                 />
                               </Table.Td>
                               <Table.Td>
@@ -411,7 +440,11 @@ function DmmMappingsPage() {
                                   >
                                     保存
                                   </Button>
-                                  <Button size="xs" variant="default" onClick={() => setEditingSource(null)}>
+                                  <Button
+                                    size="xs"
+                                    variant="default"
+                                    onClick={() => setEditingSource(null)}
+                                  >
                                     取消
                                   </Button>
                                 </Group>
@@ -452,7 +485,9 @@ function DmmMappingsPage() {
                 </Table.ScrollContainer>
               )}
               <Group justify="space-between">
-                <Text size="sm">每页 30 条；当前第 {page} / {pageCount} 页</Text>
+                <Text size="sm">
+                  每页 30 条；当前第 {page} / {pageCount} 页
+                </Text>
                 <Pagination
                   total={pageCount}
                   value={page}
@@ -499,7 +534,9 @@ function DmmMappingsPage() {
                 合并导入时，若原和谐词已存在但修正结果不同，会将原记录和导入记录一起移入冲突区，不影响其他不冲突映射。选择需要保留的一条，编辑后保存并加入正式映射；另一条可单独删除。
               </Text>
               {visibleConflicts.length === 0 ? (
-                <Text c="dimmed" size="sm">暂无待复查冲突</Text>
+                <Text c="dimmed" size="sm">
+                  暂无待复查冲突
+                </Text>
               ) : (
                 visibleConflicts.map((item) => (
                   <Paper key={item.group_id} p="sm" withBorder>
@@ -525,13 +562,21 @@ function DmmMappingsPage() {
                                   size="sm"
                                   label="原和谐词"
                                   value={draftEntry.source}
-                                  onChange={(event) => updateConflictDraft(item.group_id, side, entry, { source: event.currentTarget.value })}
+                                  onChange={(event) =>
+                                    updateConflictDraft(item.group_id, side, entry, {
+                                      source: event.currentTarget.value,
+                                    })
+                                  }
                                 />
                                 <TextInput
                                   size="sm"
                                   label="修正后文字"
                                   value={draftEntry.target}
-                                  onChange={(event) => updateConflictDraft(item.group_id, side, entry, { target: event.currentTarget.value })}
+                                  onChange={(event) =>
+                                    updateConflictDraft(item.group_id, side, entry, {
+                                      target: event.currentTarget.value,
+                                    })
+                                  }
                                 />
                               </div>
                               <Group justify="flex-end">
@@ -539,11 +584,22 @@ function DmmMappingsPage() {
                                   size="xs"
                                   loading={saveConflict.isPending}
                                   disabled={!draftEntry.source.trim() || !draftEntry.target.trim()}
-                                  onClick={() => saveConflict.mutate({ entry: draftEntry, group_id: item.group_id, side })}
+                                  onClick={() =>
+                                    saveConflict.mutate({
+                                      entry: draftEntry,
+                                      group_id: item.group_id,
+                                      side,
+                                    })
+                                  }
                                 >
                                   保存并加入映射
                                 </Button>
-                                <Button size="xs" color="red" variant="light" onClick={() => void deleteConflict(item.group_id, side)}>
+                                <Button
+                                  size="xs"
+                                  color="red"
+                                  variant="light"
+                                  onClick={() => void deleteConflict(item.group_id, side)}
+                                >
                                   删除此项
                                 </Button>
                               </Group>
@@ -556,8 +612,15 @@ function DmmMappingsPage() {
                 ))
               )}
               <Group justify="space-between">
-                <Text size="xs" c="dimmed">共 {filteredConflicts.length} 组冲突</Text>
-                <Pagination size="sm" total={conflictPageCount} value={conflictPage} onChange={setConflictPage} />
+                <Text size="xs" c="dimmed">
+                  共 {filteredConflicts.length} 组冲突
+                </Text>
+                <Pagination
+                  size="sm"
+                  total={conflictPageCount}
+                  value={conflictPage}
+                  onChange={setConflictPage}
+                />
               </Group>
             </Stack>
           </Paper>

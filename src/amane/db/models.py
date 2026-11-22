@@ -227,10 +227,13 @@ class MediaFile(SQLModel, table=True):
     status: MediaFileStatus = Field(default=MediaFileStatus.PENDING, index=True)
     # 文件相位: path 的投影, 随 path 写入/更新; 不进对外 PATCH.
     mosaic: Mosaic | None = Field(default=None, index=True)
-    #: 文件名带中字标记, 只由 path 派生.
+    #: 番号本身推导的有码/无码类型; 与 HENTAI 刮削路由类型独立.
+    number_content_type: ContentType | None = Field(default=None, index=True)
+    #: 父目录是否识别为动漫/里番.
+    hentai: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, index=True))
+    #: 文件名带中文字幕标记, 只由 path 派生.
     has_subtitle_in_name: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, index=True))
-    #: 同目录存在库 `subtitle_extensions` 命中的字幕; 登记 / 换 path / 库扫描时重新检查. 整理落盘时
-    #: 作为 `parse_file_info` 的 `has_external_subtitle` 入参并入文件相位.
+    #: 只保存精确匹配到当前视频的外挂字幕状态.
     has_external_subtitle: bool = Field(default=False, index=True)
     definition: str | None = Field(default=None, index=True)
     metadata_id: int | None = Field(default=None, foreign_key="metadata.id", index=True)
@@ -639,6 +642,7 @@ class Actor(SQLModel, table=True):
     gender: ActorGender = Field(default=ActorGender.UNKNOWN, index=True)
     birthday: str | None = None
     birthplace: str | None = None
+    blood_type: str | None = None
     height: int | None = None
     bust: int | None = None
     waist: int | None = None

@@ -34,12 +34,23 @@ class Repository(
         # 向量在 sidecar 库, 本库不持有其 schema; 级联删除经它清理.
         self._embeddings = embeddings
         self._media_hook: MediaChangeHook | None = None
+        self._mosaic_rules: dict[str, str] = {
+            "cracked": "破解,克破,CRACKED,-U,-UC",
+            "leaked": "流出,LEAKED",
+        }
         # SQLite DEFERRED: 两个 session 的 SELECT 都在写锁前看到空表. 入队互斥检查与 INSERT 同锁.
         self._task_insert_lock = asyncio.Lock()
 
     @property
     def embeddings(self) -> EmbeddingStore | None:
         return self._embeddings
+
+    def set_mosaic_rules(self, rules: dict[str, str]) -> None:
+        """设置文件相位解析规则; 新建、改路径与批量重算共用同一份规则."""
+        self._mosaic_rules = dict(rules)
+
+    def get_mosaic_rules(self) -> dict[str, str]:
+        return dict(self._mosaic_rules)
 
     def set_media_hook(self, hook: MediaChangeHook | None) -> None:
         """热重载替换语义服务时重设; 元数据写库路径据此重算向量."""

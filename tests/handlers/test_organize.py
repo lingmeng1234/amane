@@ -901,7 +901,7 @@ async def test_organize_moves_same_dir_subtitles(
     src_dir.mkdir(parents=True)
     src = src_dir / "NSFS-039.mp4"
     src.write_bytes(b"video")
-    (src_dir / "chs.srt").write_text("sub1")
+    (src_dir / "NSFS-039.srt").write_text("sub1")
     (src_dir / "NSFS-039.zh.ass").write_text("sub2")
     (src_dir / "readme.txt").write_text("skip")
 
@@ -922,15 +922,15 @@ async def test_organize_moves_same_dir_subtitles(
 
     dest_dir = lib_root / "Studio" / "NSFS-039"
     assert (dest_dir / "NSFS-039.mp4").exists()
-    assert (dest_dir / "chs.srt").read_text() == "sub1"
+    assert (dest_dir / "NSFS-039.srt").read_text() == "sub1"
     assert (dest_dir / "NSFS-039.zh.ass").read_text() == "sub2"
     assert (src_dir / "readme.txt").exists()
-    assert not (src_dir / "chs.srt").exists()
+    assert not (src_dir / "NSFS-039.srt").exists()
 
 
 @pytest.mark.asyncio(loop_scope="function")
 async def test_organize_subtitles_follow_cd(repo: Repository, resource_store: ResourceStore, tmp_path: Path) -> None:
-    """多分集: 有 CD 的字幕跟对应集, 解析不出的跟第一集."""
+    """多分集只按主番号匹配, 不比较 CD; 无法解析番号的字幕不移动."""
     lib_root = tmp_path / "lib"
     src_dir = lib_root / "incoming"
     src_dir.mkdir(parents=True)
@@ -938,8 +938,8 @@ async def test_organize_subtitles_follow_cd(repo: Repository, resource_store: Re
     src2 = src_dir / "NSFS-039-CD2.mp4"
     src1.write_bytes(b"cd1")
     src2.write_bytes(b"cd2")
-    (src_dir / "a-CD1.srt").write_text("cd1sub")
-    (src_dir / "b-CD2.ass").write_text("cd2sub")
+    (src_dir / "NSFS-039-CD1.srt").write_text("cd1sub")
+    (src_dir / "NSFS-039-CD2.ass").write_text("cd2sub")
     (src_dir / "chs.srt").write_text("unparsed")
 
     lib = await repo.create_library(name="t", path=str(lib_root), organize_path=str(lib_root), write_nfo=False)
@@ -959,9 +959,10 @@ async def test_organize_subtitles_follow_cd(repo: Repository, resource_store: Re
     assert result.result.failed == 0
 
     dest_dir = lib_root / "Studio" / "NSFS-039"
-    assert (dest_dir / "a-CD1.srt").read_text() == "cd1sub"
-    assert (dest_dir / "chs.srt").read_text() == "unparsed"
-    assert (dest_dir / "b-CD2.ass").read_text() == "cd2sub"
+    assert (dest_dir / "NSFS-039-CD1.srt").read_text() == "cd1sub"
+    assert (src_dir / "chs.srt").read_text() == "unparsed"
+    assert not (dest_dir / "chs.srt").exists()
+    assert (dest_dir / "NSFS-039-CD2.ass").read_text() == "cd2sub"
 
 
 @pytest.mark.asyncio(loop_scope="function")

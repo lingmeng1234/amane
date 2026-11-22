@@ -23,6 +23,7 @@ class FilePhaseSummary(BaseModel):
     has_subtitle: bool = False
     censored: bool = False
     uncensored: bool = False
+    hentai: bool = False
     mosaics: list[Mosaic] = []
     definition: str | None = None
 

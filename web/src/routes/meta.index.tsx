@@ -188,6 +188,7 @@ function MetaIndexPage() {
   const vr = parseHasFiles(search.vr);
   const filePhase: FilePhaseFilters = {
     has_subtitle: parseHasFiles(search.has_subtitle),
+    hentai: parseHasFiles(search.hentai),
     uncensored: parseHasFiles(search.uncensored),
     mosaic: search.mosaic ?? null,
     definition: search.definition ?? null,
@@ -195,6 +196,7 @@ function MetaIndexPage() {
   };
   const phaseActive =
     filePhase.has_subtitle !== null ||
+    filePhase.hentai !== null ||
     filePhase.uncensored !== null ||
     filePhase.mosaic != null ||
     filePhase.definition != null ||
@@ -219,6 +221,7 @@ function MetaIndexPage() {
     has_files: hasFiles === null ? undefined : hasFiles,
     vr: vr === null ? undefined : vr,
     has_subtitle: filePhase.has_subtitle === null ? undefined : filePhase.has_subtitle,
+    hentai: filePhase.hentai === null ? undefined : filePhase.hentai,
     uncensored: filePhase.uncensored === null ? undefined : filePhase.uncensored,
     mosaic: filePhase.mosaic ?? undefined,
     definition: filePhase.definition ?? undefined,
@@ -428,6 +431,7 @@ function MetaIndexPage() {
       search: (prev) => ({
         ...prev,
         has_subtitle: triToSearch(value.has_subtitle),
+        hentai: triToSearch(value.hentai),
         uncensored: triToSearch(value.uncensored),
         mosaic: value.mosaic ?? undefined,
         definition: value.definition ?? undefined,
@@ -668,6 +672,12 @@ function MetaIndexPage() {
             <ActiveTriChip
               label={`${t("search.hasSubtitle")}: ${filePhase.has_subtitle ? t("search.yes") : t("search.no")}`}
               onClear={() => setFilePhaseFilter({ ...filePhase, has_subtitle: null })}
+            />
+          )}
+          {filePhase.hentai !== null && (
+            <ActiveTriChip
+              label={`${t("search.hentai")}: ${filePhase.hentai ? t("search.yes") : t("search.no")}`}
+              onClear={() => setFilePhaseFilter({ ...filePhase, hentai: null })}
             />
           )}
           {filePhase.uncensored !== null && (

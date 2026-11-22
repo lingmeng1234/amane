@@ -199,6 +199,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
         library_ids: Sequence[int] | None = None,
         has_files: bool | None = None,
         has_subtitle: bool | None = None,
+        hentai: bool | None = None,
         vr: bool | None = None,
         mosaic: Mosaic | None = None,
         uncensored: bool | None = None,
@@ -291,7 +292,13 @@ class MetadataRepoMixin(RepositoryMixinBase):
             conditions.append(_metadata_linked_file_exists(has_subtitle_predicate()))
         elif has_subtitle is False:
             conditions.append(~_metadata_linked_file_exists(has_subtitle_predicate()))
-        if mosaic is not None:
+        if hentai is True:
+            conditions.append(_metadata_linked_file_exists(col(MediaFile.hentai).is_(True)))
+        elif hentai is False:
+            conditions.append(~_metadata_linked_file_exists(col(MediaFile.hentai).is_(True)))
+        if mosaic is Mosaic.WESTERN:
+            conditions.append(_metadata_linked_file_exists(col(MediaFile.number_content_type).is_(ContentType.WESTERN)))
+        elif mosaic is not None:
             conditions.append(_metadata_linked_file_exists(col(MediaFile.mosaic) == mosaic))
         if uncensored is not None:
             flag = _metadata_uncensored_predicate()
@@ -322,6 +329,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
         library_ids: Sequence[int] | None = None,
         has_files: bool | None = None,
         has_subtitle: bool | None = None,
+        hentai: bool | None = None,
         vr: bool | None = None,
         mosaic: Mosaic | None = None,
         uncensored: bool | None = None,
@@ -349,6 +357,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
                 library_ids=library_ids,
                 has_files=has_files,
                 has_subtitle=has_subtitle,
+                hentai=hentai,
                 vr=vr,
                 mosaic=mosaic,
                 uncensored=uncensored,
@@ -389,6 +398,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
         library_ids: Sequence[int] | None = None,
         has_files: bool | None = None,
         has_subtitle: bool | None = None,
+        hentai: bool | None = None,
         vr: bool | None = None,
         mosaic: Mosaic | None = None,
         uncensored: bool | None = None,
@@ -414,6 +424,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
                 library_ids=library_ids,
                 has_files=has_files,
                 has_subtitle=has_subtitle,
+                hentai=hentai,
                 vr=vr,
                 mosaic=mosaic,
                 uncensored=uncensored,

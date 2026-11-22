@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import NamedTuple, Unpack
 
 from sqlalchemy import delete as sqla_delete
@@ -16,14 +16,21 @@ from ..repo_types import _MEDIA_SORT_COLUMNS, MediaFileUpdates, _apply_media_pha
 from .base import RepositoryMixinBase, chunks
 
 
-def _apply_path_phase(media: MediaFile) -> None:
+def _apply_path_phase(
+    media: MediaFile,
+    phase: FilePhase | None = None,
+    *,
+    mosaic_rules: Mapping[str, str] | None = None,
+) -> None:
     """path 是真值, 相位列是投影; 创建与改 path 时必须回填.
 
     只回填 path 能推出的相位. 同目录字幕不是 path 的投影, 由调用方另经
     ``handlers._common.refresh_external_subtitle`` 写入.
     """
-    phase = file_phase_from_path(media.path)
+    phase = phase or file_phase_from_path(media.path, mosaic_rules=mosaic_rules)
     media.mosaic = phase["mosaic"]
+    media.number_content_type = phase.get("number_content_type")
+    media.hentai = phase.get("hentai", False)
     media.has_subtitle_in_name = phase["has_subtitle"]
     media.definition = phase["definition"]
 
@@ -34,6 +41,8 @@ def file_phase_of(media: MediaFile) -> FilePhase:
         mosaic=media.mosaic,
         has_subtitle=media.has_subtitle,
         definition=media.definition,
+        number_content_type=media.number_content_type,
+        hentai=media.hentai,
     )
 
 
@@ -49,7 +58,7 @@ class MediaRepoMixin(RepositoryMixinBase):
             updates["path"] = nfc_path(path)
         async with self._session() as session:
             media = MediaFile(library_id=library_id, **updates)
-            _apply_path_phase(media)
+            _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
             session.add(media)
             await session.commit()
             await session.refresh(media)
@@ -70,11 +79,23 @@ class MediaRepoMixin(RepositoryMixinBase):
             if existing is not None:
                 return existing, False
             media = MediaFile(library_id=library_id, **{**updates, "path": normalized})
-            _apply_path_phase(media)
+            _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
             session.add(media)
             await session.commit()
             await session.refresh(media)
             return media, True
+
+    async def reproject_media_phases(self) -> int:
+        """按当前自定义规则重算所有已登记文件的路径属性; 保留精确匹配的外挂字幕状态."""
+        async with self._session() as session:
+            result = await session.exec(select(MediaFile))
+            media_files = list(result.all())
+            for media in media_files:
+                _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
+                media.updated_at = _utcnow()
+                session.add(media)
+            await session.commit()
+            return len(media_files)
 
     async def get_media_file(self, media_id: int) -> MediaFile | None:
         async with self._session() as session:
@@ -125,6 +146,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         ids: Sequence[int] | None = None,
         *,
         has_subtitle: bool | None = None,
+        hentai: bool | None = None,
         mosaic: Mosaic | None = None,
         uncensored: bool | None = None,
         definition: str | None = None,
@@ -151,6 +173,7 @@ class MediaRepoMixin(RepositoryMixinBase):
                 return _apply_media_phase_filters(
                     stmt,
                     has_subtitle=has_subtitle,
+                    hentai=hentai,
                     mosaic=mosaic,
                     content_type=content_type,
                     uncensored=uncensored,
@@ -181,6 +204,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         library_id: int | None = None,
         *,
         has_subtitle: bool | None = None,
+        hentai: bool | None = None,
         mosaic: Mosaic | None = None,
         uncensored: bool | None = None,
         definition: str | None = None,
@@ -198,6 +222,7 @@ class MediaRepoMixin(RepositoryMixinBase):
             base = _apply_media_phase_filters(
                 base,
                 has_subtitle=has_subtitle,
+                hentai=hentai,
                 mosaic=mosaic,
                 uncensored=uncensored,
                 definition=definition,
@@ -217,7 +242,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         # 显式赋值, 禁止 setattr; 字段集由 MediaFileUpdates 与 MediaFile 静态对齐.
         if "path" in updates:
             media.path = nfc_path(updates["path"])
-            _apply_path_phase(media)
+            _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
         if "number" in updates:
             media.number = updates["number"]
         if "oshash" in updates:
@@ -232,6 +257,16 @@ class MediaRepoMixin(RepositoryMixinBase):
             media.status = updates["status"]
         if "metadata_id" in updates:
             media.metadata_id = updates["metadata_id"]
+        if "mosaic" in updates:
+            media.mosaic = updates["mosaic"]
+        if "number_content_type" in updates:
+            media.number_content_type = updates["number_content_type"]
+        if "hentai" in updates:
+            media.hentai = updates["hentai"]
+        if "has_subtitle_in_name" in updates:
+            media.has_subtitle_in_name = updates["has_subtitle_in_name"]
+        if "definition" in updates:
+            media.definition = updates["definition"]
         if "has_external_subtitle" in updates:
             media.has_external_subtitle = updates["has_external_subtitle"]
         media.updated_at = _utcnow()
@@ -270,6 +305,23 @@ class MediaRepoMixin(RepositoryMixinBase):
             await session.commit()
             await session.refresh(media)
             return media
+
+    async def update_media_file_phases(self, updates: Sequence[tuple[int, FilePhase]]) -> int:
+        """在单一事务中批量重算 path 派生的文件属性."""
+        if not updates:
+            return 0
+        async with self._session() as session:
+            updated = 0
+            for media_id, phase in updates:
+                media = await session.get(MediaFile, media_id)
+                if media is None:
+                    continue
+                _apply_path_phase(media, phase)
+                media.updated_at = _utcnow()
+                session.add(media)
+                updated += 1
+            await session.commit()
+            return updated
 
     async def delete_media_file(self, media_id: int) -> bool:
         async with self._session() as session:

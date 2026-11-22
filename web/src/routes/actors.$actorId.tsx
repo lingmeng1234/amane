@@ -615,6 +615,11 @@ function ActorHero({
             {actor.birthplace ? <Text size="sm">{actor.birthplace}</Text> : <EmptyValue />}
           </FieldBlock>
         )}
+        {(actor.blood_type || lockedFields.has("blood_type")) && (
+          <FieldBlock label={t("browse.person.bloodType")} lock={lockProps("blood_type")}>
+            {actor.blood_type ? <Text size="sm">{actor.blood_type}</Text> : <EmptyValue />}
+          </FieldBlock>
+        )}
         {(actor.height != null || lockedFields.has("height")) && (
           <FieldBlock label={t("browse.person.height")} lock={lockProps("height")}>
             {actor.height != null ? (

@@ -10,6 +10,7 @@ class ActorMetadata(BaseModel):
     gender: ActorGender | None = None
     birthday: str | None = None
     birthplace: str | None = None
+    blood_type: str | None = None
     height: int | None = None
     bust: int | None = None
     waist: int | None = None

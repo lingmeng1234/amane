@@ -9,8 +9,8 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { IconAlertCircle, IconFilter, IconSearch } from "@tabler/icons-react";
-import { useQuery } from "@tanstack/react-query";
+import { IconAlertCircle, IconFilter, IconSearch, IconTrash } from "@tabler/icons-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, stripSearchParams } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -35,6 +35,7 @@ import {
 import { FACET_KIND_ICON } from "@/lib/facets";
 import { useNarrowViewport } from "@/hooks/use-narrow-viewport";
 import { useUIStore } from "@/stores/ui";
+import { apiFetch } from "@/lib/api-token";
 
 const catalogKindSearchSchema = z.object({
   q: z.string().optional(),
@@ -105,6 +106,7 @@ function CatalogKindPage() {
   const { kind: rawKind } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const queryClient = useQueryClient();
   const { t } = useTranslation(["metadata", "common"]);
   const cloudLimit = useUIStore((s) => s.pageSizes.catalogKind);
   const listLimit = useUIStore((s) => s.pageSizes.catalogList);
@@ -114,6 +116,18 @@ function CatalogKindPage() {
   // 带筛选进入时直接展开高级筛选区, 否则筛选项藏在折叠面板里而列表已被过滤.
   const [advancedOpen, setAdvancedOpen] = useState(search.favorite != null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const clearEmpty = useMutation({
+    mutationFn: async () => {
+      const response = await apiFetch(`/api/facets/${kind}/empty`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json() as Promise<{ deleted: number }>;
+    },
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries();
+      window.alert(`已清除 ${result.deleted} 个空分类`);
+    },
+    onError: (error) => window.alert(`清除空分类失败：${String(error)}`),
+  });
 
   const validKind = isOneOf(CATALOG_FACET_KINDS, rawKind);
   const kind: FacetKind = validKind ? rawKind : "tag";
@@ -256,6 +270,22 @@ function CatalogKindPage() {
       }
       extras={
         <Group gap="xs" wrap="nowrap">
+          <HintedActionIcon
+            size={36}
+            label="清除空分类"
+            disabled={clearEmpty.isPending}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "确定清除当前分类中所有没有关联影片的记录吗？此操作不会加入剔除列表。",
+                )
+              ) {
+                clearEmpty.mutate();
+              }
+            }}
+          >
+            <IconTrash size={16} />
+          </HintedActionIcon>
           {/* 窄屏的筛选在底部面板里常驻展开, 该开关只在宽屏有意义. */}
           {narrow || !supportsFavorite ? null : (
             <HintedActionIcon

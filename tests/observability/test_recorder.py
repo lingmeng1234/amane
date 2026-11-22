@@ -58,21 +58,21 @@ def test_recorder_failure_keeps_http(tmp_path: Path, task: Task):
     rec.finalize(task, success=False, error=task.error, debug_capture=False)
 
     root = task_dir_for(tmp_path, 42)
-    manifest = json.loads((root / "manifest.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["http_captured"] is True
     assert manifest["capture_reason"] == CaptureReason.FAILURE
     assert manifest["redacted"] is True
     assert (root / "http" / "index.jsonl").is_file()
-    idx = json.loads((root / "http" / "index.jsonl").read_text().splitlines()[0])
+    idx = json.loads((root / "http" / "index.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert idx["site"] == "javdb"
     assert (root / "task.log").is_file()
-    cfg = json.loads((root / "config.hot.json").read_text())
+    cfg = json.loads((root / "config.hot.json").read_text(encoding="utf-8"))
     assert "watcher" not in cfg
     assert "worker" not in cfg
     assert cfg["scraping"]["site_config"]["javdb"]["cookie"]["session"] == "***"
-    secrets = json.loads((root / SECRETS_HOT_FILENAME).read_text())
+    secrets = json.loads((root / SECRETS_HOT_FILENAME).read_text(encoding="utf-8"))
     assert secrets["scraping"]["site_config"]["javdb"]["cookie"]["session"] == "secret"
-    summary = json.loads((root / "summary.json").read_text())
+    summary = json.loads((root / "summary.json").read_text(encoding="utf-8"))
     assert "error" not in summary
     assert "number" not in summary
     assert summary["sites_queried"] == ["javdb"]
@@ -86,7 +86,7 @@ def test_recorder_omits_secrets_when_none(tmp_path: Path, task: Task):
     rec.finalize(task, success=False, error="boom", debug_capture=False)
     root = task_dir_for(tmp_path, 42)
     assert not (root / SECRETS_HOT_FILENAME).exists()
-    cfg = json.loads((root / "config.hot.json").read_text())
+    cfg = json.loads((root / "config.hot.json").read_text(encoding="utf-8"))
     assert set(cfg.keys()) == {"scraping", "network", "llm", "r18", "plugins"}
 
 
@@ -104,7 +104,7 @@ def test_recorder_success_discards_http_unless_debug(tmp_path: Path, task: Task)
     task.status = TaskStatus.DONE
     rec.finalize(task, success=True, error=None, debug_capture=False)
     root = task_dir_for(tmp_path, 42)
-    manifest = json.loads((root / "manifest.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["http_captured"] is False
     assert not (root / "http").exists()
 
@@ -123,7 +123,7 @@ def test_recorder_success_keeps_http_with_debug(tmp_path: Path, task: Task):
     task.status = TaskStatus.DONE
     rec.finalize(task, success=True, error=None, debug_capture=True)
     root = task_dir_for(tmp_path, 42)
-    manifest = json.loads((root / "manifest.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["http_captured"] is True
     assert manifest["capture_reason"] == CaptureReason.DEBUG_FLAG
 

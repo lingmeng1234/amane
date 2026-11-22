@@ -95,10 +95,18 @@
       "categories": {
         "label": "分类与系列",
         "genre": {
-          "label": "分类"
+          "label": "分类",
+          "cover_attributes": { "label": "封面属性" },
+          "tags": { "label": "原有标签" },
+          "studio": { "label": "制作商" },
+          "publisher": { "label": "发行商" }
         },
         "tag": {
-          "label": "类型"
+          "label": "类型",
+          "cover_attributes": { "label": "封面属性" },
+          "tags": { "label": "原有标签" },
+          "studio": { "label": "制作商" },
+          "publisher": { "label": "发行商" }
         },
         "series": {
           "label": "系列"
@@ -545,7 +553,7 @@
           "western": "欧美",
           "fc2": "FC2",
           "amateur": "素人",
-          "hentai": "动漫",
+          "hentai": "里番",
           "uncensored_dvd": "无码 DVD",
           "uncensored_streaming": "无码流媒体"
         },
@@ -641,6 +649,14 @@
       },
       "number_mapping_rules": {
         "label": "番号映射规则"
+      },
+      "mosaic_rules": {
+        "label": "无码识别规则词",
+        "cracked": {
+          "label": "破解关键词",
+          "description": "英文逗号分隔；保存后完全替代默认关键词"
+        },
+        "leaked": { "label": "流出关键词", "description": "英文逗号分隔；保存后完全替代默认关键词" }
       }
     },
     "network": {
@@ -980,9 +996,9 @@
       },
       "corners": {
         "label": "水印位置",
-        "description": "同角多个按中字 → 无码 → 破解 → 流出 → 分辨率顺序叠加",
+        "description": "同角多个按中文字幕 → 无码 → 破解 → 流出 → LTX → 欧美 → 分辨率顺序叠加",
         "options": {
-          "subtitle": "中字",
+          "subtitle": "中文字幕",
           "uncensored": "无码",
           "cracked": "破解",
           "leaked": "流出",

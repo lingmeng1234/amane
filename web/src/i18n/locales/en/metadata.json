@@ -25,9 +25,10 @@
     "hasFilesYes": "Has files",
     "hasFilesNo": "No files",
     "hasSubtitle": "Chinese subtitles",
+    "hentai": "Hentai",
     "vr": "VR",
     "uncensored": "Uncensored",
-    "mosaic": "Mosaic mark",
+    "mosaic": "Uncensored branch",
     "definition": "Resolution",
     "contentType": "Content type",
     "any": "Any",
@@ -43,19 +44,24 @@
       "hentai": "Hentai"
     },
     "mosaics": {
-      "uncensored": "Uncensored",
+      "uncensored": "Regular uncensored",
       "cracked": "Cracked",
-      "leaked": "Leaked"
+      "leaked": "Leaked",
+      "ltx": "LTX",
+      "western": "Western"
     },
     "library": "Library",
     "libraryAll": "All libraries"
   },
   "filePhase": {
-    "subtitle": "SUB",
+    "subtitle": "Chinese subtitles",
     "censored": "CEN",
     "uncensored": "U",
     "cracked": "CRACK",
-    "leaked": "LEAK"
+    "leaked": "LEAK",
+    "ltx": "LTX",
+    "western": "WEST",
+    "hentai": "HENTAI"
   },
   "columns": {
     "number": "Number",
@@ -216,6 +222,7 @@
       "gender_unknown": "Unknown",
       "birthday": "Birthday",
       "birthplace": "Birthplace",
+      "bloodType": "Blood type",
       "height": "Height",
       "bust": "Bust",
       "waist": "Waist",

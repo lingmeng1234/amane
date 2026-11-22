@@ -8,6 +8,7 @@ from typing import Any, cast
 from sqlalchemy import bindparam, literal, or_, update
 from sqlalchemy import delete as sqla_delete
 from sqlalchemy import select as sa_select
+from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
 from sqlalchemy.orm import Mapped
 from sqlalchemy.sql.functions import count
 from sqlalchemy.sql.schema import Table
@@ -730,7 +731,7 @@ async def _load_linked_facet_values(
         relevant = col(Metadata.id).in_(select(spec.link.metadata_id).where(col(spec.link_fk).in_(chunk)))
         # SQLModel.select 的静态重载未覆盖此处的八列投影; 使用 SQLAlchemy select
         # 保留单次窄列查询, 避免退化为加载整条 Metadata ORM 记录.
-        metadata_table = cast(Table, Metadata.__table__)  # pyright: ignore[reportAttributeAccessIssue]
+        metadata_table = cast(Table, Metadata.__table__)  # pyright: ignore[reportAttributeAccessIssue]  # ty: ignore[unresolved-attribute]
         stmt = sa_select(
             metadata_table.c.id,
             metadata_table.c.actors,
@@ -742,7 +743,7 @@ async def _load_linked_facet_values(
             metadata_table.c.publisher,
         ).where(relevant)
         for metadata_id, actors, directors, tags, series_names, series, studio, publisher in (
-            await session.execute(stmt)
+            await cast(SQLAlchemyAsyncSession, session).execute(stmt)
         ).all():
             if metadata_id is None:
                 continue

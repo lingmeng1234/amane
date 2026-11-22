@@ -259,6 +259,7 @@ class AppRuntime:
     _stopped: bool = field(default=False, repr=False)
 
     def __post_init__(self) -> None:
+        self.repo.set_mosaic_rules(self.config.hot.scraping.mosaic_rules.model_dump())
         if self._r18_config is None:
             self._r18_config = self.config.hot.r18.model_copy(deep=True)
         if self.r18_handle is None and self.r18_db is not None:
@@ -593,7 +594,11 @@ def build_handlers(
         inventory_store = InventoryStore()
     handlers: dict[TaskType, TaskHandler[Any, Any]] = {
         TaskType.REFRESH: RefreshHandler(
-            repo, hot.watcher.media_extensions, inventory_store, library_locks=library_locks
+            repo,
+            hot.watcher.media_extensions,
+            inventory_store,
+            library_locks=library_locks,
+            mosaic_rules=hot.scraping.mosaic_rules.model_dump(),
         ),
         TaskType.SCRAPE: ScrapeHandler(
             repo,

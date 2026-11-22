@@ -158,6 +158,7 @@ class ActorField(StrEnum):
     GENDER = "gender"
     BIRTHDAY = "birthday"
     BIRTHPLACE = "birthplace"
+    BLOOD_TYPE = "blood_type"
     HEIGHT = "height"
     BUST = "bust"
     WAIST = "waist"

@@ -118,13 +118,19 @@ def _media_file_uncensored_predicate() -> ColumnElement[bool]:
     entry_uncensored = exists().where(
         col(Metadata.id) == col(MediaFile.metadata_id), col(Metadata.content_type) == ContentType.UNCENSORED
     )
-    return or_(col(MediaFile.mosaic).is_(Mosaic.UNCENSORED), entry_uncensored)
+    return or_(
+        col(MediaFile.mosaic).is_not(None),
+        col(MediaFile.number_content_type).is_(ContentType.UNCENSORED),
+        col(MediaFile.number_content_type).is_(ContentType.WESTERN),
+        entry_uncensored,
+    )
 
 
 def _apply_media_phase_filters(
     stmt: SelectOfScalar[MediaFile],
     *,
     has_subtitle: bool | None = None,
+    hentai: bool | None = None,
     mosaic: Mosaic | None = None,
     uncensored: bool | None = None,
     definition: str | None = None,
@@ -134,7 +140,12 @@ def _apply_media_phase_filters(
     if has_subtitle is not None:
         flag = has_subtitle_predicate()
         stmt = stmt.where(flag if has_subtitle else ~flag)
-    if mosaic is not None:
+    if hentai is not None:
+        flag = col(MediaFile.hentai).is_(True)
+        stmt = stmt.where(flag if hentai else ~flag)
+    if mosaic is Mosaic.WESTERN:
+        stmt = stmt.where(col(MediaFile.number_content_type).is_(ContentType.WESTERN))
+    elif mosaic is not None:
         stmt = stmt.where(col(MediaFile.mosaic) == mosaic)
     if uncensored is not None:
         flag = _media_file_uncensored_predicate()
@@ -153,8 +164,11 @@ def _metadata_linked_file_exists(*extra: ColumnElement[bool]) -> ColumnElement[b
 def _metadata_uncensored_predicate() -> ColumnElement[bool]:
     """条目无码: 类型为无码, 或存在带无码标记的文件. 没有挂载文件也成立."""
     return or_(
-        col(Metadata.content_type) == ContentType.UNCENSORED,
-        _metadata_linked_file_exists(col(MediaFile.mosaic) == Mosaic.UNCENSORED),
+        col(Metadata.content_type).in_((ContentType.UNCENSORED, ContentType.WESTERN)),
+        _metadata_linked_file_exists(col(MediaFile.mosaic).is_not(None)),
+        _metadata_linked_file_exists(
+            col(MediaFile.number_content_type).in_((ContentType.UNCENSORED, ContentType.WESTERN))
+        ),
     )
 
 
@@ -181,6 +195,7 @@ class ActorBrowseItem(BaseModel):
     gender: ActorGender = ActorGender.UNKNOWN
     birthday: str | None = None
     birthplace: str | None = None
+    blood_type: str | None = None
     height: int | None = None
     bust: int | None = None
     waist: int | None = None
@@ -315,6 +330,11 @@ class MediaFileUpdates(TypedDict, total=False):
     codec: str | None
     status: MediaFileStatus
     metadata_id: int | None
+    mosaic: Mosaic | None
+    number_content_type: ContentType | None
+    hentai: bool
+    has_subtitle_in_name: bool
+    definition: str | None
     has_external_subtitle: bool
 
 
@@ -386,6 +406,7 @@ class ActorPersonFields(TypedDict, total=False):
     gender: ActorGender
     birthday: str | None
     birthplace: str | None
+    blood_type: str | None
     height: int | None
     bust: int | None
     waist: int | None

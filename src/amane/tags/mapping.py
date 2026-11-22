@@ -9,7 +9,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeGuard
 
 LanguageCode = Literal["ja", "en", "zh", "other"]
 
@@ -31,6 +31,10 @@ def detect_language(value: str) -> LanguageCode:
     return "other"
 
 
+MappingKind = Literal["tag", "maker", "publisher", "series"]
+MAPPING_KINDS: tuple[MappingKind, ...] = ("tag", "maker", "publisher", "series")
+
+
 @dataclass
 class TagEntry:
     original: str
@@ -39,16 +43,27 @@ class TagEntry:
     usage_count: int = 0
     sources: list[str] | None = None
     archived: bool = False
+    type: MappingKind = "tag"
 
 
 class TagMappingStore:
+    """统一的原文→中文映射表; type 区分标签、制作商、发行商与系列."""
+
     def __init__(self, data_dir: Path) -> None:
         self.path = data_dir / "tag_mappings.json"
         self._lock = threading.RLock()
-        self._entries: dict[str, TagEntry] = {}
+        self._entries: dict[tuple[MappingKind, str], TagEntry] = {}
         self._enabled = True
-        self._last_seed = 0.0
+        self._last_seed: dict[MappingKind, float] = {}
         self._load()
+
+    @staticmethod
+    def _key(kind: MappingKind, original: str) -> tuple[MappingKind, str]:
+        return kind, original
+
+    @staticmethod
+    def _valid_kind(value: object) -> TypeGuard[MappingKind]:
+        return value in MAPPING_KINDS
 
     def _load(self) -> None:
         if not self.path.exists():
@@ -56,26 +71,43 @@ class TagMappingStore:
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             self._enabled = raw.get("enabled", True) is not False
-            for key, value in raw.get("entries", {}).items():
-                if isinstance(value, dict):
-                    self._entries[key] = TagEntry(
-                        original=key,
-                        translation=value.get("translation") or None,
-                        language=value.get("language") or detect_language(key),
-                        usage_count=max(0, int(value.get("usage_count", 0))),
-                        sources=list(value.get("sources") or []),
-                        archived=bool(value.get("archived", False)) and not bool(value.get("translation")),
-                    )
+            stored = raw.get("entries", {})
+            if isinstance(stored, dict):
+                # v1 词典只有标签; 旧记录全部按 tag 读取, 不改变既有映射.
+                records = [
+                    (key, value, value.get("type", "tag")) for key, value in stored.items() if isinstance(value, dict)
+                ]
+            elif isinstance(stored, list):
+                records = [
+                    (value.get("original"), value, value.get("type")) for value in stored if isinstance(value, dict)
+                ]
+            else:
+                return
+            for original, value, raw_kind in records:
+                if not isinstance(original, str) or not original or not self._valid_kind(raw_kind):
+                    continue
+                kind = raw_kind
+                self._entries[self._key(kind, original)] = TagEntry(
+                    original=original,
+                    translation=value.get("translation") or None,
+                    language=value.get("language") or detect_language(original),
+                    usage_count=max(0, int(value.get("usage_count", 0))),
+                    sources=list(value.get("sources") or []),
+                    archived=bool(value.get("archived", False)) and not bool(value.get("translation")),
+                    type=kind,
+                )
         except OSError, ValueError, TypeError:
-            # 不覆盖损坏文件；让服务保持可用，后续保存时使用当前可解析数据。
+            # 不覆盖损坏文件; 服务继续可用, 后续保存时使用当前可解析数据.
             self._entries = {}
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            "version": 1,
+            "version": 2,
             "enabled": self._enabled,
-            "entries": {k: asdict(v) for k, v in sorted(self._entries.items())},
+            "entries": [
+                asdict(entry) for _, entry in sorted(self._entries.items(), key=lambda item: (item[0][0], item[0][1]))
+            ],
         }
         fd, name = tempfile.mkstemp(prefix="tag-mappings-", suffix=".json", dir=self.path.parent)
         try:
@@ -88,28 +120,42 @@ class TagMappingStore:
             if temp_path.exists():
                 temp_path.unlink()
 
-    def needs_seed(self) -> bool:
-        return time.monotonic() - self._last_seed > 60
+    def needs_seed(self, kind: MappingKind = "tag") -> bool:
+        return time.monotonic() - self._last_seed.get(kind, 0.0) > 60
 
-    def seed(self, values: builtins.list[tuple[str, int]]) -> None:
-        """从现有标签分类表导入待映射词条与真实引用数，不覆盖已有人工作出的映射。"""
+    def _seed(self, kind: MappingKind, values: builtins.list[tuple[str, int]]) -> None:
         with self._lock:
             changed = False
             for original, count in values:
                 if not original:
                     continue
-                entry = self._entries.get(original)
+                key = self._key(kind, original)
+                entry = self._entries.get(key)
                 if entry is None:
-                    self._entries[original] = TagEntry(
-                        original, language=detect_language(original), usage_count=max(0, count), sources=[]
+                    self._entries[key] = TagEntry(
+                        original,
+                        language=detect_language(original),
+                        usage_count=max(0, count),
+                        sources=[],
+                        type=kind,
                     )
                     changed = True
                 elif entry.usage_count != count:
                     entry.usage_count = max(0, count)
                     changed = True
-            self._last_seed = time.monotonic()
+            self._last_seed[kind] = time.monotonic()
             if changed:
                 self._save()
+
+    def seed(self, values: builtins.list[tuple[str, int]]) -> None:
+        """从标签分类表同步标签与引用次数, 不覆盖已有人工作出的映射."""
+        self._seed("tag", values)
+
+    def seed_facets(self, kind: MappingKind, values: builtins.list[tuple[str, int]]) -> None:
+        """同步制作商、发行商或系列分类; 标签仍由 seed() 处理."""
+        if kind == "tag":
+            raise ValueError("tag mappings must use seed()")
+        self._seed(kind, values)
 
     def observe(self, tags: builtins.list[str], source: str | None = None) -> None:
         with self._lock:
@@ -118,15 +164,14 @@ class TagMappingStore:
                 name = tag.strip()
                 if not name:
                     continue
-                entry = self._entries.get(name)
+                key = self._key("tag", name)
+                entry = self._entries.get(key)
                 if entry is None:
-                    entry = TagEntry(name, language=detect_language(name), sources=[])
-                    self._entries[name] = entry
-                    changed = True
+                    entry = TagEntry(name, language=detect_language(name), sources=[], type="tag")
+                    self._entries[key] = entry
                 entry.usage_count += 1
                 if source and source not in (entry.sources or []):
                     entry.sources = [*(entry.sources or []), source]
-                    changed = True
                 changed = True
             if changed:
                 self._save()
@@ -142,41 +187,44 @@ class TagMappingStore:
             self._save()
             return self._enabled
 
-    def map_tags(self, tags: builtins.list[str]) -> builtins.list[str]:
+    def map_values(self, kind: MappingKind, values: builtins.list[str]) -> builtins.list[str]:
+        """按归属类型映射并在映射后去重; UI、片库响应与 NFO 共用此映射词典, 未映射词条原样保留."""
         with self._lock:
             if not self._enabled:
-                return list(dict.fromkeys(tag for tag in tags if tag))
-            # 必须在映射后去重；未映射词条原样保留。
-            translated: list[str] = []
-            for tag in tags:
-                if not tag:
+                return list(dict.fromkeys(value for value in values if value))
+            translated: builtins.list[str] = []
+            for value in values:
+                if not value:
                     continue
-                entry = self._entries.get(tag)
-                translation = entry.translation if entry is not None else None
-                translated.append(translation or tag)
+                entry = self._entries.get(self._key(kind, value))
+                translated.append((entry.translation if entry else None) or value)
             return list(dict.fromkeys(translated))
 
-    def display_name(self, original: str) -> str:
-        """返回原始标签对应的展示名称；不修改原始标签。"""
+    def map_tags(self, tags: builtins.list[str]) -> builtins.list[str]:
+        return self.map_values("tag", tags)
+
+    def display_name(self, original: str, kind: MappingKind = "tag") -> str:
+        """返回指定类别原始名称对应的展示名称; 不修改原始值."""
         with self._lock:
             if not self._enabled:
                 return original
-            entry = self._entries.get(original)
+            entry = self._entries.get(self._key(kind, original))
             return (entry.translation if entry else None) or original
 
-    def map_id_map(self, values: dict[str, int]) -> dict[str, int]:
-        """将详情页标签名映射到展示名称；每个展示名称保留一个代表 ID。"""
+    def map_id_map(self, values: dict[str, int], kind: MappingKind = "tag") -> dict[str, int]:
+        """将分类名称映射到展示名称; 每个展示名称保留一个代表 ID."""
         mapped: dict[str, int] = {}
         with self._lock:
             for original, facet_id in values.items():
-                entry = self._entries.get(original) if self._enabled else None
+                entry = self._entries.get(self._key(kind, original)) if self._enabled else None
                 display = (entry.translation if entry else None) or original
-                mapped.setdefault(display, facet_id)
+                mapped[display] = min(mapped.get(display, facet_id), facet_id)
         return mapped
 
     def list(
         self,
         *,
+        kind: MappingKind = "tag",
         status: str = "all",
         language: str = "all",
         frequency: str = "all",
@@ -185,7 +233,7 @@ class TagMappingStore:
         limit: int = 50,
     ) -> tuple[builtins.list[TagEntry], int]:
         with self._lock:
-            values = list(self._entries.values())
+            values = [entry for entry in self._entries.values() if entry.type == kind]
             if status == "pending":
                 values = [v for v in values if not v.translation and not v.archived]
             elif status == "mapped":
@@ -204,40 +252,44 @@ class TagMappingStore:
             values.sort(key=lambda v: (-v.usage_count, v.original.casefold()))
             return values[offset : offset + limit], len(values)
 
-    def counts(self) -> dict[str, int]:
+    def counts(self, kind: MappingKind = "tag") -> dict[str, int]:
         with self._lock:
-            total = len(self._entries)
-            mapped = sum(1 for entry in self._entries.values() if entry.translation)
-            archived = sum(1 for entry in self._entries.values() if entry.archived)
+            values = [entry for entry in self._entries.values() if entry.type == kind]
+            total = len(values)
+            mapped = sum(1 for entry in values if entry.translation)
+            archived = sum(1 for entry in values if entry.archived)
             pending = total - mapped - archived
             return {"all": total, "mapped": mapped, "pending": pending, "archived": archived}
 
-    def upsert(self, original: str, translation: str | None) -> TagEntry:
+    def upsert(self, original: str, translation: str | None, kind: MappingKind = "tag") -> TagEntry:
         original = original.strip()
         if not original:
-            raise ValueError("原始标签不能为空")
+            raise ValueError("原始名称不能为空")
         with self._lock:
-            entry = self._entries.get(original) or TagEntry(original, language=detect_language(original), sources=[])
+            key = self._key(kind, original)
+            entry = self._entries.get(key) or TagEntry(
+                original, language=detect_language(original), sources=[], type=kind
+            )
             entry.translation = translation.strip() if translation and translation.strip() else None
             entry.archived = False
-            self._entries[original] = entry
+            self._entries[key] = entry
             self._save()
             return entry
 
-    def archive(self, original: str) -> bool:
+    def archive(self, original: str, kind: MappingKind = "tag") -> bool:
         with self._lock:
-            entry = self._entries.get(original)
+            entry = self._entries.get(self._key(kind, original))
             if entry is None or entry.translation:
                 return False
             entry.archived = True
             self._save()
             return True
 
-    def archive_many(self, originals: builtins.list[str]) -> tuple[int, int]:
+    def archive_many(self, originals: builtins.list[str], kind: MappingKind = "tag") -> tuple[int, int]:
         archived = skipped = 0
         with self._lock:
             for original in dict.fromkeys(originals):
-                entry = self._entries.get(original)
+                entry = self._entries.get(self._key(kind, original))
                 if entry is None or entry.translation:
                     skipped += 1
                     continue
@@ -248,9 +300,9 @@ class TagMappingStore:
                 self._save()
         return archived, skipped
 
-    def restore(self, original: str) -> bool:
+    def restore(self, original: str, kind: MappingKind = "tag") -> bool:
         with self._lock:
-            entry = self._entries.get(original)
+            entry = self._entries.get(self._key(kind, original))
             if entry is None or not entry.archived:
                 return False
             entry.archived = False
@@ -258,11 +310,11 @@ class TagMappingStore:
             self._save()
             return True
 
-    def restore_many(self, originals: builtins.list[str]) -> int:
+    def restore_many(self, originals: builtins.list[str], kind: MappingKind = "tag") -> int:
         restored = 0
         with self._lock:
             for original in dict.fromkeys(originals):
-                entry = self._entries.get(original)
+                entry = self._entries.get(self._key(kind, original))
                 if entry is not None and entry.archived:
                     entry.archived = False
                     entry.translation = None
@@ -274,24 +326,49 @@ class TagMappingStore:
     def export(self) -> dict:
         with self._lock:
             return {
-                "version": 1,
-                "entries": {k: asdict(v) for k, v in sorted(self._entries.items()) if v.translation or v.archived},
+                "version": 2,
+                "entries": [
+                    asdict(entry)
+                    for _, entry in sorted(self._entries.items(), key=lambda item: (item[0][0], item[0][1]))
+                    if entry.translation or entry.archived
+                ],
             }
 
     def import_data(self, payload: dict) -> int:
-        entries = payload.get("entries", {})
-        if not isinstance(entries, dict):
+        stored = payload.get("entries", {})
+        if isinstance(stored, dict):
+            # v1 导出只有标签; 允许继续导入, 归属明确解释为 tag.
+            records = [
+                {"original": original, **value, "type": value.get("type", "tag")}
+                for original, value in stored.items()
+                if isinstance(original, str) and isinstance(value, dict)
+            ]
+        elif isinstance(stored, list):
+            records = stored
+        else:
             raise ValueError("导入文件格式不正确")
+
+        normalized: list[tuple[MappingKind, str, dict]] = []
+        for value in records:
+            if not isinstance(value, dict):
+                raise ValueError("导入文件格式不正确")
+            original = value.get("original")
+            kind = value.get("type")
+            if not isinstance(original, str) or not original.strip():
+                raise ValueError("映射原始名称不能为空")
+            if not self._valid_kind(kind):
+                raise ValueError(f"无法识别的映射归属类型: {kind}")
+            normalized.append((kind, original.strip(), value))
+
         count = 0
         with self._lock:
-            for original, value in entries.items():
-                if not isinstance(original, str) or not isinstance(value, dict):
-                    continue
-                current = self._entries.get(original)
-                translation = value.get("translation")
+            for kind, original, value in normalized:
+                key = self._key(kind, original)
+                current = self._entries.get(key)
                 if current is None:
-                    current = TagEntry(original, language=detect_language(original), sources=[])
-                    self._entries[original] = current
+                    current = TagEntry(original, language=detect_language(original), sources=[], type=kind)
+                    self._entries[key] = current
+                translation = value.get("translation")
                 current.translation = (
                     translation.strip() if isinstance(translation, str) and translation.strip() else None
                 )

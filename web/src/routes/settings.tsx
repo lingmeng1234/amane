@@ -8,6 +8,7 @@ import {
   NavLink,
   Paper,
   Select,
+  SimpleGrid,
   Stack,
   Tabs,
   Text,
@@ -98,6 +99,7 @@ function scrapingFieldActions(field: string, setValue: (value: unknown) => void)
     content_routes: DEFAULT_CONTENT_ROUTES,
     uncensored_streaming_number_rules: DEFAULT_UNCENSORED_STREAMING_NUMBER_RULES,
     number_mapping_rules: [],
+    mosaic_rules: { cracked: "破解,克破,CRACKED,-U,-UC", leaked: "流出,LEAKED" },
   };
 
   if (!(field in defaults)) return null;
@@ -167,23 +169,68 @@ function NfoOutputSettings({ schema, values, saving, onSave }: NfoOutputSettings
 
       <Text fw={600}>{categoryTitle}</Text>
 
-      <SchemaForm
-        key={`${activeKey}:${JSON.stringify(categoryValues)}`}
-        schema={categorySchema}
-        prefix={activeKey}
-        values={categoryValues}
-        i18nPrefix="settings:fields.nfo_output"
-        actionsPlacement="affix"
-        fieldLayout="checkbox-grid"
-        onSave={(patch) => {
-          const fullCategory = {
-            ...categoryValues,
-            ...patch,
-          };
-          onSave(activeKey, fullCategory);
-        }}
-        saving={saving}
-      />
+      {activeKey === "categories" ? (
+        <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
+          {(["genre", "tag", "series"] as const).map((columnKey) => {
+            const propertySchema = categorySchema.properties?.[columnKey];
+            if (!propertySchema) return null;
+            const isSeries = columnKey === "series";
+            const columnSchema: JSONSchemaObject = isSeries
+              ? { type: "object", properties: { series: propertySchema } }
+              : propertySchema;
+            const columnValues = isSeries
+              ? { series: categoryValues.series }
+              : ((categoryValues[columnKey] as Record<string, unknown> | undefined) ?? {});
+            const columnTitle = String(
+              t(`fields.nfo_output.categories.${columnKey}.label` as never, {
+                defaultValue: columnKey,
+              }),
+            );
+
+            return (
+              <Paper key={columnKey} withBorder p="sm">
+                <Text fw={600} mb="sm">
+                  {columnTitle}
+                </Text>
+                <SchemaForm
+                  key={`${columnKey}:${JSON.stringify(columnValues)}`}
+                  schema={columnSchema}
+                  prefix={isSeries ? "categories" : `categories.${columnKey}`}
+                  values={columnValues}
+                  i18nPrefix="settings:fields.nfo_output"
+                  actionsPlacement="affix"
+                  fieldLayout="checkbox-grid"
+                  onSave={(patch) => {
+                    const fullCategory = isSeries
+                      ? { ...categoryValues, ...patch }
+                      : { ...categoryValues, [columnKey]: { ...columnValues, ...patch } };
+                    onSave(activeKey, fullCategory);
+                  }}
+                  saving={saving}
+                />
+              </Paper>
+            );
+          })}
+        </SimpleGrid>
+      ) : (
+        <SchemaForm
+          key={`${activeKey}:${JSON.stringify(categoryValues)}`}
+          schema={categorySchema}
+          prefix={activeKey}
+          values={categoryValues}
+          i18nPrefix="settings:fields.nfo_output"
+          actionsPlacement="affix"
+          fieldLayout="checkbox-grid"
+          onSave={(patch) => {
+            const fullCategory = {
+              ...categoryValues,
+              ...patch,
+            };
+            onSave(activeKey, fullCategory);
+          }}
+          saving={saving}
+        />
+      )}
     </Stack>
   );
 }

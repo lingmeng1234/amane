@@ -18,6 +18,7 @@ _SCALAR_FIELDS: tuple[str, ...] = (
     "gender",
     "birthday",
     "birthplace",
+    "blood_type",
     "height",
     "bust",
     "waist",
@@ -33,6 +34,7 @@ class AggregatedActor(BaseModel):
     gender: ActorGender = ActorGender.UNKNOWN
     birthday: str | None = None
     birthplace: str | None = None
+    blood_type: str | None = None
     height: int | None = None
     bust: int | None = None
     waist: int | None = None

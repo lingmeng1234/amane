@@ -1398,6 +1398,8 @@ class TestRefreshHandler:
         expected: bool,
     ):
         """存量行的外挂字幕标记只在库扫描时补齐: 迁移不回填, 登记与改 path 都不覆盖既有行."""
+        metadata = await repo.upsert_metadata(number="MIDV-771")
+        assert metadata.id is not None
         video = tmp_path / "MIDV-771.mp4"
         video.write_bytes(b"\x00" * 100)
         if subtitle_name is not None:
@@ -1406,7 +1408,9 @@ class TestRefreshHandler:
             name="t", path=str(tmp_path), write_nfo=False, subtitle_extensions=subtitle_extensions
         )
         assert lib.id is not None
-        media = await repo.create_media_file(library_id=lib.id, path=str(video), has_external_subtitle=stored)
+        media = await repo.create_media_file(
+            library_id=lib.id, path=str(video), has_external_subtitle=stored, metadata_id=metadata.id
+        )
         assert media.id is not None
 
         result = await RefreshHandler(repo=repo).handle(
@@ -1437,8 +1441,13 @@ class TestRefreshHandler:
         stale = await repo.create_media_file(
             library_id=lib.id, path=str(lib_root / "hit" / "MIDV-772.mp4"), has_external_subtitle=True
         )
+        kept_metadata = await repo.upsert_metadata(number="MIDV-773")
+        assert kept_metadata.id is not None
         kept = await repo.create_media_file(
-            library_id=lib.id, path=str(lib_root / "kept" / "MIDV-773.mp4"), has_external_subtitle=True
+            library_id=lib.id,
+            path=str(lib_root / "kept" / "MIDV-773.mp4"),
+            has_external_subtitle=True,
+            metadata_id=kept_metadata.id,
         )
         outside = await repo.create_media_file(
             library_id=lib.id, path=str(lib_root / "outside" / "MIDV-774.mp4"), has_external_subtitle=False
@@ -1828,6 +1837,20 @@ class TestRefreshHandler:
         assert scrapes[0].payload["number"] == "MIDV-123"
         assert scrapes[0].payload["use_cache"] == []  # 空集透传 = 全部强制刷新
         assert scrapes[0].key == f"scrape:{scrapes[0].payload['media_file_id']}"
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_hentai_directory_keeps_number_content_type_for_scrape_task(self, repo: Repository, tmp_path: Path):
+        """里番目录只增加文件属性, 不得把有码番号改成 HENTAI Metadata 类型."""
+        hentai_dir = tmp_path / "里番"
+        hentai_dir.mkdir()
+        (hentai_dir / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
+
+        result = await RefreshHandler(repo=repo).handle(RefreshPayload(library_id=1, path=str(tmp_path)))
+
+        scrapes = [task for task in (result.followups or []) if task.task_type == TaskType.SCRAPE]
+        assert len(scrapes) == 1
+        assert scrapes[0].payload["number"] == "MIDV-123"
+        assert scrapes[0].payload["content_type"] == ContentType.CENSORED.value
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_scrape_fanout_not_capped_by_list_page_size(self, repo: Repository, tmp_path):

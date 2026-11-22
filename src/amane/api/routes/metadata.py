@@ -19,6 +19,7 @@ from ...media.file_type import detect_media_type_bytes
 from ...parsing import ContentType, summarize_file_phases
 from ...parsing import FilePhaseSummary as ParsedFilePhase
 from ...semantic import SemanticUnavailable
+from ...tags.mapping import MappingKind
 from ...utils.collections import unique_ids
 from ...utils.dates import normalize_calendar_date
 from ...utils.model import to_resp
@@ -54,6 +55,22 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/metadata", tags=["metadata"])
 
 
+def _metadata_response(metadata: Metadata, runtime: RuntimeDep) -> MetadataResponse:
+    """所有 Metadata 响应统一应用展示映射; 不修改数据库中的原始值."""
+    series_names = runtime.tag_mappings.map_values("series", metadata.series_names)
+    return to_resp(MetadataResponse, metadata).model_copy(
+        update={
+            "tags": runtime.tag_mappings.map_values("tag", metadata.tags),
+            "studio": runtime.tag_mappings.display_name(metadata.studio, "maker") if metadata.studio else None,
+            "publisher": (
+                runtime.tag_mappings.display_name(metadata.publisher, "publisher") if metadata.publisher else None
+            ),
+            "series": runtime.tag_mappings.display_name(metadata.series, "series") if metadata.series else None,
+            "series_names": series_names,
+        }
+    )
+
+
 async def build_metadata_responses(
     repo: RepoDep, items: Sequence[Metadata], runtime: RuntimeDep
 ) -> list[MetadataResponse]:
@@ -65,11 +82,8 @@ async def build_metadata_responses(
     responses: list[MetadataResponse] = []
     for m in items:
         summary = summaries.get(m.id) if m.id is not None else None
-        response = to_resp(MetadataResponse, m).model_copy(
-            update={
-                "tags": runtime.tag_mappings.map_tags(m.tags),
-                "actor_genders": {name: gender_by_name[name] for name in m.actors if name in gender_by_name},
-            }
+        response = _metadata_response(m, runtime).model_copy(
+            update={"actor_genders": {name: gender_by_name[name] for name in m.actors if name in gender_by_name}}
         )
         if summary is not None:
             response = response.model_copy(
@@ -87,6 +101,7 @@ def _file_phase_resp(summary: ParsedFilePhase) -> FilePhaseSummary:
         has_subtitle=summary.has_subtitle,
         censored=summary.censored,
         uncensored=summary.uncensored,
+        hentai=summary.hentai,
         mosaics=list(summary.mosaics),
         definition=summary.definition,
     )
@@ -140,6 +155,63 @@ async def _mapped_tag_id_groups(
     return groups
 
 
+async def _mapped_facet_ids(
+    repo: RepoDep, runtime: RuntimeDep, kind: FacetKind, selected_ids: list[int] | None
+) -> list[int] | None:
+    """把展示用代表 ID 扩展为该中文名称下的全部原始分类 ID."""
+    if not selected_ids:
+        return None
+    mapping_kinds: dict[FacetKind, MappingKind] = {
+        FacetKind.STUDIO: "maker",
+        FacetKind.PUBLISHER: "publisher",
+        FacetKind.SERIES: "series",
+    }
+    mapping_kind = mapping_kinds.get(kind)
+    if mapping_kind is None or not runtime.tag_mappings.enabled:
+        return selected_ids
+
+    all_items = []
+    offset = 0
+    while True:
+        page, total = await repo.list_facets(
+            kind,
+            offset=offset,
+            limit=1000,
+            sort_by=FacetSortField.NAME,
+            order=SortOrder.ASC,
+        )
+        all_items.extend(page)
+        offset += len(page)
+        if not page or offset >= total:
+            break
+    by_id = {item.id: item for item in all_items}
+    ids_by_display: dict[str, list[int]] = {}
+    for item in all_items:
+        display = runtime.tag_mappings.display_name(item.name, mapping_kind)
+        ids_by_display.setdefault(display, []).append(item.id)
+
+    expanded: list[int] = []
+    seen_displays: set[str] = set()
+    for selected_id in selected_ids:
+        item = by_id.get(selected_id)
+        if item is None:
+            expanded.append(selected_id)
+            continue
+        display = runtime.tag_mappings.display_name(item.name, mapping_kind)
+        if display in seen_displays:
+            continue
+        seen_displays.add(display)
+        expanded.extend(ids_by_display.get(display, [selected_id]))
+    return list(dict.fromkeys(expanded))
+
+
+async def _mapped_facet_id(repo: RepoDep, runtime: RuntimeDep, kind: FacetKind, facet_id: int | None) -> int | None:
+    if facet_id is None:
+        return None
+    expanded = await _mapped_facet_ids(repo, runtime, kind, [facet_id])
+    return min(expanded) if expanded else facet_id
+
+
 @router.get("")
 async def list_metadata(
     repo: RepoDep,
@@ -157,6 +229,9 @@ async def list_metadata(
 ) -> MetadataListResponse:
     definition = require_known_definition(filters.definition)
     tag_id_groups = await _mapped_tag_id_groups(repo, runtime, filters.tag_id)
+    studio_ids = await _mapped_facet_ids(repo, runtime, FacetKind.STUDIO, filters.studio_id)
+    publisher_ids = await _mapped_facet_ids(repo, runtime, FacetKind.PUBLISHER, filters.publisher_id)
+    series_ids = await _mapped_facet_ids(repo, runtime, FacetKind.SERIES, filters.series_id)
     id_subquery_sql = None
     if filters.saved_query_id is not None:
         id_subquery_sql = await resolve_saved_query_id_subquery(repo, filters.saved_query_id, SavedQueryEntity.METADATA)
@@ -171,6 +246,9 @@ async def list_metadata(
             definition=definition,
             id_subquery_sql=id_subquery_sql,
             tag_id_groups=tag_id_groups,
+            studio_ids=studio_ids,
+            publisher_ids=publisher_ids,
+            series_ids=series_ids,
             offset=offset,
             limit=limit,
         )
@@ -183,13 +261,14 @@ async def list_metadata(
         actor_ids=filters.actor_id,
         director_ids=filters.director_id,
         tag_id_groups=tag_id_groups,
-        studio_ids=filters.studio_id,
-        publisher_ids=filters.publisher_id,
-        series_ids=filters.series_id,
+        studio_ids=studio_ids,
+        publisher_ids=publisher_ids,
+        series_ids=series_ids,
         user_tag_ids=filters.user_tag_id,
         library_ids=filters.library_id,
         has_files=filters.has_files,
         has_subtitle=filters.has_subtitle,
+        hentai=filters.hentai,
         vr=filters.vr,
         mosaic=filters.mosaic,
         uncensored=filters.uncensored,
@@ -211,6 +290,9 @@ async def _semantic_list(
     definition: str | None,
     id_subquery_sql: str | None,
     tag_id_groups: list[list[int]] | None,
+    studio_ids: list[int] | None,
+    publisher_ids: list[int] | None,
+    series_ids: list[int] | None,
     offset: int,
     limit: int,
 ) -> MetadataListResponse:
@@ -225,13 +307,14 @@ async def _semantic_list(
             actor_ids=filters.actor_id,
             director_ids=filters.director_id,
             tag_id_groups=tag_id_groups,
-            studio_ids=filters.studio_id,
-            publisher_ids=filters.publisher_id,
-            series_ids=filters.series_id,
+            studio_ids=studio_ids,
+            publisher_ids=publisher_ids,
+            series_ids=series_ids,
             user_tag_ids=filters.user_tag_id,
             library_ids=filters.library_id,
             has_files=filters.has_files,
             has_subtitle=filters.has_subtitle,
+            hentai=filters.hentai,
             vr=filters.vr,
             mosaic=filters.mosaic,
             uncensored=filters.uncensored,
@@ -356,11 +439,14 @@ async def get_metadata(metadata_id: int, repo: RepoDep, runtime: RuntimeDep) -> 
         series_id,
     ) = await repo.resolve_metadata_facet_ids(metadata)
     series_ids = await repo.resolve_metadata_series_ids(metadata)
-    tag_ids = runtime.tag_mappings.map_id_map(tag_ids)
+    tag_ids = runtime.tag_mappings.map_id_map(tag_ids, "tag")
+    studio_id = await _mapped_facet_id(repo, runtime, FacetKind.STUDIO, studio_id)
+    publisher_id = await _mapped_facet_id(repo, runtime, FacetKind.PUBLISHER, publisher_id)
+    series_id = await _mapped_facet_id(repo, runtime, FacetKind.SERIES, series_id)
+    series_ids = runtime.tag_mappings.map_id_map(series_ids, "series")
     return MetadataDetailResponse(
-        metadata=to_resp(MetadataResponse, metadata).model_copy(
+        metadata=_metadata_response(metadata, runtime).model_copy(
             update={
-                "tags": runtime.tag_mappings.map_tags(metadata.tags),
                 "file_count": len(files),
                 "file_phase": _file_phase_resp(
                     summarize_file_phases((file_phase_of(f) for f in files), metadata.content_type)
@@ -404,7 +490,7 @@ async def update_metadata(
     if metadata is None:
         raise HTTPException(status_code=404, detail="影片不存在")
     logger.info("metadata updated", metadata_id=metadata_id, fields=list(updates.keys()))
-    return to_resp(MetadataResponse, metadata).model_copy(update={"tags": runtime.tag_mappings.map_tags(metadata.tags)})
+    return _metadata_response(metadata, runtime)
 
 
 @router.put("/{metadata_id}/locks")
@@ -416,7 +502,7 @@ async def set_metadata_locks(
     if metadata is None:
         raise HTTPException(status_code=404, detail="影片不存在")
     logger.info("metadata locks updated", metadata_id=metadata_id, fields=[str(field) for field in req.fields])
-    return to_resp(MetadataResponse, metadata).model_copy(update={"tags": runtime.tag_mappings.map_tags(metadata.tags)})
+    return _metadata_response(metadata, runtime)
 
 
 @router.delete("/{metadata_id}", status_code=204)
@@ -469,7 +555,7 @@ async def upload_metadata_image(
     logger.info(
         "metadata image uploaded", metadata_id=metadata_id, kind=normalized_kind, sha256=sha256(data).hexdigest()
     )
-    return to_resp(MetadataResponse, updated).model_copy(update={"tags": runtime.tag_mappings.map_tags(updated.tags)})
+    return _metadata_response(updated, runtime)
 
 
 @router.post("/{metadata_id}/crop-poster")
@@ -517,7 +603,7 @@ async def crop_poster_from_cover(
         rotation=req.rotation,
         poster_url=poster_url,
     )
-    return to_resp(MetadataResponse, updated).model_copy(update={"tags": runtime.tag_mappings.map_tags(updated.tags)})
+    return _metadata_response(updated, runtime)
 
 
 async def _translate_selected_text(updates: dict[str, object], runtime: RuntimeDep, content_type: ContentType) -> None:
@@ -595,4 +681,4 @@ async def merge_metadata(metadata_id: int, req: MergeRequest, repo: RepoDep, run
     updated = await repo.update_metadata(metadata_id, mode=WriteMode.MANUAL, **cast("MetadataFields", updates))
     assert updated is not None
     logger.info("metadata merged", metadata_id=metadata_id, selections=req.selections)
-    return to_resp(MetadataResponse, updated).model_copy(update={"tags": runtime.tag_mappings.map_tags(updated.tags)})
+    return _metadata_response(updated, runtime)

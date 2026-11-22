@@ -92,6 +92,17 @@ def test_parse_figure(
     assert _parse_figure(raw) == expected
 
 
+def test_parse_detail_extracts_blood_type() -> None:
+    page = """<div class="act-profile"><h2>Alice</h2><table>
+    <tr><td><span>血液型</span><p>A型</p></td></tr>
+    </table></div>"""
+    result = parse_minnano_detail(
+        page, page_url="https://www.minnano-av.com/actress1.html", base_url="https://www.minnano-av.com"
+    )
+    assert result is not None
+    assert result.blood_type == "A型"
+
+
 def test_parse_detail_without_profile() -> None:
     assert (
         parse_minnano_detail("<html><body></body></html>", page_url="u", base_url="https://www.minnano-av.com") is None

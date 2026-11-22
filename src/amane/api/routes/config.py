@@ -7,7 +7,8 @@ from pydantic import ValidationError
 from ...config import HotSettings, MediaServerConfig
 from ...events import Event, EventType
 from ...media_server import MediaServerClient, MediaServerError
-from ..deps import ConfigDep, PluginManagerDep, RuntimeDep
+from ...parsing import file_phase_from_path
+from ..deps import ConfigDep, PluginManagerDep, RepoDep, RuntimeDep
 
 logger = structlog.get_logger()
 
@@ -43,16 +44,28 @@ async def get_config(config: ConfigDep) -> HotSettings:
 
 
 @router.patch("")
-async def update_config(req: dict[str, Any], config: ConfigDep, runtime: RuntimeDep) -> HotSettings:
+async def update_config(req: dict[str, Any], config: ConfigDep, repo: RepoDep, runtime: RuntimeDep) -> HotSettings:
     """先用当前会话的插件目录校验新路由和插件配置, 再持久化."""
     changed_sections = list(req.keys())
     logger.info("config update requested", sections=changed_sections)
 
     try:
+        previous_rules = config.hot.scraping.mosaic_rules.model_dump()
         preview = config.preview(req)
         if runtime.plugin_manager is not None:
             runtime.plugin_manager.validate_hot_settings(preview, require_available=False)
         config.update(req)
+        next_rules = preview.scraping.mosaic_rules.model_dump()
+        if previous_rules != next_rules:
+            repo.set_mosaic_rules(next_rules)
+            media_files = await repo.list_media_files(limit=None)
+            phase_updates = [
+                (media.id, file_phase_from_path(media.path, mosaic_rules=next_rules))
+                for media in media_files
+                if media.id is not None
+            ]
+            updated_count = await repo.update_media_file_phases(phase_updates)
+            logger.info("media file attributes reprojected after mosaic rule change", count=updated_count)
     except (KeyError, ValidationError, ValueError) as e:
         logger.warning("config update rejected", error=str(e), sections=changed_sections)
         raise HTTPException(status_code=422, detail=str(e)) from e

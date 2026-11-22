@@ -213,6 +213,41 @@ class TestMediaFileRepo:
         assert updated.mosaic is Mosaic.CRACKED
 
     @pytest.mark.asyncio(loop_scope="function")
+    async def test_custom_mosaic_rules_reproject_existing_and_future_files(self, repo: Repository):
+        existing = await repo.create_media_file(library_id=1, path="/v/MIDV-001-custom.mp4")
+        assert existing.id is not None
+        assert existing.mosaic is None
+        await repo.update_media_file(existing.id, has_external_subtitle=True)
+
+        repo.set_mosaic_rules({"cracked": "custom", "leaked": ""})
+        assert await repo.reproject_media_phases() == 1
+        updated = await repo.get_media_file(existing.id)
+        assert updated is not None
+        assert updated.mosaic is Mosaic.CRACKED
+        assert updated.has_external_subtitle is True
+
+        future = await repo.create_media_file(library_id=1, path="/v/MIDV-002-custom.mp4")
+        assert future.id is not None
+        assert future.mosaic is Mosaic.CRACKED
+
+        repo.set_mosaic_rules({"cracked": "", "leaked": ""})
+        await repo.reproject_media_phases()
+        updated = await repo.get_media_file(existing.id)
+        future = await repo.get_media_file(future.id)
+        assert updated is not None and updated.mosaic is None
+        assert future is not None and future.mosaic is None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_media_file_hentai_and_western_filters(self, repo: Repository):
+        hentai = await repo.create_media_file(library_id=1, path="/v/里番/MIDV-001.mp4")
+        western = await repo.create_media_file(library_id=1, path="/v/欧美/Studio.26.10.16.mp4")
+        normal = await repo.create_media_file(library_id=1, path="/v/MIDV-002.mp4")
+
+        assert {item.path for item in await repo.list_media_files(hentai=True, limit=None)} == {hentai.path}
+        assert {item.path for item in await repo.list_media_files(mosaic=Mosaic.WESTERN, limit=None)} == {western.path}
+        assert normal.path not in {item.path for item in await repo.list_media_files(hentai=True, limit=None)}
+
+    @pytest.mark.asyncio(loop_scope="function")
     async def test_list_media_files_phase_filters(self, repo: Repository):
         await repo.create_media_file(library_id=1, path="/v/MIDV-001-C.mp4")
         await repo.create_media_file(library_id=1, path="/v/MIDV-002-无码.mp4")
@@ -222,14 +257,18 @@ class TestMediaFileRepo:
         subs = await repo.list_media_files(has_subtitle=True, limit=None)
         assert {f.path for f in subs} == {"/v/MIDV-001-C.mp4"}
         uncensored = await repo.list_media_files(uncensored=True, limit=None)
-        assert {f.path for f in uncensored} == {"/v/MIDV-002-无码.mp4"}
+        assert {f.path for f in uncensored} == {
+            "/v/MIDV-002-无码.mp4",
+            "/v/HEYZO-1234.mp4",
+            "/v/MIDV-003-U.mp4",
+        }
         cracked = await repo.list_media_files(mosaic=Mosaic.CRACKED, limit=None)
         assert [f.path for f in cracked] == ["/v/MIDV-003-U.mp4"]
-        assert await repo.count_media_files(uncensored=True) == 1
+        assert await repo.count_media_files(uncensored=True) == 3
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_list_media_files_uncensored_joins_entry_type(self, repo: Repository):
-        """无码按所属条目的类型判定, 与这一份文件有没有标记无关; 未绑定条目的文件只看自身标记."""
+        """无码包含所属条目类型、WESTERN 类型或本文件的无码标记; 未绑定条目也按自身识别结果判定."""
         uncensored_entry = await repo.upsert_metadata(number="HEYZO-1234")
         censored_entry = await repo.upsert_metadata(number="MIDV-123")
         assert uncensored_entry.id is not None and censored_entry.id is not None
@@ -250,8 +289,14 @@ class TestMediaFileRepo:
 
         yes = paths(await repo.list_media_files(uncensored=True, limit=None))
         no = paths(await repo.list_media_files(uncensored=False, limit=None))
-        assert yes == {"/v/HEYZO-1234.mp4", "/v/HEYZO-1235-U.mp4", "/v/MIDV-124-无码.mp4", "/v/PLAIN-1-无码.mp4"}
-        assert no == {"/v/MIDV-123.mp4", "/v/PLAIN-2.mp4"}
+        assert yes == {
+            "/v/HEYZO-1234.mp4",
+            "/v/HEYZO-1235-U.mp4",
+            "/v/MIDV-124-无码.mp4",
+            "/v/PLAIN-1-无码.mp4",
+            "/v/PLAIN-2.mp4",
+        }
+        assert no == {"/v/MIDV-123.mp4"}
         # 两侧互补: 没有一行同时落空 (mosaic 为空的行尤其容易被 NULL 语义漏掉)
         assert yes | no == paths(await repo.list_media_files(limit=None))
         assert yes & no == set()
@@ -287,6 +332,28 @@ class TestMediaFileRepo:
         assert {f.path for f in without} == {"/v/MIDV-003.mp4"}
         assert await repo.count_media_files(has_subtitle=True) == 2
         assert await repo.count_media_files(has_subtitle=False) == 1
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_metadata_hentai_and_western_file_filters(self, repo: Repository):
+        hentai_metadata = await repo.upsert_metadata(number="MIDV-001")
+        normal_metadata = await repo.upsert_metadata(number="MIDV-002")
+        western_metadata = await repo.upsert_western_metadata("western-filter", "Studio.26.10.16")
+        assert hentai_metadata.id and normal_metadata.id and western_metadata.id
+
+        hentai_file = await repo.create_media_file(library_id=1, path="/v/里番/MIDV-001.mp4")
+        normal_file = await repo.create_media_file(library_id=1, path="/v/MIDV-002.mp4")
+        western_file = await repo.create_media_file(library_id=1, path="/v/欧美/Studio.26.10.16.mp4")
+        assert hentai_file.id and normal_file.id and western_file.id
+        await repo.update_media_file(hentai_file.id, metadata_id=hentai_metadata.id)
+        await repo.update_media_file(normal_file.id, metadata_id=normal_metadata.id)
+        await repo.update_media_file(western_file.id, metadata_id=western_metadata.id)
+
+        hentai_items, _ = await repo.list_metadata(hentai=True)
+        assert {item.number for item in hentai_items} == {"MIDV-001"}
+        no_hentai_items, _ = await repo.list_metadata(hentai=False)
+        assert {item.number for item in no_hentai_items} == {"MIDV-002", "Studio.26.10.16"}
+        western_items, _ = await repo.list_metadata(mosaic=Mosaic.WESTERN)
+        assert {item.number for item in western_items} == {"Studio.26.10.16"}
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_list_metadata_has_subtitle_filter_unions_both_sources(self, repo: Repository):
@@ -1162,10 +1229,10 @@ class TestMetadataRepo:
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_list_metadata_file_phase_filters(self, repo: Repository):
-        sub = await repo.upsert_metadata(number="SUB-1")
-        marked = await repo.upsert_metadata(number="MIDV-002")
-        uncensored = await repo.upsert_metadata(number="HEYZO-1234")
-        plain = await repo.upsert_metadata(number="PLAIN-1")
+        sub = await repo.upsert_metadata(number="SUB-1", content_type=ContentType.CENSORED)
+        marked = await repo.upsert_metadata(number="MIDV-002", content_type=ContentType.CENSORED)
+        uncensored = await repo.upsert_metadata(number="HEYZO-1234", content_type=ContentType.UNCENSORED)
+        plain = await repo.upsert_metadata(number="PLAIN-1", content_type=ContentType.CENSORED)
         assert sub.id and marked.id and uncensored.id and plain.id
 
         m_sub = await repo.create_media_file(library_id=1, path="/v/MIDV-001-C.mp4")
@@ -1194,7 +1261,7 @@ class TestMetadataRepo:
         assert summaries[sub.id].phase.has_subtitle is True
         assert summaries[uncensored.id].file_count == 0
         assert summaries[uncensored.id].phase.uncensored is True
-        assert summaries[marked.id].phase.censored is True
+        assert summaries[marked.id].phase.censored is False
         assert summaries[marked.id].phase.uncensored is True
         assert summaries[plain.id].phase.uncensored is False
 

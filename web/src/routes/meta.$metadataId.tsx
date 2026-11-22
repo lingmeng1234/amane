@@ -138,11 +138,7 @@ function FieldBlock({
         {lock && <LockToggle {...lock} />}
       </Group>
       <div
-        style={
-          alignValue
-            ? { display: "flex", alignItems: "center", minHeight: 24 }
-            : undefined
-        }
+        style={alignValue ? { display: "flex", alignItems: "center", minHeight: 24 } : undefined}
       >
         {children}
       </div>
@@ -450,7 +446,7 @@ function TitleDetailPage() {
       setOriginalPlotOverflow(
         Boolean(
           originalPlotElement &&
-            originalPlotElement.scrollHeight > originalPlotElement.clientHeight + 1,
+          originalPlotElement.scrollHeight > originalPlotElement.clientHeight + 1,
         ),
       );
     };
@@ -838,7 +834,11 @@ function TitleDetailPage() {
               </FieldBlock>
             )}
             {item.publisher && (
-              <FieldBlock label={t("detail.fields.publisher")} lock={lockProps("publisher")} alignValue>
+              <FieldBlock
+                label={t("detail.fields.publisher")}
+                lock={lockProps("publisher")}
+                alignValue
+              >
                 <FacetBadge kind="publisher" id={data.publisher_id} name={item.publisher} />
               </FieldBlock>
             )}
@@ -976,19 +976,19 @@ function TitleDetailPage() {
             <Stack gap="sm">
               {item.plot && (
                 <FieldBlock label={t("detail.fields.plot")} lock={lockProps("plot")}>
-                  <Text ref={plotTextRef} size="sm" lineClamp={8} style={{ whiteSpace: "pre-line" }}>
+                  <Text
+                    ref={plotTextRef}
+                    size="sm"
+                    lineClamp={8}
+                    style={{ whiteSpace: "pre-line" }}
+                  >
                     {item.plot}
                   </Text>
-                {plotOverflow && (
-                  <Button
-                    variant="subtle"
-                    size="xs"
-                    px={0}
-                    onClick={() => setPlotDialog("plot")}
-                  >
-                    {t("view.more")}
-                  </Button>
-                )}
+                  {plotOverflow && (
+                    <Button variant="subtle" size="xs" px={0} onClick={() => setPlotDialog("plot")}>
+                      {t("view.more")}
+                    </Button>
+                  )}
                 </FieldBlock>
               )}
               {item.original_plot && (
@@ -996,19 +996,24 @@ function TitleDetailPage() {
                   label={t("detail.fields.originalPlot")}
                   lock={!item.plot ? lockProps("plot") : undefined}
                 >
-                  <Text ref={originalPlotTextRef} size="sm" lineClamp={8} style={{ whiteSpace: "pre-line" }}>
+                  <Text
+                    ref={originalPlotTextRef}
+                    size="sm"
+                    lineClamp={8}
+                    style={{ whiteSpace: "pre-line" }}
+                  >
                     {item.original_plot}
                   </Text>
-                {originalPlotOverflow && (
-                  <Button
-                    variant="subtle"
-                    size="xs"
-                    px={0}
-                    onClick={() => setPlotDialog("original_plot")}
-                  >
-                    {t("view.more")}
-                  </Button>
-                )}
+                  {originalPlotOverflow && (
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      px={0}
+                      onClick={() => setPlotDialog("original_plot")}
+                    >
+                      {t("view.more")}
+                    </Button>
+                  )}
                 </FieldBlock>
               )}
             </Stack>
@@ -1238,11 +1243,7 @@ function TitleDetailPage() {
       <Modal
         opened={plotDialog !== null}
         onClose={() => setPlotDialog(null)}
-        title={
-          plotDialog === "plot"
-            ? t("detail.fields.plot")
-            : t("detail.fields.originalPlot")
-        }
+        title={plotDialog === "plot" ? t("detail.fields.plot") : t("detail.fields.originalPlot")}
         size="40rem"
         centered
         styles={{

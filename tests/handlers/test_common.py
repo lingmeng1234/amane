@@ -59,9 +59,9 @@ class TestScanLibrary:
         hits = scan_library.sync(
             tree,
             recursive=True,
-            scan=LibraryScan(patterns=["*.txt", "*.nfo"], trailer_pattern="(?i)trailer", blacklist_patterns=["广告"]),
+            scan=LibraryScan(patterns=["*.mp4", "*.mkv"], trailer_pattern="(?i)trailer", blacklist_patterns=["广告"]),
         )
-        assert _names(hits, LibraryFileKind.MEDIA) == {"b.txt", "d.nfo"}
+        assert _names(hits, LibraryFileKind.MEDIA) == {"a.mp4", "c.mkv"}
         assert _names(hits, LibraryFileKind.SKIP) == {"trailer.mp4"}
         assert _names(hits, LibraryFileKind.UNWANTED) == {"广告.html"}
 
@@ -179,7 +179,31 @@ class TestFinalizeMediaFile:
 
 
 class TestRefreshMediaAssociation:
-    """WESTERN 本地身份预检查：只读核对身份，命中后恢复关联。"""
+    """番号类型与目录里番属性分离; WESTERN 仍按身份预检查."""
+
+    @pytest.mark.asyncio
+    async def test_hentai_directory_associates_by_number_content_type(
+        self, repo: Repository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        number = "MIDV-007"
+        metadata = await repo.upsert_metadata(number)
+        assert metadata.id is not None
+        media = await repo.create_media_file(library_id=1, path=str(tmp_path / "里番" / f"{number}.mp4"))
+        assert media.id is not None
+
+        monkeypatch.setattr(
+            "amane.handlers._common.parse_file_info",
+            lambda path: SimpleNamespace(
+                number=number,
+                content_type=ContentType.HENTAI,
+                number_content_type=ContentType.CENSORED,
+            ),
+        )
+
+        assert await refresh_media_association(repo, media) is True
+        stored = await repo.get_media_file(media.id)
+        assert stored is not None
+        assert stored.metadata_id == metadata.id
 
     @pytest.mark.asyncio
     async def test_matches_oshash_among_same_number_candidates(
@@ -332,6 +356,7 @@ class TestExternalSubtitle:
         (tmp_path / "MIDV-001.chs.srt").touch()
         library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
         assert library.id is not None
+        await repo.upsert_metadata("MIDV-001")
 
         media = await register_media_file(repo, library.id, tmp_path / "MIDV-001.mp4", library=library)
         assert media is not None
@@ -342,6 +367,35 @@ class TestExternalSubtitle:
         stored = await repo.get_media_file(media.id)
         assert stored is not None
         assert stored.has_external_subtitle is True
+
+    @pytest.mark.asyncio
+    async def test_register_media_file_requires_matching_metadata(self, repo: Repository, tmp_path: Path):
+        video = tmp_path / "MIDV-005.mp4"
+        video.touch()
+        (tmp_path / "MIDV-005.srt").touch()
+        library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
+        assert library.id is not None
+
+        media = await register_media_file(repo, library.id, video, library=library)
+
+        assert media is not None
+        assert media.has_external_subtitle is False
+        assert media.has_subtitle is False
+
+    @pytest.mark.asyncio
+    async def test_directory_subtitle_for_another_number_is_not_shared(self, repo: Repository, tmp_path: Path):
+        video = tmp_path / "MIDV-006.mp4"
+        video.touch()
+        (tmp_path / "SSIS-001.srt").touch()
+        library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
+        assert library.id is not None
+        await repo.upsert_metadata("MIDV-006")
+
+        media = await register_media_file(repo, library.id, video, library=library)
+
+        assert media is not None
+        assert media.has_external_subtitle is False
+        assert media.has_subtitle is False
 
     @pytest.mark.asyncio
     async def test_register_media_file_without_library_leaves_flag(self, repo: Repository, tmp_path: Path):
@@ -360,6 +414,7 @@ class TestExternalSubtitle:
         subtitle.touch()
         library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
         assert library.id is not None
+        await repo.upsert_metadata("MIDV-003")
 
         media = await register_media_file(repo, library.id, video, library=library)
         assert media is not None

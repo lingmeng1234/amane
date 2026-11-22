@@ -48,6 +48,7 @@ export const ActorFieldSchema = {
         'gender',
         'birthday',
         'birthplace',
+        'blood_type',
         'height',
         'bust',
         'waist',
@@ -316,6 +317,17 @@ export const ActorResponseSchema = {
                 }
             ],
             title: 'Birthplace'
+        },
+        blood_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Blood Type'
         },
         height: {
             anyOf: [
@@ -658,6 +670,17 @@ export const ActorUpdateRequestSchema = {
                 }
             ],
             title: 'Birthplace'
+        },
+        blood_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Blood Type'
         },
         height: {
             anyOf: [
@@ -3213,6 +3236,11 @@ export const FilePhaseSummarySchema = {
             title: 'Uncensored',
             default: false
         },
+        hentai: {
+            type: 'boolean',
+            title: 'Hentai',
+            default: false
+        },
         mosaics: {
             items: {
                 $ref: '#/components/schemas/Mosaic'
@@ -3348,6 +3376,10 @@ export const HotSettingsSchema = {
                     'HEYZO-[0-9]{4}'
                 ],
                 number_mapping_rules: [],
+                mosaic_rules: {
+                    cracked: '破解,克破,CRACKED,-U,-UC',
+                    leaked: '流出,LEAKED'
+                },
                 field_priority: {},
                 field_blacklist: {},
                 field_language: {
@@ -5397,6 +5429,17 @@ export const MappingSelectionSchema = {
             maxItems: 200,
             minItems: 1,
             title: 'Originals'
+        },
+        type: {
+            type: 'string',
+            enum: [
+                'tag',
+                'maker',
+                'publisher',
+                'series'
+            ],
+            title: 'Type',
+            default: 'tag'
         }
     },
     type: 'object',
@@ -5439,6 +5482,17 @@ export const MappingUpdateSchema = {
                 }
             ],
             title: 'Translation'
+        },
+        type: {
+            type: 'string',
+            enum: [
+                'tag',
+                'maker',
+                'publisher',
+                'series'
+            ],
+            title: 'Type',
+            default: 'tag'
         }
     },
     type: 'object',
@@ -5580,6 +5634,11 @@ export const MediaFileResponseSchema = {
         uncensored: {
             type: 'boolean',
             title: 'Uncensored',
+            default: false
+        },
+        hentai: {
+            type: 'boolean',
+            title: 'Hentai',
             default: false
         },
         has_subtitle: {
@@ -6857,10 +6916,32 @@ export const MosaicSchema = {
     enum: [
         'uncensored',
         'cracked',
-        'leaked'
+        'leaked',
+        'ltx',
+        'western'
     ],
     title: 'Mosaic',
-    description: '马赛克标记; 有码是条目类型, 不在此列.'
+    description: '无码分支标记; 有码由 number_content_type 表示.'
+} as const;
+
+export const MosaicRulesConfigSchema = {
+    properties: {
+        cracked: {
+            type: 'string',
+            title: '破解',
+            description: '英文逗号分隔; 留空表示关闭此类关键词',
+            default: '破解,克破,CRACKED,-U,-UC'
+        },
+        leaked: {
+            type: 'string',
+            title: '流出',
+            description: '英文逗号分隔; 留空表示关闭此类关键词',
+            default: '流出,LEAKED'
+        }
+    },
+    type: 'object',
+    title: 'MosaicRulesConfig',
+    description: '视频文件名中的破解/流出识别词; 保存内容完全替代默认值.'
 } as const;
 
 export const MoveModeSchema = {
@@ -6988,16 +7069,12 @@ export const NfoBasicInfoConfigSchema = {
 export const NfoCategoriesConfigSchema = {
     properties: {
         genre: {
-            type: 'boolean',
-            title: 'Genre',
-            description: '分类',
-            default: true
+            $ref: '#/components/schemas/NfoCategorySourcesConfig',
+            title: '分类'
         },
         tag: {
-            type: 'boolean',
-            title: 'Tag',
-            description: '类型',
-            default: true
+            $ref: '#/components/schemas/NfoCategorySourcesConfig',
+            title: '类型'
         },
         series: {
             type: 'boolean',
@@ -7009,6 +7086,34 @@ export const NfoCategoriesConfigSchema = {
     type: 'object',
     title: 'NfoCategoriesConfig',
     description: 'NFO 分类与系列输出选项.'
+} as const;
+
+export const NfoCategorySourcesConfigSchema = {
+    properties: {
+        cover_attributes: {
+            type: 'boolean',
+            title: '封面属性',
+            default: false
+        },
+        tags: {
+            type: 'boolean',
+            title: '原有标签',
+            default: true
+        },
+        studio: {
+            type: 'boolean',
+            title: '制作商',
+            default: false
+        },
+        publisher: {
+            type: 'boolean',
+            title: '发行商',
+            default: false
+        }
+    },
+    type: 'object',
+    title: 'NfoCategorySourcesConfig',
+    description: 'Genre 或 Tag 各自可选的数据来源.'
 } as const;
 
 export const NfoImagesConfigSchema = {
@@ -9147,6 +9252,10 @@ export const ScrapingConfigSchema = {
             description: '通用番号映射规则; 每行格式为完整匹配正则表达式 => 替换表达式, 仅自动非欧美非无码流媒体刮削使用.',
             'x-ordered': true
         },
+        mosaic_rules: {
+            $ref: '#/components/schemas/MosaicRulesConfig',
+            title: '无码识别规则词'
+        },
         field_priority: {
             additionalProperties: {
                 items: {
@@ -10238,6 +10347,17 @@ export const SuggestRequestSchema = {
             maxItems: 30,
             minItems: 1,
             title: 'Originals'
+        },
+        type: {
+            type: 'string',
+            enum: [
+                'tag',
+                'maker',
+                'publisher',
+                'series'
+            ],
+            title: 'Type',
+            default: 'tag'
         }
     },
     type: 'object',

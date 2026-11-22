@@ -29,16 +29,10 @@ class UnwantedKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class LibraryHit:
-    """一次遍历命中的文件.
-
-    ``has_companion_subtitle`` 由同层子项的扩展名判定, 不额外读取磁盘; 与
-    `rules.has_companion_subtitle` 同口径, 区别只在悬空链接按文件计. 不经遍历构造命中
-    (云盘事件) 的调用方保持假值.
-    """
+    """一次遍历命中的媒体文件; 字幕归属在 Metadata 建立后按主番号单独核对."""
 
     path: Path
     kind: LibraryFileKind
-    has_companion_subtitle: bool = False
 
 
 class LibraryScan:
@@ -87,14 +81,13 @@ class LibraryScan:
         # 预告片 → 跳过.
         if self._matches(self._trailer, path.name):
             return LibraryFileKind.SKIP
-        # glob 或扩展名命中 → 媒体; 其余不产出.
-        if self.patterns:
-            if any(path.match(p) for p in self.patterns):
-                return LibraryFileKind.MEDIA
+        # 必须先命中配置的视频扩展名; glob 只负责在视频集合中进一步筛选,
+        # 不能让字幕、图片、NFO 等伴随文件独立成为 MediaFile.
+        if path.suffix.lower() not in self.media_extensions:
             return None
-        if path.suffix.lower() in self.media_extensions:
-            return LibraryFileKind.MEDIA
-        return None
+        if self.patterns and not any(path.match(p) for p in self.patterns):
+            return None
+        return LibraryFileKind.MEDIA
 
     @staticmethod
     def _matches(patterns: list[Pattern[str]] | None, name: str) -> bool:

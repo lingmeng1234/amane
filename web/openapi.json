@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Amane API",
-    "version": "0.28.0"
+    "version": "0.28.2"
   },
   "paths": {
     "/api/health": {
@@ -578,10 +578,28 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by subtitle marker",
+              "description": "Filter by Chinese-subtitle marker",
               "title": "Has Subtitle"
             },
-            "description": "Filter by subtitle marker"
+            "description": "Filter by Chinese-subtitle marker"
+          },
+          {
+            "name": "hentai",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by hentai directory attribute",
+              "title": "Hentai"
+            },
+            "description": "Filter by hentai directory attribute"
           },
           {
             "name": "mosaic",
@@ -1228,10 +1246,28 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by linked file subtitle marker",
+              "description": "Filter by linked file Chinese-subtitle marker",
               "title": "Has Subtitle"
             },
-            "description": "Filter by linked file subtitle marker"
+            "description": "Filter by linked file Chinese-subtitle marker"
+          },
+          {
+            "name": "hentai",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by hentai directory attribute",
+              "title": "Hentai"
+            },
+            "description": "Filter by hentai directory attribute"
           },
           {
             "name": "vr",
@@ -4192,6 +4228,52 @@
         }
       }
     },
+    "/api/facets/{kind}/empty": {
+      "delete": {
+        "tags": [
+          "facets"
+        ],
+        "summary": "Delete Empty Facets",
+        "description": "清除没有关联影片的分类实体; 不写入剔除规则.",
+        "operationId": "delete_empty_facets",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FacetKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Delete Empty Facets"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/facets/{kind}/{facet_id}": {
       "get": {
         "tags": [
@@ -6177,6 +6259,22 @@
             }
           },
           {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "tag",
+                "maker",
+                "publisher",
+                "series"
+              ],
+              "type": "string",
+              "default": "tag",
+              "title": "Type"
+            }
+          },
+          {
             "name": "offset",
             "in": "query",
             "required": false,
@@ -6331,6 +6429,22 @@
               "type": "string",
               "title": "Original"
             }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "tag",
+                "maker",
+                "publisher",
+                "series"
+              ],
+              "type": "string",
+              "default": "tag",
+              "title": "Type"
+            }
           }
         ],
         "responses": {
@@ -6370,6 +6484,22 @@
             "schema": {
               "type": "string",
               "title": "Original"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "tag",
+                "maker",
+                "publisher",
+                "series"
+              ],
+              "type": "string",
+              "default": "tag",
+              "title": "Type"
             }
           }
         ],
@@ -6539,7 +6669,7 @@
           "tag-mappings"
         ],
         "summary": "Suggest Mappings",
-        "description": "只返回候选译名，不写入词典；人工确认仍由 PUT 接口完成。",
+        "description": "只返回候选译名，不写入词典；人工确认仍由 PUT 接口完成.",
         "operationId": "suggest_mappings",
         "requestBody": {
           "content": {
@@ -9097,6 +9227,7 @@
           "gender",
           "birthday",
           "birthplace",
+          "blood_type",
           "height",
           "bust",
           "waist",
@@ -9357,6 +9488,17 @@
               }
             ],
             "title": "Birthplace"
+          },
+          "blood_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
           },
           "height": {
             "anyOf": [
@@ -9693,6 +9835,17 @@
               }
             ],
             "title": "Birthplace"
+          },
+          "blood_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
           },
           "height": {
             "anyOf": [
@@ -12173,6 +12326,11 @@
             "title": "Uncensored",
             "default": false
           },
+          "hentai": {
+            "type": "boolean",
+            "title": "Hentai",
+            "default": false
+          },
           "mosaics": {
             "items": {
               "$ref": "#/components/schemas/Mosaic"
@@ -12304,6 +12462,10 @@
                 "HEYZO-[0-9]{4}"
               ],
               "number_mapping_rules": [],
+              "mosaic_rules": {
+                "cracked": "破解,克破,CRACKED,-U,-UC",
+                "leaked": "流出,LEAKED"
+              },
               "field_priority": {},
               "field_blacklist": {},
               "field_language": {
@@ -14333,6 +14495,17 @@
             "maxItems": 200,
             "minItems": 1,
             "title": "Originals"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "tag",
+              "maker",
+              "publisher",
+              "series"
+            ],
+            "title": "Type",
+            "default": "tag"
           }
         },
         "type": "object",
@@ -14373,6 +14546,17 @@
               }
             ],
             "title": "Translation"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "tag",
+              "maker",
+              "publisher",
+              "series"
+            ],
+            "title": "Type",
+            "default": "tag"
           }
         },
         "type": "object",
@@ -14511,6 +14695,11 @@
           "uncensored": {
             "type": "boolean",
             "title": "Uncensored",
+            "default": false
+          },
+          "hentai": {
+            "type": "boolean",
+            "title": "Hentai",
             "default": false
           },
           "has_subtitle": {
@@ -15768,10 +15957,31 @@
         "enum": [
           "uncensored",
           "cracked",
-          "leaked"
+          "leaked",
+          "ltx",
+          "western"
         ],
         "title": "Mosaic",
-        "description": "马赛克标记; 有码是条目类型, 不在此列."
+        "description": "无码分支标记; 有码由 number_content_type 表示."
+      },
+      "MosaicRulesConfig": {
+        "properties": {
+          "cracked": {
+            "type": "string",
+            "title": "破解",
+            "description": "英文逗号分隔; 留空表示关闭此类关键词",
+            "default": "破解,克破,CRACKED,-U,-UC"
+          },
+          "leaked": {
+            "type": "string",
+            "title": "流出",
+            "description": "英文逗号分隔; 留空表示关闭此类关键词",
+            "default": "流出,LEAKED"
+          }
+        },
+        "type": "object",
+        "title": "MosaicRulesConfig",
+        "description": "视频文件名中的破解/流出识别词; 保存内容完全替代默认值."
       },
       "MoveMode": {
         "type": "string",
@@ -15895,16 +16105,12 @@
       "NfoCategoriesConfig": {
         "properties": {
           "genre": {
-            "type": "boolean",
-            "title": "Genre",
-            "description": "分类",
-            "default": true
+            "$ref": "#/components/schemas/NfoCategorySourcesConfig",
+            "title": "分类"
           },
           "tag": {
-            "type": "boolean",
-            "title": "Tag",
-            "description": "类型",
-            "default": true
+            "$ref": "#/components/schemas/NfoCategorySourcesConfig",
+            "title": "类型"
           },
           "series": {
             "type": "boolean",
@@ -15916,6 +16122,33 @@
         "type": "object",
         "title": "NfoCategoriesConfig",
         "description": "NFO 分类与系列输出选项."
+      },
+      "NfoCategorySourcesConfig": {
+        "properties": {
+          "cover_attributes": {
+            "type": "boolean",
+            "title": "封面属性",
+            "default": false
+          },
+          "tags": {
+            "type": "boolean",
+            "title": "原有标签",
+            "default": true
+          },
+          "studio": {
+            "type": "boolean",
+            "title": "制作商",
+            "default": false
+          },
+          "publisher": {
+            "type": "boolean",
+            "title": "发行商",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "NfoCategorySourcesConfig",
+        "description": "Genre 或 Tag 各自可选的数据来源."
       },
       "NfoImagesConfig": {
         "properties": {
@@ -17998,6 +18231,10 @@
             "description": "通用番号映射规则; 每行格式为完整匹配正则表达式 => 替换表达式, 仅自动非欧美非无码流媒体刮削使用.",
             "x-ordered": true
           },
+          "mosaic_rules": {
+            "$ref": "#/components/schemas/MosaicRulesConfig",
+            "title": "无码识别规则词"
+          },
           "field_priority": {
             "additionalProperties": {
               "items": {
@@ -19066,6 +19303,17 @@
             "maxItems": 30,
             "minItems": 1,
             "title": "Originals"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "tag",
+              "maker",
+              "publisher",
+              "series"
+            ],
+            "title": "Type",
+            "default": "tag"
           }
         },
         "type": "object",

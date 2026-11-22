@@ -9,7 +9,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listFacetsOptions } from "@/client/@tanstack/react-query.gen";
 import type { ContentType, FacetKind, LibraryResponse, Mosaic } from "@/client/types.gen";
-import { CONTENT_TYPES, FACET_KINDS, FILE_DEFINITIONS, MOSAICS } from "@/lib/exhaustive-maps";
+import {
+  CONTENT_TYPE_FILTERS,
+  FACET_KINDS,
+  FILE_DEFINITIONS,
+  MOSAICS,
+} from "@/lib/exhaustive-maps";
 import { facetIdsOf, type FacetFilters } from "@/lib/facets";
 
 const PICKER_LIMIT = 40;
@@ -19,10 +24,11 @@ export type HasFilesFilter = boolean | null;
 
 export type FilePhaseFilters = {
   has_subtitle: HasFilesFilter;
+  hentai: HasFilesFilter;
   uncensored: HasFilesFilter;
   mosaic: Mosaic | null;
   definition: (typeof FILE_DEFINITIONS)[number] | null;
-  content_type: ContentType | null;
+  content_type: Exclude<ContentType, "hentai"> | null;
 };
 
 interface FacetFilterControlsProps {
@@ -117,8 +123,8 @@ function parseMosaic(value: string | null): Mosaic | null {
   return null;
 }
 
-function parseContentType(value: string | null): ContentType | null {
-  for (const contentType of CONTENT_TYPES) {
+function parseContentType(value: string | null): Exclude<ContentType, "hentai"> | null {
+  for (const contentType of CONTENT_TYPE_FILTERS) {
     if (contentType === value) return contentType;
   }
   return null;
@@ -209,6 +215,15 @@ export function FacetFilterControls({
             size="sm"
           />
           <Select
+            label={t("search.hentai")}
+            placeholder={t("search.any")}
+            data={triData}
+            value={triSelectValue(filePhase.hentai)}
+            onChange={(v) => onFilePhaseChange({ ...filePhase, hentai: parseTriSelect(v) })}
+            clearable
+            size="sm"
+          />
+          <Select
             label={t("search.uncensored")}
             placeholder={t("search.any")}
             data={triData}
@@ -249,7 +264,7 @@ export function FacetFilterControls({
           <Select
             label={t("search.contentType")}
             placeholder={t("search.any")}
-            data={CONTENT_TYPES.map((contentType) => ({
+            data={CONTENT_TYPE_FILTERS.map((contentType) => ({
               value: contentType,
               label: t(`search.contentTypes.${contentType}`),
             }))}

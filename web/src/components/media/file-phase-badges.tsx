@@ -1,11 +1,14 @@
 import { Badge, Group } from "@mantine/core";
 import {
   IconBadgeHd,
+  IconBolt,
   IconBlur,
   IconDroplet,
   IconEye,
   IconLockOpen,
+  IconMasksTheater,
   IconSubtitles,
+  IconWorld,
 } from "@tabler/icons-react";
 import type { TFunction } from "i18next";
 import type { ReactNode } from "react";
@@ -19,13 +22,14 @@ export type FilePhaseLike = {
   /** 条目相位才有: 有码 / 无码由条目类型决定, 与挂载文件无关. */
   censored?: boolean;
   uncensored?: boolean;
+  hentai?: boolean;
   mosaics?: Array<Mosaic>;
   /** 文件相位: 这一份文件自己的马赛克标记. */
   mosaic?: Mosaic | null;
   definition?: string | null;
 };
 
-type PhaseChipKey = "sub" | "cen" | "u" | "crack" | "leak" | "def";
+type PhaseChipKey = "sub" | "cen" | "u" | "crack" | "leak" | "ltx" | "western" | "hentai" | "def";
 
 type PhaseChip = { key: PhaseChipKey; label: string };
 
@@ -55,6 +59,21 @@ const PHASE_CHIP = exhaustiveRecord<PhaseChipKey>()({
     Icon: IconDroplet,
     iconColor: "var(--mantine-color-teal-3)",
   },
+  ltx: {
+    color: "indigo",
+    Icon: IconBolt,
+    iconColor: "var(--mantine-color-indigo-3)",
+  },
+  western: {
+    color: "cyan",
+    Icon: IconWorld,
+    iconColor: "var(--mantine-color-cyan-3)",
+  },
+  hentai: {
+    color: "pink",
+    Icon: IconMasksTheater,
+    iconColor: "var(--mantine-color-pink-3)",
+  },
   def: {
     color: "blue",
     Icon: IconBadgeHd,
@@ -70,7 +89,7 @@ function showsCensored(phase: FilePhaseLike): boolean {
 /** 无码: 条目给了布尔值就用它 (类型已并上文件标记), 否则退回看这一份文件自己的标记. */
 function showsUncensored(phase: FilePhaseLike): boolean {
   if (phase.uncensored != null) return phase.uncensored;
-  return phase.mosaic === "uncensored";
+  return phase.mosaic != null;
 }
 
 function hasMosaic(phase: FilePhaseLike, mosaic: Mosaic): boolean {
@@ -91,6 +110,15 @@ function mosaicChips(phase: FilePhaseLike, t: TFunction<"metadata">): PhaseChip[
   }
   if (hasMosaic(phase, "leaked")) {
     chips.push({ key: "leak", label: t("filePhase.leaked") });
+  }
+  if (hasMosaic(phase, "ltx")) {
+    chips.push({ key: "ltx", label: t("filePhase.ltx") });
+  }
+  if (hasMosaic(phase, "western")) {
+    chips.push({ key: "western", label: t("filePhase.western") });
+  }
+  if (phase.hentai) {
+    chips.push({ key: "hentai", label: t("filePhase.hentai") });
   }
   return chips;
 }

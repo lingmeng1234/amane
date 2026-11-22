@@ -74,7 +74,23 @@ export const CONTENT_TYPES = exhaustiveTuple<ContentType>()(
   "hentai",
 );
 
-export const MOSAICS = exhaustiveTuple<Mosaic>()("uncensored", "cracked", "leaked");
+/** 面板的作品类型筛选不重复提供 HENTAI; 里番只由独立文件属性 hentai 筛选. */
+export const CONTENT_TYPE_FILTERS = exhaustiveTuple<Exclude<ContentType, "hentai">>()(
+  "censored",
+  "uncensored",
+  "chinese",
+  "western",
+  "fc2",
+  "amateur",
+);
+
+export const MOSAICS = exhaustiveTuple<Mosaic>()(
+  "uncensored",
+  "cracked",
+  "leaked",
+  "ltx",
+  "western",
+);
 
 /** 顺序即优先级 (高→低). 与后端 DEFINITION_VALUES 对齐. */
 export const FILE_DEFINITIONS = exhaustiveTuple<

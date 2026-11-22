@@ -45,7 +45,8 @@ async def list_media(
     status: Annotated[MediaFileStatus | None, Query(description="Filter by media file status")] = None,
     search: Annotated[str | None, Query(description="Search by path or number")] = None,
     library_id: Annotated[int | None, Query(description="Filter by owning library")] = None,
-    has_subtitle: Annotated[bool | None, Query(description="Filter by subtitle marker")] = None,
+    has_subtitle: Annotated[bool | None, Query(description="Filter by Chinese-subtitle marker")] = None,
+    hentai: Annotated[bool | None, Query(description="Filter by hentai directory attribute")] = None,
     mosaic: Annotated[Mosaic | None, Query(description="Filter by mosaic marker")] = None,
     uncensored: Annotated[
         bool | None, Query(description="Filter by uncensored (own marker or uncensored number content type)")
@@ -68,6 +69,7 @@ async def list_media(
         sort_by,
         order,
         has_subtitle=has_subtitle,
+        hentai=hentai,
         mosaic=mosaic,
         uncensored=uncensored,
         definition=definition,
@@ -78,6 +80,7 @@ async def list_media(
         search=search,
         library_id=library_id,
         has_subtitle=has_subtitle,
+        hentai=hentai,
         mosaic=mosaic,
         uncensored=uncensored,
         definition=definition,

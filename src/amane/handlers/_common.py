@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -8,8 +9,9 @@ import structlog
 
 from ..db import Library
 from ..db.models import MediaIdentityType
-from ..library import LibraryHit, LibraryScan, has_companion_subtitle
-from ..parsing import ContentType, parse_file_info
+from ..library import LibraryHit, LibraryScan
+from ..organize import discover_subtitles
+from ..parsing import ContentType, file_phase_from_path, parse_file_info
 from ..utils.litepan_strm import read_litepan_115_file_id
 from ..utils.oshash import compute_oshash
 from ..utils.threads import existing_disk_path, in_thread
@@ -60,7 +62,12 @@ def scan_library(scan_dir: Path, *, recursive: bool, scan: LibraryScan) -> list[
 
 
 async def register_media_file(
-    repo: Repository, library_id: int, path: Path, *, library: Library | None = None
+    repo: Repository,
+    library_id: int,
+    path: Path,
+    *,
+    library: Library | None = None,
+    mosaic_rules: Mapping[str, str] | None = None,
 ) -> MediaFile | None:
     """按全局路径唯一性登记; 已被其它媒体库登记时不重复插入、不自动转移."""
     media, created = await repo.create_media_file_if_absent(library_id=library_id, path=str(path))
@@ -72,19 +79,65 @@ async def register_media_file(
             requested_library_id=library_id,
         )
         return None
-    if created and library is not None:
-        await refresh_external_subtitle(repo, media, library)
+    if created:
+        await refresh_file_phase(repo, media, mosaic_rules)
+        if library is not None:
+            await refresh_external_subtitle(repo, media, library)
     return media
 
 
-async def refresh_external_subtitle(repo: Repository, media: MediaFile, library: Library) -> None:
-    """按视频当前所在目录检查一次外挂字幕, 写回 ``MediaFile.has_external_subtitle``.
+async def refresh_file_phase(
+    repo: Repository,
+    media: MediaFile,
+    mosaic_rules: Mapping[str, str] | None = None,
+) -> None:
+    """按当前无码识别规则重新计算并持久化 path 派生属性."""
+    if media.id is None:
+        return
+    phase = file_phase_from_path(media.path, mosaic_rules=mosaic_rules)
+    updated = await repo.update_media_file(
+        media.id,
+        mosaic=phase["mosaic"],
+        number_content_type=phase.get("number_content_type"),
+        hentai=phase.get("hentai", False),
+        has_subtitle_in_name=phase["has_subtitle"],
+        definition=phase["definition"],
+    )
+    if updated is not None:
+        media.mosaic = updated.mosaic
+        media.number_content_type = updated.number_content_type
+        media.hentai = updated.hentai
+        media.has_subtitle_in_name = updated.has_subtitle_in_name
+        media.definition = updated.definition
 
-    库 ``subtitle_extensions`` 为空表示关闭发现, 此时写入假值, 早先命中的角标随之熄灭.
+
+async def refresh_external_subtitle(repo: Repository, media: MediaFile, library: Library) -> None:
+    """按主番号与现有 Metadata 精确匹配同目录外挂字幕, 写回文件级标记.
+
+    不使用目录级存在性判断: 无法解析番号、没有对应 Metadata 或属于其它作品的字幕均不命中.
     """
     extensions = library.subtitle_extensions or []
-    found = await has_companion_subtitle(Path(media.path), extensions)
+    parsed = parse_file_info(media.path)
+    number_content_type = getattr(parsed, "number_content_type", None) or parsed.content_type
+    found = False
+    if extensions and parsed.number:
+        if number_content_type is ContentType.WESTERN:
+            metadata_exists = bool(await repo.list_western_metadata_by_number(parsed.number))
+        else:
+            metadata_exists = (
+                await repo.get_metadata_by_number(parsed.number, content_type=number_content_type)
+            ) is not None
+        if metadata_exists:
+            found = bool(
+                await discover_subtitles(
+                    Path(media.path),
+                    extensions,
+                    parsed,
+                    metadata_number=parsed.number,
+                )
+            )
     if media.id is None:
+        media.has_external_subtitle = found
         return
     media.has_external_subtitle = found
     await repo.update_media_file(media.id, has_external_subtitle=found)
@@ -96,12 +149,13 @@ async def refresh_media_association(repo: Repository, media: MediaFile) -> bool:
         return False
 
     parsed = parse_file_info(media.path)
+    number_content_type = getattr(parsed, "number_content_type", None) or parsed.content_type
     metadata = None
 
-    if parsed.number and parsed.content_type != ContentType.WESTERN:
-        metadata = await repo.get_metadata_by_number(parsed.number, content_type=parsed.content_type)
+    if parsed.number and number_content_type != ContentType.WESTERN:
+        metadata = await repo.get_metadata_by_number(parsed.number, content_type=number_content_type)
 
-    elif parsed.number and parsed.content_type == ContentType.WESTERN:
+    elif parsed.number and number_content_type == ContentType.WESTERN:
         candidates = await repo.list_western_metadata_by_number(parsed.number)
         candidate_ids = [item.id for item in candidates if item.id is not None]
         if not candidate_ids:
@@ -130,8 +184,13 @@ async def refresh_media_association(repo: Repository, media: MediaFile) -> bool:
     if metadata is None or metadata.id is None:
         return False
 
-    # finalize_media_file 只恢复关联，不登记或修改番号、115 ID、OSHASH。
+    # 恢复关联后立即按 Metadata 重新计算外挂字幕, 避免扫描时因尚无档案而留下假值.
     await repo.finalize_media_file(media.id, metadata.id)
+    updated = await repo.get_media_file(media.id)
+    if updated is not None:
+        library = await repo.get_library(updated.library_id)
+        if library is not None:
+            await refresh_external_subtitle(repo, updated, library)
     return True
 
 
@@ -156,3 +215,8 @@ async def finalize_media_file(repo: Repository, media_file_id: int | None, metad
     if media_file_id is None:
         return
     await repo.finalize_media_file(media_file_id, metadata_id)
+    media = await repo.get_media_file(media_file_id)
+    if media is not None:
+        library = await repo.get_library(media.library_id)
+        if library is not None:
+            await refresh_external_subtitle(repo, media, library)

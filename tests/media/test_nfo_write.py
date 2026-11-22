@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from amane.config.manager import NfoOutputConfig
 from amane.db.models import Metadata
 from amane.media import write_nfo
-from amane.parsing.file_info import ContentType
+from amane.parsing import ContentType, parse_file_info
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -231,3 +232,229 @@ async def test_write_nfo_uses_original_tags_when_global_mapping_is_disabled(tmp_
     root = ET.parse(nfo_path).getroot()
     assert [node.text for node in root.findall("genre")] == ["中出し", "制服"]
     assert [node.text for node in root.findall("tag")] == ["中出し", "制服"]
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_category_sources_are_independent_and_ordered(tmp_path: Path):
+    metadata = Metadata(
+        number="MIDV-123",
+        title="Title",
+        tags=["Drama", "Drama", "Romance"],
+        studio="Studio X",
+        publisher="Publisher Y",
+    )
+    config = NfoOutputConfig.model_validate(
+        {
+            "categories": {
+                "genre": {
+                    "cover_attributes": True,
+                    "tags": True,
+                    "studio": True,
+                    "publisher": True,
+                },
+                "tag": {
+                    "cover_attributes": False,
+                    "tags": True,
+                    "studio": False,
+                    "publisher": True,
+                },
+            }
+        }
+    )
+    info = parse_file_info("/media/里番/MIDV-123-U-4K-C.mp4")
+    nfo_path = tmp_path / "MIDV-123.nfo"
+
+    assert await write_nfo(metadata, nfo_path, nfo_output=config, file_info=info) is True
+
+    root = ET.parse(nfo_path).getroot()
+    assert [item.text for item in root.findall("genre")] == [
+        "无码",
+        "破解",
+        "里番",
+        "4K",
+        "中文字幕",
+        "Drama",
+        "Romance",
+        "制作商:Studio X",
+        "发行商:Publisher Y",
+    ]
+    assert [item.text for item in root.findall("tag")] == [
+        "Drama",
+        "Romance",
+        "发行商:Publisher Y",
+    ]
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_cover_attributes_without_existing_tags(tmp_path: Path):
+    metadata = Metadata(number="MIDV-123", title="Title", tags=[])
+    config = NfoOutputConfig.model_validate(
+        {"categories": {"genre": {"cover_attributes": True, "tags": False}, "tag": {"tags": False}}}
+    )
+    info = parse_file_info("/media/动漫/MIDV-123.mp4")
+    nfo_path = tmp_path / "MIDV-123.nfo"
+
+    assert await write_nfo(metadata, nfo_path, nfo_output=config, file_info=info) is True
+    root = ET.parse(nfo_path).getroot()
+    assert [item.text for item in root.findall("genre")] == ["有码", "里番"]
+    assert root.findall("tag") == []
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_uses_independent_genre_and_tag_sources(tmp_path: Path, metadata: Metadata):
+    metadata.publisher = "Publisher Y"
+    metadata.tags = ["Drama", "LTX", "Drama"]
+    file_info = parse_file_info(
+        "/media/动漫/MIDV-123-LTX-4K-C.mp4",
+        has_external_subtitle=True,
+    )
+    output = NfoOutputConfig.model_validate(
+        {
+            "categories": {
+                "genre": {
+                    "cover_attributes": True,
+                    "tags": True,
+                    "studio": True,
+                    "publisher": False,
+                },
+                "tag": {
+                    "cover_attributes": False,
+                    "tags": False,
+                    "studio": False,
+                    "publisher": True,
+                },
+            }
+        }
+    )
+    nfo_path = tmp_path / "MIDV-123.nfo"
+
+    assert await write_nfo(metadata, nfo_path, nfo_output=output, file_info=file_info)
+
+    root = ET.parse(nfo_path).getroot()
+    assert [node.text for node in root.findall("genre")] == [
+        "无码",
+        "LTX",
+        "里番",
+        "4K",
+        "中文字幕",
+        "Drama",
+        "制作商:Studio X",
+    ]
+    assert [node.text for node in root.findall("tag")] == ["发行商:Publisher Y"]
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_cover_attributes_do_not_require_existing_tags(tmp_path: Path):
+    metadata = Metadata(number="MIDV-123", tags=[])
+    file_info = parse_file_info("/media/MIDV-123.mp4")
+    output = NfoOutputConfig.model_validate(
+        {"categories": {"genre": {"cover_attributes": True, "tags": False}, "tag": {"tags": False}}}
+    )
+    nfo_path = tmp_path / "MIDV-123.nfo"
+
+    assert await write_nfo(metadata, nfo_path, nfo_output=output, file_info=file_info)
+
+    root = ET.parse(nfo_path).getroot()
+    assert [node.text for node in root.findall("genre")] == ["有码"]
+    assert root.findall("tag") == []
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_uses_typed_chinese_mappings_for_tags_and_merchants(tmp_path: Path):
+    """同一原文在四种归属中可独立映射; Genre/Tag/Series 写入中文值, 独立 studio 字段保留原文."""
+    mapping_path = tmp_path / "tag_mappings.json"
+    mapping_path.write_text(
+        (
+            '{"version":2,"enabled":true,"entries":['
+            '{"original":"Same","translation":"中文标签","type":"tag"},'
+            '{"original":"Same","translation":"中文制作商","type":"maker"},'
+            '{"original":"Same","translation":"中文发行商","type":"publisher"},'
+            '{"original":"Same","translation":"中文系列","type":"series"}'
+            "]}"
+        ),
+        encoding="utf-8",
+    )
+    metadata = Metadata(
+        number="MAP-NFO-1",
+        tags=["Same", "Other"],
+        studio="Same",
+        publisher="Same",
+        series="Same",
+        series_names=["Same"],
+    )
+    output = NfoOutputConfig.model_validate(
+        {
+            "categories": {
+                "genre": {
+                    "cover_attributes": False,
+                    "tags": True,
+                    "studio": True,
+                    "publisher": True,
+                },
+                "tag": {
+                    "cover_attributes": False,
+                    "tags": True,
+                    "studio": True,
+                    "publisher": True,
+                },
+                "series": True,
+            }
+        }
+    )
+    nfo_path = tmp_path / "MAP-NFO-1.nfo"
+
+    assert await write_nfo(metadata, nfo_path, tag_mapping_path=mapping_path, nfo_output=output) is True
+
+    root = ET.parse(nfo_path).getroot()
+    expected = ["中文标签", "Other", "制作商:中文制作商", "发行商:中文发行商"]
+    assert [node.text for node in root.findall("genre")] == expected
+    assert [node.text for node in root.findall("tag")] == expected
+    assert root.findtext("series") == "中文系列"
+    assert [node.findtext("name") for node in root.findall("set")] == ["中文系列"]
+    # 独立 NFO 字段沿用原有行为, 不受 Genre/Tag 中文映射开关影响.
+    assert root.findtext("studio") == "中文制作商"
+    assert root.findtext("maker") == "中文制作商"
+    assert root.findtext("publisher") == "中文发行商"
+    assert root.findtext("label") == "中文发行商"
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_global_switch_disables_all_mapping_categories(tmp_path: Path):
+    mapping_path = tmp_path / "tag_mappings.json"
+    mapping_path.write_text(
+        (
+            '{"version":2,"enabled":false,"entries":['
+            '{"original":"Same","translation":"中文标签","type":"tag"},'
+            '{"original":"Same","translation":"中文制作商","type":"maker"},'
+            '{"original":"Same","translation":"中文发行商","type":"publisher"},'
+            '{"original":"Same","translation":"中文系列","type":"series"}'
+            "]}"
+        ),
+        encoding="utf-8",
+    )
+    metadata = Metadata(
+        number="MAP-OFF-1",
+        tags=["Same"],
+        studio="Same",
+        publisher="Same",
+        series="Same",
+        series_names=["Same"],
+    )
+    output = NfoOutputConfig.model_validate(
+        {
+            "categories": {
+                "genre": {"tags": True, "studio": True, "publisher": True},
+                "tag": {"tags": True, "studio": True, "publisher": True},
+                "series": True,
+            }
+        }
+    )
+    nfo_path = tmp_path / "MAP-OFF-1.nfo"
+
+    assert await write_nfo(metadata, nfo_path, tag_mapping_path=mapping_path, nfo_output=output) is True
+
+    root = ET.parse(nfo_path).getroot()
+    expected = ["Same", "制作商:Same", "发行商:Same"]
+    assert [node.text for node in root.findall("genre")] == expected
+    assert [node.text for node in root.findall("tag")] == expected
+    assert root.findtext("series") == "Same"

@@ -56,6 +56,8 @@ def _meta(**kwargs) -> Metadata:
     """
     defaults = {
         "number": "ABC-123",
+        # 模板测试的中性类型, 不继承默认 WESTERN 的 mosaic? 展示值.
+        "content_type": ContentType.CHINESE,
         "title": "Test Title",
         "actors": ["Actor1", "Actor2"],
         "studio": "StudioX",
@@ -128,7 +130,7 @@ RENDER_CASES: tuple[_RenderCase, ...] = (
     _RenderCase("[破解]MIDV-123.mp4", "{mosaic?}/{number}.{ext}", "cracked/ABC-123.mp4"),
     _RenderCase("[流出]MIDV-123.mp4", "{mosaic?}/{number}.{ext}", "leaked/ABC-123.mp4"),
     _RenderCase("MIDV-123_4K_无码.mp4", "{mosaic?}/{def?}/{number}.{ext}", "uncensored/4K/ABC-123.mp4"),
-    _RenderCase("/media/uncensored/MIDV-123.mp4", "{mosaic?}/{def?}/{number}.{ext}", "uncensored/ABC-123.mp4"),
+    _RenderCase("/media/uncensored/MIDV-123.mp4", "{mosaic?}/{def?}/{number}.{ext}", "ABC-123.mp4"),
     _RenderCase("/media/4K/MIDV-123.mp4", "{mosaic?}/{def?}/{number}.{ext}", "ABC-123.mp4"),
     _RenderCase(None, "{mosaic?}/{def?}/{number}.{ext}", "ABC-123.mp4"),
     _RenderCase("HEYZO-123-流出.mp4", "{mosaic?}/{number}.{ext}", "leaked/ABC-123.mp4"),
@@ -203,6 +205,12 @@ RENDER_CASES: tuple[_RenderCase, ...] = (
         "{mosaic?|censored=有码,uncensored=无码}/{number}.{ext}",
         "有码/ABC-123.mp4",
         meta={"content_type": ContentType.CENSORED},
+    ),
+    _RenderCase(
+        "/media/里番/MIDV-123.mp4",
+        "{mosaic?}/{number}.{ext}",
+        "censored/ABC-123.mp4",
+        meta={"content_type": ContentType.HENTAI},
     ),
     # {cd} 不是 {cd?}, 视为未知 key
     _RenderCase("MIDV-123-CD1.mp4", "{number}[-CD{cd}].{ext}", "ABC-123-CDUnknown.mp4"),

@@ -1,7 +1,7 @@
 import os
 import re
 import shutil
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -35,7 +35,7 @@ from ..organize import (
     video_dest,
 )
 from ..organize.link import create_video_link
-from ..parsing import ContentType, FileInfo, parse_file_info
+from ..parsing import ContentType, FileInfo, file_phase_from_path, parse_file_info
 from ..utils.path import existing_disk_path as existing_disk_path_sync
 from ..utils.path import is_descendant, nfc_path, path_is_under
 from ..utils.threads import existing_disk_path, in_thread, path_is_dir
@@ -149,7 +149,12 @@ async def execute_file_operations(
     # 发现字幕: 必须在视频移动前检查同目录.
     subtitles: list[Path] = []
     if library is not None:
-        subtitles = await discover_subtitles(source_path, library.subtitle_extensions, file_info)
+        subtitles = await discover_subtitles(
+            source_path,
+            library.subtitle_extensions,
+            file_info,
+            metadata_number=metadata.number,
+        )
 
     org_result = await execute_organize(
         source=source_path,
@@ -193,6 +198,7 @@ async def execute_file_operations(
             tag_mapping_path=tag_mapping_path,
             nfo_output=config.nfo_output if config is not None else None,
             actor_genders=actor_genders,
+            file_info=file_info,
         )
 
     # 字幕按模板落到 video_dest 侧.
@@ -249,7 +255,11 @@ async def apply_file_operations(
 
     # 渲染路径后执行落盘.
     ext = Path(media_file.path).suffix.lstrip(".")
-    file_info = parse_file_info(media_file.path, has_external_subtitle=media_file.has_external_subtitle)
+    file_info = parse_file_info(
+        media_file.path,
+        has_external_subtitle=media_file.has_external_subtitle,
+        mosaic_rules=config.scraping.mosaic_rules.model_dump(),
+    )
     actor_genders = {a.name: a.gender for a in await repo.get_actors_by_names(metadata.actors)}
     paths = resolve_paths(
         library,
@@ -285,6 +295,8 @@ async def commit_organized_media_file(
     media: MediaFile,
     placed: Path,
     library_root: Path,
+    *,
+    mosaic_rules: Mapping[str, str] | None = None,
 ) -> None:
     """提交整理后的文件记录.
 
@@ -304,7 +316,16 @@ async def commit_organized_media_file(
 
     occupant = await repo.get_media_file_by_path(str(placed))
     if occupant is None or occupant.id == media.id:
-        updated = await repo.update_media_file(media.id, path=str(placed))
+        phase = file_phase_from_path(placed, mosaic_rules=mosaic_rules)
+        updated = await repo.update_media_file(
+            media.id,
+            path=str(placed),
+            mosaic=phase["mosaic"],
+            number_content_type=phase.get("number_content_type"),
+            hentai=phase.get("hentai", False),
+            has_subtitle_in_name=phase["has_subtitle"],
+            definition=phase["definition"],
+        )
         if updated is not None and library is not None:
             await refresh_external_subtitle(repo, updated, library)
         return
@@ -667,7 +688,13 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
 
                 source_root = owning_root(file_path)
                 if fop_result.dest and media_file.id is not None and source_root is not None:
-                    await commit_organized_media_file(self._repo, media_file, fop_result.dest, source_root)
+                    await commit_organized_media_file(
+                        self._repo,
+                        media_file,
+                        fop_result.dest,
+                        source_root,
+                        mosaic_rules=self._config.scraping.mosaic_rules.model_dump(),
+                    )
                 match fop_result.outcome:
                     case PlaceOutcome.PLACED:
                         organized += 1

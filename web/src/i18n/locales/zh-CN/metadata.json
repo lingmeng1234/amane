@@ -24,10 +24,11 @@
     "hasFilesAny": "不限",
     "hasFilesYes": "有文件",
     "hasFilesNo": "无文件",
-    "hasSubtitle": "中字",
+    "hasSubtitle": "中文字幕",
+    "hentai": "里番",
     "vr": "VR",
     "uncensored": "无码",
-    "mosaic": "马赛克标记",
+    "mosaic": "无码分支",
     "definition": "分辨率",
     "contentType": "类型",
     "any": "不限",
@@ -40,22 +41,27 @@
       "western": "欧美",
       "fc2": "FC2",
       "amateur": "素人",
-      "hentai": "动漫"
+      "hentai": "里番"
     },
     "mosaics": {
-      "uncensored": "无码",
+      "uncensored": "普通无码",
       "cracked": "破解",
-      "leaked": "流出"
+      "leaked": "流出",
+      "ltx": "LTX",
+      "western": "欧美"
     },
     "library": "媒体库",
     "libraryAll": "全部媒体库"
   },
   "filePhase": {
-    "subtitle": "中字",
+    "subtitle": "中文字幕",
     "censored": "有码",
     "uncensored": "无码",
     "cracked": "破解",
-    "leaked": "流出"
+    "leaked": "流出",
+    "ltx": "LTX",
+    "western": "欧美",
+    "hentai": "里番"
   },
   "columns": {
     "number": "番号",
@@ -212,6 +218,7 @@
       "gender_unknown": "未知",
       "birthday": "生日",
       "birthplace": "出生地",
+      "bloodType": "血型",
       "height": "身高",
       "bust": "胸围",
       "waist": "腰围",

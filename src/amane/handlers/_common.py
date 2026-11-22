@@ -118,13 +118,14 @@ async def refresh_external_subtitle(repo: Repository, media: MediaFile, library:
     """
     extensions = library.subtitle_extensions or []
     parsed = parse_file_info(media.path)
+    number_content_type = getattr(parsed, "number_content_type", None) or parsed.content_type
     found = False
     if extensions and parsed.number:
-        if parsed.content_type is ContentType.WESTERN:
+        if number_content_type is ContentType.WESTERN:
             metadata_exists = bool(await repo.list_western_metadata_by_number(parsed.number))
         else:
             metadata_exists = (
-                await repo.get_metadata_by_number(parsed.number, content_type=parsed.content_type)
+                await repo.get_metadata_by_number(parsed.number, content_type=number_content_type)
             ) is not None
         if metadata_exists:
             found = bool(
@@ -148,12 +149,13 @@ async def refresh_media_association(repo: Repository, media: MediaFile) -> bool:
         return False
 
     parsed = parse_file_info(media.path)
+    number_content_type = getattr(parsed, "number_content_type", None) or parsed.content_type
     metadata = None
 
-    if parsed.number and parsed.content_type != ContentType.WESTERN:
-        metadata = await repo.get_metadata_by_number(parsed.number, content_type=parsed.content_type)
+    if parsed.number and number_content_type != ContentType.WESTERN:
+        metadata = await repo.get_metadata_by_number(parsed.number, content_type=number_content_type)
 
-    elif parsed.number and parsed.content_type == ContentType.WESTERN:
+    elif parsed.number and number_content_type == ContentType.WESTERN:
         candidates = await repo.list_western_metadata_by_number(parsed.number)
         candidate_ids = [item.id for item in candidates if item.id is not None]
         if not candidate_ids:

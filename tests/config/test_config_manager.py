@@ -865,3 +865,44 @@ def test_default_actor_source_orders() -> None:
     cfg = ActorScrapingConfig()
     assert [str(site) for site in cfg.profile_sites] == ["minnano", "theporndb", "wikipedia", "javdb", "avbase"]
     assert [str(site) for site in cfg.image_sites] == ["tushy", "tushy_raw", "gfriends"]
+
+
+class TestMosaicAndNfoConfig:
+    def test_mosaic_rules_defaults_and_full_replacement(self):
+        defaults = ScrapingConfig().mosaic_rules
+        assert defaults.cracked == "破解,克破,CRACKED,-U,-UC"
+        assert defaults.leaked == "流出,LEAKED"
+        custom = ScrapingConfig.model_validate({"mosaic_rules": {"cracked": "自定义", "leaked": ""}})
+        assert custom.mosaic_rules.cracked == "自定义"
+        assert custom.mosaic_rules.leaked == ""
+
+    def test_mosaic_rules_reject_cross_branch_duplicates(self):
+        with pytest.raises(ValidationError, match="不能同时属于破解和流出"):
+            ScrapingConfig(mosaic_rules={"cracked": "CRACKED,custom", "leaked": "CUSTOM"})
+
+    def test_nfo_legacy_boolean_switches_are_migrated(self):
+        from amane.config.manager import NfoCategoriesConfig
+
+        config = NfoCategoriesConfig.model_validate({"genre": True, "tag": False})
+        assert config.genre.tags is True
+        assert config.tag.tags is False
+        assert config.genre.cover_attributes is False
+        assert config.tag.studio is False
+
+    def test_nfo_genre_and_tag_sources_are_independent(self):
+        from amane.config.manager import NfoCategoriesConfig
+
+        config = NfoCategoriesConfig.model_validate(
+            {
+                "genre": {"cover_attributes": True, "tags": False, "studio": True},
+                "tag": {"cover_attributes": False, "tags": True, "publisher": True},
+            }
+        )
+        assert config.genre.cover_attributes is True
+        assert config.genre.tags is False
+        assert config.genre.studio is True
+        assert config.tag.cover_attributes is False
+        assert config.tag.tags is True
+        assert config.tag.publisher is True
+
+

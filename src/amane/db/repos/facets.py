@@ -604,9 +604,7 @@ class FacetsRepoMixin(RepositoryMixinBase):
             elif kind == FacetKind.TAG:
                 entity = Tag
                 ids = (
-                    await session.exec(
-                        select(Tag.id).where(~exists().where(col(MetadataTag.tag_id) == col(Tag.id)))
-                    )
+                    await session.exec(select(Tag.id).where(~exists().where(col(MetadataTag.tag_id) == col(Tag.id))))
                 ).all()
             elif kind == FacetKind.STUDIO:
                 entity = Studio

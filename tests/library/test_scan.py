@@ -53,6 +53,15 @@ class TestClassify:
         assert scan.classify(Path("/tmp/a.mkv")) is LibraryFileKind.MEDIA
         assert scan.classify(Path("/tmp/a.mp4")) is None
 
+
+    def test_patterns_never_promote_companion_files_to_media(self):
+        scan = LibraryScan(patterns=["*"])
+        for name in ("subtitle.srt", "cover.jpg", "movie.nfo", "metadata.xml"):
+            assert scan.classify(Path(f"/tmp/{name}")) is None
+
+        subtitle_only = LibraryScan(patterns=["*.srt"])
+        assert subtitle_only.classify(Path("/tmp/subtitle.srt")) is None
+
     def test_blacklist_outside_patterns(self):
         scan = LibraryScan(patterns=["*.mkv"], blacklist_patterns=["广告"])
         assert scan.classify(Path("/tmp/广告.mp4")) is LibraryFileKind.UNWANTED

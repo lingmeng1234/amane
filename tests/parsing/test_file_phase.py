@@ -115,6 +115,47 @@ def test_summarize_file_phases_without_files(content_type: ContentType, censored
     assert summary.definition is None
 
 
+def test_summarize_file_phases_prefers_uncensored_when_mixed_resources_exist() -> None:
+    censored: FilePhase = {
+        "mosaic": None,
+        "has_subtitle": False,
+        "definition": "1080p",
+        "number_content_type": ContentType.CENSORED,
+    }
+    cracked: FilePhase = {
+        "mosaic": Mosaic.CRACKED,
+        "has_subtitle": False,
+        "definition": "4K",
+        "number_content_type": ContentType.CENSORED,
+    }
+    leaked: FilePhase = {
+        "mosaic": Mosaic.LEAKED,
+        "has_subtitle": True,
+        "definition": "720p",
+        "number_content_type": ContentType.CENSORED,
+    }
+
+    summary = summarize_file_phases((censored, cracked, leaked), ContentType.CENSORED)
+
+    assert summary.censored is False
+    assert summary.uncensored is True
+    assert summary.mosaics == (Mosaic.CRACKED, Mosaic.LEAKED)
+    assert summary.definition == "4K"
+    assert summary.has_subtitle is True
+
+
+def test_western_fallback_does_not_override_an_explicit_branch() -> None:
+    leaked_western: FilePhase = {
+        "mosaic": Mosaic.LEAKED,
+        "has_subtitle": False,
+        "definition": None,
+        "number_content_type": ContentType.WESTERN,
+    }
+    summary = summarize_file_phases((leaked_western,), ContentType.WESTERN)
+    assert summary.uncensored is True
+    assert summary.mosaics == (Mosaic.LEAKED,)
+
+
 def test_summarize_file_phases_keeps_hentai_separate_from_coded_state() -> None:
     hentai_censored: FilePhase = {
         "mosaic": None,

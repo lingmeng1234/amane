@@ -208,7 +208,7 @@ CASES: list[object] = [
     _Case("/media/010115_01.mp4", number="010115_01", content_type=ContentType.UNCENSORED),
     _Case("/media/010115-001/video.mp4", number="010115-001", content_type=ContentType.UNCENSORED),
     _Case("/media/38-068.mp4", number="38-068", content_type=ContentType.WESTERN),
-    _Case("/media/欧美/T38-068.mp4", number="T38-068", content_type=ContentType.WESTERN),
+    _Case("/media/欧美/T38-068.mp4", number="T38-068", content_type=ContentType.CENSORED),
     _Case("/media/欧美/010115-001.mp4", number="010115-001", content_type=ContentType.UNCENSORED),
     _Case("/media/SSNI00321.mp4", number="SSNI-321", content_type=ContentType.CENSORED),
     _Case("/media/Mywife No.1234.mp4", number="Mywife No.1234", content_type=ContentType.CENSORED),
@@ -336,7 +336,7 @@ CASES: list[object] = [
         "/media/欧美/ABC-123.1080p.mp4",
         definition="1080p",
         number="ABC-123",
-        content_type=ContentType.WESTERN,
+        content_type=ContentType.CENSORED,
     ),
     _Case(
         "/media/lib/MIDV-123-UC-CD1.mp4",

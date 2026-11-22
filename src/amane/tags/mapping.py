@@ -366,9 +366,7 @@ class TagMappingStore:
                 key = self._key(kind, original)
                 current = self._entries.get(key)
                 if current is None:
-                    current = TagEntry(
-                        original, language=detect_language(original), sources=[], type=kind
-                    )
+                    current = TagEntry(original, language=detect_language(original), sources=[], type=kind)
                     self._entries[key] = current
                 translation = value.get("translation")
                 current.translation = (

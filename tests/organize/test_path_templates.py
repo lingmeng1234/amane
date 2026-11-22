@@ -206,6 +206,12 @@ RENDER_CASES: tuple[_RenderCase, ...] = (
         "有码/ABC-123.mp4",
         meta={"content_type": ContentType.CENSORED},
     ),
+    _RenderCase(
+        "/media/里番/MIDV-123.mp4",
+        "{mosaic?}/{number}.{ext}",
+        "censored/ABC-123.mp4",
+        meta={"content_type": ContentType.HENTAI},
+    ),
     # {cd} 不是 {cd?}, 视为未知 key
     _RenderCase("MIDV-123-CD1.mp4", "{number}[-CD{cd}].{ext}", "ABC-123-CDUnknown.mp4"),
     # metadata 缺省是字面量 Unknown; 映成空串后可选组省略, 路径空段折叠

@@ -144,8 +144,8 @@ CASES: list[object] = [
     _Case("/media/裏番/something-123.mp4"),
     _Case("/media/getchu/item-123.mp4"),
     _Case("/media/GETCHU/item-123.mp4"),
-    _Case("/media/欧美/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.WESTERN),
-    _Case("/mnt/nas/library/欧美/2024/studio/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.WESTERN),
+    _Case("/media/欧美/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
+    _Case("/mnt/nas/library/欧美/2024/studio/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     # 东欧美 不含「欧美」单独命中
     _Case("/media/东欧美/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     # getchu 必须整段相等; 子串不分类
@@ -154,11 +154,12 @@ CASES: list[object] = [
     _Case("/media/my-getchu/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     # 里番/欧美须在段首; 嵌在其它词里不算
     _Case("/media/里番合集/something-123.mp4", content_type=ContentType.HENTAI, hentai=True),
-    _Case("/media/欧美片商/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.WESTERN),
+    _Case("/media/欧美片商/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     _Case("/media/非欧美/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     _Case("/media/这里番号/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
-    # 路径关键词优先于番号分类
-    _Case("/media/欧美/HEYZO-123.mp4", number="HEYZO-123", content_type=ContentType.WESTERN),
+    # 里番目录用于路由; 欧美目录只在番号无法识别时兜底.
+    _Case("/media/欧美/HEYZO-123.mp4", number="HEYZO-123", content_type=ContentType.UNCENSORED),
+    _Case("/media/欧美/Unknown Movie.mp4", content_type=ContentType.WESTERN),
     _Case("/media/里番/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.HENTAI, number_content_type=ContentType.CENSORED, hentai=True),
     # 无路径关键词: 按番号
     _Case("/media/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),

@@ -141,9 +141,7 @@ class DmmTextMappingStore:
             self._write_conflicts(current)
             return self.list_conflicts()
 
-    def update_conflict(
-        self, group_id: int, side: str, entry: dict[str, str] | None
-    ) -> builtins.list[dict[str, Any]]:
+    def update_conflict(self, group_id: int, side: str, entry: dict[str, str] | None) -> builtins.list[dict[str, Any]]:
         if side not in {"old", "new"}:
             raise ValueError("冲突记录侧别无效")
         with self._lock:
@@ -161,9 +159,7 @@ class DmmTextMappingStore:
             self._write_conflicts(items)
             return self.list_conflicts()
 
-    def save_conflict_entry(
-        self, group_id: int, side: str, source: str, target: str
-    ) -> builtins.list[dict[str, Any]]:
+    def save_conflict_entry(self, group_id: int, side: str, source: str, target: str) -> builtins.list[dict[str, Any]]:
         if side not in {"old", "new"}:
             raise ValueError("冲突记录侧别无效")
         with self._lock:

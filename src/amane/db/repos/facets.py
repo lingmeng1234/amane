@@ -640,9 +640,7 @@ class FacetsRepoMixin(RepositoryMixinBase):
                 return 0
             if kind == FacetKind.USER_TAG:
                 # 用户标签也可能挂在演员上; 清理无影片引用的标签时同步清除演员挂载.
-                await session.exec(
-                    sqla_delete(ActorUserTag).where(col(ActorUserTag.user_tag_id).in_(clean_ids))
-                )
+                await session.exec(sqla_delete(ActorUserTag).where(col(ActorUserTag.user_tag_id).in_(clean_ids)))
             await session.exec(sqla_delete(entity).where(col(entity.id).in_(clean_ids)))
             await session.commit()
             return len(clean_ids)

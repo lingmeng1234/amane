@@ -116,7 +116,7 @@ function parseTriSelect(value: string | null): HasFilesFilter {
   return null;
 }
 
-function parseMosaic(value: string | null): Mosaic | null {
+function parseMosaic(value: string | null): (typeof MOSAIC_FILTERS)[number] | null {
   for (const mosaic of MOSAIC_FILTERS) {
     if (mosaic === value) return mosaic;
   }

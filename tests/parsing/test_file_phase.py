@@ -111,7 +111,7 @@ def test_summarize_file_phases_without_files(content_type: ContentType, censored
     summary = summarize_file_phases((), content_type)
     assert summary.censored is censored
     assert summary.uncensored is uncensored
-    assert summary.mosaics == ()
+    assert summary.mosaics == ((Mosaic.WESTERN,) if content_type is ContentType.WESTERN else ())
     assert summary.definition is None
 
 

@@ -739,3 +739,17 @@ def test_ltx_marker_has_its_own_branch(filename: str) -> None:
 )
 def test_ltx_marker_requires_token_boundary(filename: str) -> None:
     assert parse_file_info(filename).mosaic is None
+
+
+def test_hentai_directory_does_not_override_known_western_number_type() -> None:
+    info = parse_file_info("/media/动漫/Vixen.23.04.15.mp4")
+    assert info.content_type is ContentType.WESTERN
+    assert info.number_content_type is ContentType.WESTERN
+    assert info.hentai is True
+
+
+def test_hentai_directory_keeps_number_derived_censored_type() -> None:
+    info = parse_file_info("/media/里番/MIDV-123.mp4")
+    assert info.content_type is ContentType.HENTAI
+    assert info.number_content_type is ContentType.CENSORED
+    assert info.hentai is True

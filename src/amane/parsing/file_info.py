@@ -12,11 +12,11 @@ from __future__ import annotations
 import contextlib
 import re
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 # ---------------------------------------------------------------------------
 # Types
@@ -34,29 +34,32 @@ class ContentType(StrEnum):
 
 
 class Mosaic(StrEnum):
-    """马赛克标记; 有码是条目类型, 不在此列."""
+    """无码分支标记; 有码由 number_content_type 表示."""
 
     UNCENSORED = "uncensored"
     CRACKED = "cracked"
     LEAKED = "leaked"
+    LTX = "ltx"
+    WESTERN = "western"
 
 
 class MosaicNature(StrEnum):
-    """马赛克性质: 展示口径的 有码 / 无码 / 破解 / 流出, 不落库.
-
-    比 ``Mosaic`` 多一个 ``CENSORED``: 标记是这一份文件自己的证据, 性质是标记与条目类型合成后的结果.
-    """
+    """展示口径的有码 / 无码及无码分支."""
 
     CENSORED = "censored"
     UNCENSORED = "uncensored"
     CRACKED = "cracked"
     LEAKED = "leaked"
+    LTX = "ltx"
+    WESTERN = "western"
 
 
 @dataclass(frozen=True)
 class FileInfo:
     number: str | None
     content_type: ContentType
+    number_content_type: ContentType
+    hentai: bool
     prefix: str
     cd: int | None = None
     has_subtitle_in_name: bool = False
@@ -71,20 +74,23 @@ class FileInfo:
 
 
 class FilePhase(TypedDict):
-    """MediaFile 上持久化的文件相位 (path 的投影, 不含 number/cd/类型)."""
+    """MediaFile 上持久化的文件属性 (path 的投影)."""
 
     mosaic: Mosaic | None
     has_subtitle: bool
     definition: str | None
+    number_content_type: NotRequired[ContentType]
+    hentai: NotRequired[bool]
 
 
 @dataclass(frozen=True)
 class FilePhaseSummary:
-    """条目级聚合: 有码 / 无码取条目类型并并上文件标记, 其余任一文件具备即为真, definition 取最高档."""
+    """条目级聚合: 有码 / 无码与里番按文件属性合成, 其它相位按任一文件具备聚合."""
 
     has_subtitle: bool = False
     censored: bool = False
     uncensored: bool = False
+    hentai: bool = False
     mosaics: tuple[Mosaic, ...] = ()
     definition: str | None = None
 
@@ -251,17 +257,9 @@ _ROOT_PARTS = frozenset({"/", ".", ""})
 _CD_DIR = re.compile(r"^(?:CD|PART)(\d{1,2})$", re.IGNORECASE)
 _DIR_BRACKET_STRIP = "[]【】()（）"
 
-_MOSAIC_DIR_TOKENS: dict[str, Mosaic] = {
-    k.casefold(): v
-    for k, v in (
-        ("uncensored", Mosaic.UNCENSORED),
-        ("無碼", Mosaic.UNCENSORED),
-        ("无码", Mosaic.UNCENSORED),
-        ("cracked", Mosaic.CRACKED),
-        ("破解", Mosaic.CRACKED),
-        ("leaked", Mosaic.LEAKED),
-        ("流出", Mosaic.LEAKED),
-    )
+DEFAULT_MOSAIC_RULES: dict[str, str] = {
+    "cracked": "破解,克破,CRACKED,-U,-UC",
+    "leaked": "流出,LEAKED",
 }
 MOSAIC_VALUES: tuple[Mosaic, ...] = tuple(Mosaic)
 MOSAIC_NATURE_VALUES: tuple[MosaicNature, ...] = tuple(MosaicNature)
@@ -296,11 +294,12 @@ def parse_file_info(
     text: str | None = None,
     has_external_subtitle: bool = False,
     escape_strings: list[str] | None = None,
+    mosaic_rules: Mapping[str, str] | None = None,
 ) -> FileInfo:
     """有路径则解析路径, 否则解析 ``text``. 两者至少要有一个.
 
     路径: 文件名优先, 未命中可回退父目录; 仍未命中用清理后的文件名 (不丢弃).
-    目录关键词 (欧美 / 里番 / getchu) 可覆盖类型. 分集还可认直接父目录 CD/PART.
+    父目录只识别「动漫 / 里番」属性与「欧美」类型兜底; 分集还可认直接父目录 CD/PART.
     文本: 只执行番号规则, 未命中 ``number is None`` (不能把原文当番号). 文件相位只依据该字符串
     (``Path(text).stem``, 与中字分集检测一致), 不依据目录.
 
@@ -315,24 +314,36 @@ def parse_file_info(
         p = Path(path)
         stem = p.stem
         dirs = _dir_names(p)
-        number, content_type = _identify(stem.strip(), dirs, escape, fallback=True)
-        content_type = _classify_from_path(stem, dirs) or content_type
+        number, number_content_type = _identify(stem.strip(), dirs, escape, fallback=True)
+        path_type = _classify_from_path(dirs)
+        content_type = path_type or number_content_type
+        if path_type is ContentType.WESTERN:
+            number_content_type = ContentType.WESTERN
+        hentai = _is_hentai_dir(dirs)
         basename = stem.upper()
         cd = _detect_cd(basename)
         if cd is None and dirs:
             cd = _detect_cd_from_parent(dirs[-1])
-        mosaic = _detect_mosaic(basename) or _detect_mosaic_from_dirs(dirs)
+        mosaic = _detect_mosaic(basename, mosaic_rules)
+        if number_content_type is ContentType.WESTERN:
+            mosaic = Mosaic.WESTERN
     else:
         # 文本: 只执行番号规则; 未命中则 number 为 None, 相位只依据该字符串.
         assert text is not None
         dirs = ()
-        number, content_type = _identify(text, dirs, escape, fallback=False)
+        number, number_content_type = _identify(text, dirs, escape, fallback=False)
+        content_type = number_content_type
+        hentai = False
         basename = Path(text).stem.upper()
         cd = _detect_cd(basename)
-        mosaic = _detect_mosaic(basename)
+        mosaic = _detect_mosaic(basename, mosaic_rules)
+        if number_content_type is ContentType.WESTERN:
+            mosaic = Mosaic.WESTERN
     return FileInfo(
         number=number,
         content_type=content_type,
+        number_content_type=number_content_type,
+        hentai=hentai,
         prefix=_prefix(number) if number else "",
         cd=cd,
         has_subtitle_in_name=_detect_subtitle(basename),
@@ -390,13 +401,15 @@ def is_vr(tags: Iterable[str]) -> bool:
     return any(tag.strip().casefold() in VR_TAGS for tag in tags)
 
 
-def file_phase_from_path(path: str | Path) -> FilePhase:
-    """入库相位只取路径能给出的部分: 外挂字幕命中不在路径里, 由 MediaFile 各自的列承载."""
-    info = parse_file_info(path)
+def file_phase_from_path(path: str | Path, *, mosaic_rules: Mapping[str, str] | None = None) -> FilePhase:
+    """入库属性取路径可确定部分; 外挂字幕由精确匹配单独写入."""
+    info = parse_file_info(path, mosaic_rules=mosaic_rules)
     return FilePhase(
         mosaic=info.mosaic,
         has_subtitle=info.has_subtitle_in_name,
         definition=info.definition,
+        number_content_type=info.number_content_type,
+        hentai=info.hentai,
     )
 
 
@@ -405,7 +418,7 @@ def shows_uncensored(mosaic: Mosaic | None, content_type: ContentType | None) ->
 
     ``content_type`` 为 None 时只看这一份文件 (未绑定条目的文件):
     """
-    return mosaic is Mosaic.UNCENSORED or content_type is ContentType.UNCENSORED
+    return mosaic is not None or content_type in {ContentType.UNCENSORED, ContentType.WESTERN}
 
 
 def mosaic_nature(mosaic: Mosaic | None, content_type: ContentType | None) -> MosaicNature | None:
@@ -416,6 +429,8 @@ def mosaic_nature(mosaic: Mosaic | None, content_type: ContentType | None) -> Mo
         return MosaicNature.CENSORED
     if content_type is ContentType.UNCENSORED:
         return MosaicNature.UNCENSORED
+    if content_type is ContentType.WESTERN:
+        return MosaicNature.WESTERN
     return None
 
 
@@ -437,15 +452,28 @@ def max_definition(values: Iterable[str | None]) -> str | None:
 
 
 def summarize_file_phases(phases: Iterable[FilePhase], content_type: ContentType) -> FilePhaseSummary:
-    """``content_type`` 是条目类型: 有码取类型为有码, 无码取类型为无码或任一文件带无码标记; 其余按「任一文件具备」聚合."""
+    """有码/无码和里番按文件属性聚合; 没有文件时回退条目类型."""
     items = list(phases)
     mosaic_present = {phase["mosaic"] for phase in items if phase["mosaic"] is not None}
+    if items:
+        censored = any(
+            phase.get("number_content_type", content_type) is ContentType.CENSORED and phase["mosaic"] is None
+            for phase in items
+        )
+        uncensored = any(
+            phase.get("number_content_type", content_type) in {ContentType.UNCENSORED, ContentType.WESTERN}
+            or phase["mosaic"] is not None
+            for phase in items
+        )
+    else:
+        censored = content_type is ContentType.CENSORED
+        uncensored = content_type in {ContentType.UNCENSORED, ContentType.WESTERN}
     return FilePhaseSummary(
         has_subtitle=any(phase["has_subtitle"] for phase in items),
-        censored=content_type is ContentType.CENSORED,
-        uncensored=content_type is ContentType.UNCENSORED or Mosaic.UNCENSORED in mosaic_present,
+        censored=censored,
+        uncensored=uncensored,
+        hentai=any(phase.get("hentai", False) for phase in items),
         mosaics=tuple(mosaic for mosaic in MOSAIC_VALUES if mosaic in mosaic_present),
-        # 没有任何文件时不伪造分辨率; 有文件但均未识别时默认显示 1080p.
         definition=max_definition(phase["definition"] for phase in items) if items else None,
     )
 
@@ -705,16 +733,17 @@ def _dir_names(path: Path) -> tuple[str, ...]:
     return tuple(p for p in path.parent.parts if p not in _ROOT_PARTS)
 
 
-def _classify_from_path(stem: str, dir_names: tuple[str, ...]) -> ContentType | None:
-    """getchu 整段相等; 里番/裏番/欧美必须段首, 避免 这里番号 / 非欧美."""
-    for name in (stem, *dir_names):
-        if name.lower() == "getchu":
-            return ContentType.HENTAI
-        if name.startswith(("里番", "裏番")):
-            return ContentType.HENTAI
-        if name.startswith("欧美"):
-            return ContentType.WESTERN
+def _classify_from_path(dir_names: tuple[str, ...]) -> ContentType | None:
+    """仅保留动漫/里番属性和欧美类型兜底; 其它父目录关键词不参与类型识别."""
+    if any(name.startswith("欧美") for name in dir_names):
+        return ContentType.WESTERN
+    if _is_hentai_dir(dir_names):
+        return ContentType.HENTAI
     return None
+
+
+def _is_hentai_dir(dir_names: tuple[str, ...]) -> bool:
+    return any(name.startswith(("动漫", "里番")) for name in dir_names)
 
 
 def _detect_cd(basename: str) -> int | None:
@@ -743,26 +772,29 @@ def _detect_subtitle(basename: str) -> bool:
     return bool(re.search(r"[字幕中文]", basename))
 
 
-def _detect_mosaic(basename: str) -> Mosaic | None:
-    """basename 已大写. `CRACKED` / `-U` / `-UC` / `-LTX` 是破解; 多标记优先级见 docs/dev/data-model.md."""
-    if (
-        re.search(r"破解|克破|CRACKED", basename)
-        or re.search(r"-U(C)?(?![A-Z0-9])", basename)
-        or re.search(r"-LTX(?![A-Z0-9])", basename)
-    ):
+def _detect_mosaic(basename: str, rules: Mapping[str, str] | None = None) -> Mosaic | None:
+    """按视频文件名识别; LTX 固定识别, 破解/流出关键词完全由设置决定."""
+    if re.search(r"-LTX(?![A-Z0-9])", basename, re.IGNORECASE):
+        return Mosaic.LTX
+    active = DEFAULT_MOSAIC_RULES if rules is None else rules
+
+    def matches(raw: str) -> bool:
+        for token in (part.strip() for part in raw.split(",")):
+            if not token:
+                continue
+            if token.startswith("-"):
+                if re.search(re.escape(token) + r"(?![A-Z0-9])", basename, re.IGNORECASE):
+                    return True
+            elif token.casefold() in basename.casefold():
+                return True
+        return False
+
+    if matches(active.get("cracked", "")):
         return Mosaic.CRACKED
-    if re.search(r"流出|LEAKED", basename):
+    if matches(active.get("leaked", "")):
         return Mosaic.LEAKED
-    if re.search(r"無碼|无码|UNCENSORED", basename):
+    if re.search(r"無碼|无码|UNCENSORED", basename, re.IGNORECASE):
         return Mosaic.UNCENSORED
-    return None
-
-
-def _detect_mosaic_from_dirs(dir_names: tuple[str, ...]) -> Mosaic | None:
-    for name in reversed(dir_names):
-        token = name.strip().strip(_DIR_BRACKET_STRIP).casefold()
-        if token in _MOSAIC_DIR_TOKENS:
-            return _MOSAIC_DIR_TOKENS[token]
     return None
 
 

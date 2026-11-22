@@ -72,3 +72,65 @@ class TestMappedTagFacetSearch:
         assert filtered.status_code == 200
         assert filtered.json()["total"] == 3
         assert {item["number"] for item in filtered.json()["items"]} == {"MAP-001", "MAP-002", "MAP-003"}
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_typed_mapping_api_uses_one_export_with_distinct_ownership(
+    client: AsyncClient, app: FastAPI, repo: Repository
+) -> None:
+    await repo.upsert_metadata(
+        number="MAP-TYPE-001",
+        tags=["Same"],
+        studio="Same",
+        publisher="Same",
+        series_names=["Same"],
+    )
+    store = app.state.runtime.tag_mappings
+    store.upsert("Same", "中文标签", "tag")
+    store.upsert("Same", "中文制作商", "maker")
+    store.upsert("Same", "中文发行商", "publisher")
+    store.upsert("Same", "中文系列", "series")
+
+    for kind, translation in (
+        ("tag", "中文标签"),
+        ("maker", "中文制作商"),
+        ("publisher", "中文发行商"),
+        ("series", "中文系列"),
+    ):
+        response = await client.get(f"tag-mappings?type={kind}&status=mapped")
+        assert response.status_code == 200
+        item = next(item for item in response.json()["items"] if item["original"] == "Same")
+        assert item["type"] == kind
+        assert item["translation"] == translation
+
+    exported = await client.get("tag-mappings/export")
+    assert exported.status_code == 200
+    entries = exported.json()["entries"]
+    assert {
+        (item["original"], item["type"], item["translation"])
+        for item in entries
+    } == {
+        ("Same", "tag", "中文标签"),
+        ("Same", "maker", "中文制作商"),
+        ("Same", "publisher", "中文发行商"),
+        ("Same", "series", "中文系列"),
+    }
+
+    imported = await client.post(
+        "tag-mappings/import",
+        json={
+            "version": 2,
+            "entries": [
+                {"original": "Other", "translation": "其他制作商", "type": "maker"},
+                {"original": "Other", "translation": "其他系列", "type": "series"},
+            ],
+        },
+    )
+    assert imported.status_code == 200
+    assert imported.json() == {"imported": 2}
+
+    invalid = await client.post(
+        "tag-mappings/import",
+        json={"version": 2, "entries": [{"original": "Bad", "translation": "错误", "type": "unknown"}]},
+    )
+    assert invalid.status_code == 400

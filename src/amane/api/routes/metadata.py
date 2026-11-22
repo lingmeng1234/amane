@@ -87,6 +87,7 @@ def _file_phase_resp(summary: ParsedFilePhase) -> FilePhaseSummary:
         has_subtitle=summary.has_subtitle,
         censored=summary.censored,
         uncensored=summary.uncensored,
+        hentai=summary.hentai,
         mosaics=list(summary.mosaics),
         definition=summary.definition,
     )

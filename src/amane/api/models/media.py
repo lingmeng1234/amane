@@ -21,6 +21,7 @@ class MediaFileResponse(BaseModel):
     mosaic: Mosaic | None = None
     censored: bool = False
     uncensored: bool = False
+    hentai: bool = False
     has_subtitle: bool = False
     definition: str | None = None
     metadata_id: int | None = None
@@ -37,8 +38,9 @@ def to_media_file_response(media: MediaFile, content_type: ContentType | None = 
     response = to_resp(MediaFileResponse, media)
     return response.model_copy(
         update={
-            "censored": mosaic_nature(media.mosaic, content_type) is MosaicNature.CENSORED,
-            "uncensored": shows_uncensored(media.mosaic, content_type),
+            "censored": mosaic_nature(media.mosaic, media.number_content_type) is MosaicNature.CENSORED,
+            "uncensored": shows_uncensored(media.mosaic, media.number_content_type),
+            "hentai": media.hentai,
         }
     )
 

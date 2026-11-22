@@ -24,6 +24,8 @@ def _apply_path_phase(media: MediaFile) -> None:
     """
     phase = file_phase_from_path(media.path)
     media.mosaic = phase["mosaic"]
+    media.number_content_type = phase["number_content_type"]
+    media.hentai = phase["hentai"]
     media.has_subtitle_in_name = phase["has_subtitle"]
     media.definition = phase["definition"]
 
@@ -34,6 +36,8 @@ def file_phase_of(media: MediaFile) -> FilePhase:
         mosaic=media.mosaic,
         has_subtitle=media.has_subtitle,
         definition=media.definition,
+        number_content_type=media.number_content_type,
+        hentai=media.hentai,
     )
 
 
@@ -232,6 +236,16 @@ class MediaRepoMixin(RepositoryMixinBase):
             media.status = updates["status"]
         if "metadata_id" in updates:
             media.metadata_id = updates["metadata_id"]
+        if "mosaic" in updates:
+            media.mosaic = updates["mosaic"]
+        if "number_content_type" in updates:
+            media.number_content_type = updates["number_content_type"]
+        if "hentai" in updates:
+            media.hentai = updates["hentai"]
+        if "has_subtitle_in_name" in updates:
+            media.has_subtitle_in_name = updates["has_subtitle_in_name"]
+        if "definition" in updates:
+            media.definition = updates["definition"]
         if "has_external_subtitle" in updates:
             media.has_external_subtitle = updates["has_external_subtitle"]
         media.updated_at = _utcnow()

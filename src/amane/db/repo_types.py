@@ -118,7 +118,11 @@ def _media_file_uncensored_predicate() -> ColumnElement[bool]:
     entry_uncensored = exists().where(
         col(Metadata.id) == col(MediaFile.metadata_id), col(Metadata.content_type) == ContentType.UNCENSORED
     )
-    return or_(col(MediaFile.mosaic).is_(Mosaic.UNCENSORED), entry_uncensored)
+    return or_(
+        col(MediaFile.mosaic).is_not(None),
+        col(MediaFile.number_content_type).in_((ContentType.UNCENSORED, ContentType.WESTERN)),
+        entry_uncensored,
+    )
 
 
 def _apply_media_phase_filters(
@@ -153,8 +157,11 @@ def _metadata_linked_file_exists(*extra: ColumnElement[bool]) -> ColumnElement[b
 def _metadata_uncensored_predicate() -> ColumnElement[bool]:
     """条目无码: 类型为无码, 或存在带无码标记的文件. 没有挂载文件也成立."""
     return or_(
-        col(Metadata.content_type) == ContentType.UNCENSORED,
-        _metadata_linked_file_exists(col(MediaFile.mosaic) == Mosaic.UNCENSORED),
+        col(Metadata.content_type).in_((ContentType.UNCENSORED, ContentType.WESTERN)),
+        _metadata_linked_file_exists(col(MediaFile.mosaic).is_not(None)),
+        _metadata_linked_file_exists(
+            col(MediaFile.number_content_type).in_((ContentType.UNCENSORED, ContentType.WESTERN))
+        ),
     )
 
 
@@ -315,6 +322,11 @@ class MediaFileUpdates(TypedDict, total=False):
     codec: str | None
     status: MediaFileStatus
     metadata_id: int | None
+    mosaic: Mosaic | None
+    number_content_type: ContentType
+    hentai: bool
+    has_subtitle_in_name: bool
+    definition: str | None
     has_external_subtitle: bool
 
 

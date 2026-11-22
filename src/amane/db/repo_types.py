@@ -195,6 +195,7 @@ class ActorBrowseItem(BaseModel):
     gender: ActorGender = ActorGender.UNKNOWN
     birthday: str | None = None
     birthplace: str | None = None
+    blood_type: str | None = None
     height: int | None = None
     bust: int | None = None
     waist: int | None = None
@@ -405,6 +406,7 @@ class ActorPersonFields(TypedDict, total=False):
     gender: ActorGender
     birthday: str | None
     birthplace: str | None
+    blood_type: str | None
     height: int | None
     bust: int | None
     waist: int | None

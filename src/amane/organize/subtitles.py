@@ -45,7 +45,7 @@ def discover_subtitles(
             continue
         if child.suffix.lower() not in exts:
             continue
-        if _belongs(video, parse_file_info(text=child.name)):
+        if _belongs(video, parse_file_info(text=child.name), metadata_number):
             found.append(child)
     found.sort(key=lambda p: p.name.casefold())
     return found

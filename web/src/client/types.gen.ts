@@ -2617,6 +2617,10 @@ export type MappingSelection = {
      * Originals
      */
     originals: Array<string>;
+    /**
+     * Type
+     */
+    type?: 'tag' | 'maker' | 'publisher' | 'series';
 };
 
 /**
@@ -2641,6 +2645,10 @@ export type MappingUpdate = {
      * Translation
      */
     translation?: string | null;
+    /**
+     * Type
+     */
+    type?: 'tag' | 'maker' | 'publisher' | 'series';
 };
 
 /**
@@ -3366,9 +3374,29 @@ export type MetadataUserTagsResponse = {
 /**
  * Mosaic
  *
- * 马赛克标记; 有码是条目类型, 不在此列.
+ * 无码分支标记; 有码由 number_content_type 表示.
  */
 export type Mosaic = 'uncensored' | 'cracked' | 'leaked' | 'ltx' | 'western';
+
+/**
+ * MosaicRulesConfig
+ *
+ * 视频文件名中的破解/流出识别词; 保存内容完全替代默认值.
+ */
+export type MosaicRulesConfig = {
+    /**
+     * 破解
+     *
+     * 英文逗号分隔; 留空表示关闭此类关键词
+     */
+    cracked?: string;
+    /**
+     * 流出
+     *
+     * 英文逗号分隔; 留空表示关闭此类关键词
+     */
+    leaked?: string;
+};
 
 /**
  * MoveMode
@@ -3459,22 +3487,45 @@ export type NfoBasicInfoConfig = {
  *
  * NFO 分类与系列输出选项.
  */
-export type NfoCategorySourcesConfig = {
-    cover_attributes?: boolean;
-    tags?: boolean;
-    studio?: boolean;
-    publisher?: boolean;
+export type NfoCategoriesConfig = {
+    /**
+     * 分类
+     */
+    genre?: NfoCategorySourcesConfig;
+    /**
+     * 类型
+     */
+    tag?: NfoCategorySourcesConfig;
+    /**
+     * Series
+     *
+     * 系列
+     */
+    series?: boolean;
 };
 
 /**
- * NfoCategoriesConfig
+ * NfoCategorySourcesConfig
  *
- * NFO 分类与系列输出选项.
+ * Genre 或 Tag 各自可选的数据来源.
  */
-export type NfoCategoriesConfig = {
-    genre?: NfoCategorySourcesConfig;
-    tag?: NfoCategorySourcesConfig;
-    series?: boolean;
+export type NfoCategorySourcesConfig = {
+    /**
+     * 封面属性
+     */
+    cover_attributes?: boolean;
+    /**
+     * 原有标签
+     */
+    tags?: boolean;
+    /**
+     * 制作商
+     */
+    studio?: boolean;
+    /**
+     * 发行商
+     */
+    publisher?: boolean;
 };
 
 /**
@@ -4785,14 +4836,6 @@ export type ScrapeSubmission = {
 /**
  * ScrapingConfig
  */
-export type MosaicRulesConfig = {
-    cracked?: string;
-    leaked?: string;
-};
-
-/**
- * ScrapingConfig
- */
 export type ScrapingConfig = {
     /**
      * Download Resources
@@ -4838,6 +4881,9 @@ export type ScrapingConfig = {
      * 通用番号映射规则; 每行格式为完整匹配正则表达式 => 替换表达式, 仅自动非欧美非无码流媒体刮削使用.
      */
     number_mapping_rules?: Array<string>;
+    /**
+     * 无码识别规则词
+     */
     mosaic_rules?: MosaicRulesConfig;
     /**
      * Field Priority
@@ -5409,6 +5455,10 @@ export type SuggestRequest = {
      * Originals
      */
     originals: Array<string>;
+    /**
+     * Type
+     */
+    type?: 'tag' | 'maker' | 'publisher' | 'series';
 };
 
 /**
@@ -7054,13 +7104,13 @@ export type ListMetadataData = {
         /**
          * Has Subtitle
          *
-         * Filter by linked file subtitle marker
+         * Filter by linked file Chinese-subtitle marker
          */
         has_subtitle?: boolean | null;
         /**
          * Hentai
          *
-         * Filter by linked file hentai directory attribute
+         * Filter by hentai directory attribute
          */
         hentai?: boolean | null;
         /**
@@ -8736,6 +8786,37 @@ export type BatchFacetsResponses = {
 
 export type BatchFacetsResponse = BatchFacetsResponses[keyof BatchFacetsResponses];
 
+export type DeleteEmptyFacetsData = {
+    body?: never;
+    path: {
+        kind: FacetKind;
+    };
+    query?: never;
+    url: '/api/facets/{kind}/empty';
+};
+
+export type DeleteEmptyFacetsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteEmptyFacetsError = DeleteEmptyFacetsErrors[keyof DeleteEmptyFacetsErrors];
+
+export type DeleteEmptyFacetsResponses = {
+    /**
+     * Response Delete Empty Facets
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: number;
+    };
+};
+
+export type DeleteEmptyFacetsResponse = DeleteEmptyFacetsResponses[keyof DeleteEmptyFacetsResponses];
+
 export type DeleteFacetData = {
     body?: never;
     path: {
@@ -9928,6 +10009,10 @@ export type ListMappingsData = {
          */
         search?: string;
         /**
+         * Type
+         */
+        type?: 'tag' | 'maker' | 'publisher' | 'series';
+        /**
          * Offset
          */
         offset?: number;
@@ -10023,7 +10108,12 @@ export type ArchiveMappingData = {
          */
         original: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Type
+         */
+        type?: 'tag' | 'maker' | 'publisher' | 'series';
+    };
     url: '/api/tag-mappings/{original}/archive';
 };
 
@@ -10051,7 +10141,12 @@ export type RestoreMappingData = {
          */
         original: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Type
+         */
+        type?: 'tag' | 'maker' | 'publisher' | 'series';
+    };
     url: '/api/tag-mappings/{original}/restore';
 };
 

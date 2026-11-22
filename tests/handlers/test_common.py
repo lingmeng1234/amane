@@ -332,6 +332,7 @@ class TestExternalSubtitle:
         (tmp_path / "MIDV-001.chs.srt").touch()
         library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
         assert library.id is not None
+        await repo.upsert_metadata("MIDV-001")
 
         media = await register_media_file(repo, library.id, tmp_path / "MIDV-001.mp4", library=library)
         assert media is not None
@@ -342,6 +343,36 @@ class TestExternalSubtitle:
         stored = await repo.get_media_file(media.id)
         assert stored is not None
         assert stored.has_external_subtitle is True
+
+
+    @pytest.mark.asyncio
+    async def test_register_media_file_requires_matching_metadata(self, repo: Repository, tmp_path: Path):
+        video = tmp_path / "MIDV-005.mp4"
+        video.touch()
+        (tmp_path / "MIDV-005.srt").touch()
+        library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
+        assert library.id is not None
+
+        media = await register_media_file(repo, library.id, video, library=library)
+
+        assert media is not None
+        assert media.has_external_subtitle is False
+        assert media.has_subtitle is False
+
+    @pytest.mark.asyncio
+    async def test_directory_subtitle_for_another_number_is_not_shared(self, repo: Repository, tmp_path: Path):
+        video = tmp_path / "MIDV-006.mp4"
+        video.touch()
+        (tmp_path / "SSIS-001.srt").touch()
+        library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
+        assert library.id is not None
+        await repo.upsert_metadata("MIDV-006")
+
+        media = await register_media_file(repo, library.id, video, library=library)
+
+        assert media is not None
+        assert media.has_external_subtitle is False
+        assert media.has_subtitle is False
 
     @pytest.mark.asyncio
     async def test_register_media_file_without_library_leaves_flag(self, repo: Repository, tmp_path: Path):
@@ -360,6 +391,7 @@ class TestExternalSubtitle:
         subtitle.touch()
         library = await repo.create_library(name="t", path=str(tmp_path), subtitle_extensions=[".srt"])
         assert library.id is not None
+        await repo.upsert_metadata("MIDV-003")
 
         media = await register_media_file(repo, library.id, video, library=library)
         assert media is not None

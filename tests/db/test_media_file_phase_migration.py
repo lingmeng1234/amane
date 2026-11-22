@@ -96,12 +96,12 @@ def test_media_file_phase_columns_backfill_from_path(tmp_path: Path) -> None:
         }
         assert loaded["/media/MIDV-123-UC-4K.mp4"].mosaic is Mosaic.CRACKED
         assert loaded["/media/HEYZO-1234.mp4"].mosaic is None
-        assert loaded["/media/HEYZO-1234.mp4"].number_content_type is ContentType.WESTERN
+        assert loaded["/media/HEYZO-1234.mp4"].number_content_type is ContentType.UNCENSORED
         assert loaded["/media/ABC-123-LTX.mp4"].mosaic is Mosaic.LTX
         assert loaded["/media/动漫/MIDV-124.mp4"].hentai is True
         assert loaded["/media/动漫/MIDV-124.mp4"].number_content_type is ContentType.CENSORED
-        assert loaded["/media/欧美/MIDV-125-4K-无码.mp4"].number_content_type is ContentType.WESTERN
-        assert loaded["/media/欧美/MIDV-125-4K-无码.mp4"].mosaic is None
+        assert loaded["/media/欧美/MIDV-125-4K-无码.mp4"].number_content_type is ContentType.CENSORED
+        assert loaded["/media/欧美/MIDV-125-4K-无码.mp4"].mosaic is Mosaic.UNCENSORED
 
     engine.dispose()
 
@@ -138,7 +138,7 @@ def test_media_file_mosaic_type_fill_cleared(tmp_path: Path) -> None:
 
     assert _file_phase(engine) == {
         "/media/HEYZO-1234.mp4": (None, False, None),
-        "/media/HEYZO-1234-流出.mp4": (None, False, None),
+        "/media/HEYZO-1234-流出.mp4": ("LEAKED", False, None),
         "/media/MIDV-123.mp4": (None, False, None),
         "/media/MIDV-123-无码.mp4": ("UNCENSORED", False, None),
         "/media/MD0165-1.mp4": (None, False, None),

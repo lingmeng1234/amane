@@ -198,4 +198,3 @@ def test_subtitle_stays_in_place_when_metadata_number_does_not_match(tmp_path: P
 
     assert moved == []
     assert subtitle.exists()
-

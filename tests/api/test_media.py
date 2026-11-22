@@ -78,6 +78,21 @@ class TestMediaHttp:
         assert mixed_response.json()["mosaic"] == "western"
         assert mixed_response.json()["hentai"] is True
 
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_hentai_media_filter(self, client: AsyncClient, repo: Repository):
+        hentai = await repo.create_media_file(library_id=1, path="/v/动漫/MIDV-010.mp4")
+        normal = await repo.create_media_file(library_id=1, path="/v/MIDV-011.mp4")
+        assert hentai.id is not None and normal.id is not None
+
+        included = await client.get("media?hentai=true")
+        assert included.status_code == 200
+        assert {row["id"] for row in included.json()["items"]} == {hentai.id}
+
+        excluded = await client.get("media?hentai=false")
+        assert excluded.status_code == 200
+        assert {row["id"] for row in excluded.json()["items"]} == {normal.id}
+
     @pytest.mark.asyncio(loop_scope="function")
     async def test_phase_derived_from_entry_type(self, client: AsyncClient, repo: Repository):
         """文件行的有码 / 无码按条目类型派生; 未绑定条目的文件只看自身标记."""

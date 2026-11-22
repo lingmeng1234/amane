@@ -4,7 +4,7 @@ Revision ID: 6940e4cf8a80
 Revises: 9054ebacea29
 Create Date: 2026-11-02 22:33:38.389631
 
-文件名 `-LTX` 是破解. 按当前 parse_file_info 重算这类行的马赛克标记; 谓词只看文件名,
+文件名 `-LTX` 独立归类为 LTX 分支. 按当前 parse_file_info 重算这类行的马赛克标记; 谓词只看文件名,
 其它行保持原值.
 """
 

@@ -210,7 +210,11 @@ async def write_nfo(
             else:
                 assert file_info is not None
                 uncensored = shows_uncensored(file_info.mosaic, file_info.number_content_type)
-                mosaics = (file_info.mosaic,) if file_info.mosaic is not None else ()
+                mosaics = (
+                    (file_info.mosaic,)
+                    if file_info.mosaic is not None
+                    else ((Mosaic.WESTERN,) if file_info.number_content_type is ContentType.WESTERN else ())
+                )
                 hentai = file_info.hentai
                 definition = file_info.definition
                 has_subtitle = file_info.has_subtitle

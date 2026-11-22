@@ -270,7 +270,7 @@ class TestMediaFileRepo:
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_list_media_files_uncensored_joins_entry_type(self, repo: Repository):
-        """无码按所属条目的类型判定, 与这一份文件有没有标记无关; 未绑定条目的文件只看自身标记."""
+        """无码包含所属条目类型、WESTERN 类型或本文件的无码标记; 未绑定条目也按自身识别结果判定."""
         uncensored_entry = await repo.upsert_metadata(number="HEYZO-1234")
         censored_entry = await repo.upsert_metadata(number="MIDV-123")
         assert uncensored_entry.id is not None and censored_entry.id is not None
@@ -291,8 +291,14 @@ class TestMediaFileRepo:
 
         yes = paths(await repo.list_media_files(uncensored=True, limit=None))
         no = paths(await repo.list_media_files(uncensored=False, limit=None))
-        assert yes == {"/v/HEYZO-1234.mp4", "/v/HEYZO-1235-U.mp4", "/v/MIDV-124-无码.mp4", "/v/PLAIN-1-无码.mp4"}
-        assert no == {"/v/MIDV-123.mp4", "/v/PLAIN-2.mp4"}
+        assert yes == {
+            "/v/HEYZO-1234.mp4",
+            "/v/HEYZO-1235-U.mp4",
+            "/v/MIDV-124-无码.mp4",
+            "/v/PLAIN-1-无码.mp4",
+            "/v/PLAIN-2.mp4",
+        }
+        assert no == {"/v/MIDV-123.mp4"}
         # 两侧互补: 没有一行同时落空 (mosaic 为空的行尤其容易被 NULL 语义漏掉)
         assert yes | no == paths(await repo.list_media_files(limit=None))
         assert yes & no == set()
@@ -1225,10 +1231,10 @@ class TestMetadataRepo:
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_list_metadata_file_phase_filters(self, repo: Repository):
-        sub = await repo.upsert_metadata(number="SUB-1")
-        marked = await repo.upsert_metadata(number="MIDV-002")
-        uncensored = await repo.upsert_metadata(number="HEYZO-1234")
-        plain = await repo.upsert_metadata(number="PLAIN-1")
+        sub = await repo.upsert_metadata(number="SUB-1", content_type=ContentType.CENSORED)
+        marked = await repo.upsert_metadata(number="MIDV-002", content_type=ContentType.CENSORED)
+        uncensored = await repo.upsert_metadata(number="HEYZO-1234", content_type=ContentType.UNCENSORED)
+        plain = await repo.upsert_metadata(number="PLAIN-1", content_type=ContentType.CENSORED)
         assert sub.id and marked.id and uncensored.id and plain.id
 
         m_sub = await repo.create_media_file(library_id=1, path="/v/MIDV-001-C.mp4")

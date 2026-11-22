@@ -160,7 +160,13 @@ CASES: list[object] = [
     # 里番目录用于路由; 欧美目录只在番号无法识别时兜底.
     _Case("/media/欧美/HEYZO-123.mp4", number="HEYZO-123", content_type=ContentType.UNCENSORED),
     _Case("/media/欧美/Unknown Movie.mp4", content_type=ContentType.WESTERN),
-    _Case("/media/里番/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.HENTAI, number_content_type=ContentType.CENSORED, hentai=True),
+    _Case(
+        "/media/里番/MIDV-123.mp4",
+        number="MIDV-123",
+        content_type=ContentType.HENTAI,
+        number_content_type=ContentType.CENSORED,
+        hentai=True,
+    ),
     # 无路径关键词: 按番号
     _Case("/media/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     _Case("/media/SSIS-456.mp4", number="SSIS-456", content_type=ContentType.CENSORED),

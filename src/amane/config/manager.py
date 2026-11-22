@@ -383,7 +383,9 @@ class SiteConfig(BaseModel):
 class MosaicRulesConfig(BaseModel):
     """视频文件名中的破解/流出识别词; 保存内容完全替代默认值."""
 
-    cracked: str = Field(default="破解,克破,CRACKED,-U,-UC", title="破解", description="英文逗号分隔; 留空表示关闭此类关键词")
+    cracked: str = Field(
+        default="破解,克破,CRACKED,-U,-UC", title="破解", description="英文逗号分隔; 留空表示关闭此类关键词"
+    )
     leaked: str = Field(default="流出,LEAKED", title="流出", description="英文逗号分隔; 留空表示关闭此类关键词")
 
     @model_validator(mode="after")

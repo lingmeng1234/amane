@@ -74,7 +74,9 @@ class TagMappingStore:
             stored = raw.get("entries", {})
             if isinstance(stored, dict):
                 # v1 词典只有标签; 旧记录全部按 tag 读取, 不改变既有映射.
-                records = [(key, value, value.get("type", "tag")) for key, value in stored.items() if isinstance(value, dict)]
+                records = [
+                    (key, value, value.get("type", "tag")) for key, value in stored.items() if isinstance(value, dict)
+                ]
             elif isinstance(stored, list):
                 records = [
                     (value.get("original"), value, value.get("type"))

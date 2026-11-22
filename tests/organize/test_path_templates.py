@@ -56,7 +56,6 @@ def _meta(**kwargs) -> Metadata:
     """
     defaults = {
         "number": "ABC-123",
-        "content_type": ContentType.CENSORED,
         "title": "Test Title",
         "actors": ["Actor1", "Actor2"],
         "studio": "StudioX",

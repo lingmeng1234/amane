@@ -25,6 +25,8 @@ class _Case(NamedTuple):
     definition: str | None = None
     number: str | None = None
     content_type: ContentType | None = None
+    number_content_type: ContentType | None = None
+    hentai: bool = False
 
 
 CASES: list[object] = [
@@ -138,10 +140,10 @@ CASES: list[object] = [
     # 字幕反例: -CD / -CS 不是 -C
     _Case("MIDV-123-CS.mp4", number="MIDV-123"),
     # --- 完整路径: 目录关键词决定内容类型 ---
-    _Case("/media/里番/something-123.mp4", content_type=ContentType.HENTAI),
-    _Case("/media/裏番/something-123.mp4", content_type=ContentType.HENTAI),
-    _Case("/media/getchu/item-123.mp4", content_type=ContentType.HENTAI),
-    _Case("/media/GETCHU/item-123.mp4", content_type=ContentType.HENTAI),
+    _Case("/media/里番/something-123.mp4", content_type=ContentType.HENTAI, hentai=True),
+    _Case("/media/裏番/something-123.mp4"),
+    _Case("/media/getchu/item-123.mp4"),
+    _Case("/media/GETCHU/item-123.mp4"),
     _Case("/media/欧美/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.WESTERN),
     _Case("/mnt/nas/library/欧美/2024/studio/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.WESTERN),
     # 东欧美 不含「欧美」单独命中
@@ -151,13 +153,13 @@ CASES: list[object] = [
     _Case("/media/getchu-docs/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     _Case("/media/my-getchu/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     # 里番/欧美须在段首; 嵌在其它词里不算
-    _Case("/media/里番合集/something-123.mp4", content_type=ContentType.HENTAI),
+    _Case("/media/里番合集/something-123.mp4", content_type=ContentType.HENTAI, hentai=True),
     _Case("/media/欧美片商/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.WESTERN),
     _Case("/media/非欧美/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     _Case("/media/这里番号/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     # 路径关键词优先于番号分类
     _Case("/media/欧美/HEYZO-123.mp4", number="HEYZO-123", content_type=ContentType.WESTERN),
-    _Case("/media/里番/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.HENTAI),
+    _Case("/media/里番/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.HENTAI, number_content_type=ContentType.CENSORED, hentai=True),
     # 无路径关键词: 按番号
     _Case("/media/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
     _Case("/media/SSIS-456.mp4", number="SSIS-456", content_type=ContentType.CENSORED),
@@ -213,31 +215,31 @@ CASES: list[object] = [
     # --- 完整路径: 马赛克可从目录名整段补; 分辨率仍只看文件名 ---
     _Case(
         "/media/uncensored/4K/MIDV-123.mp4",
-        mosaic="uncensored",
+        mosaic=None,
         number="MIDV-123",
         content_type=ContentType.CENSORED,
     ),
     _Case(
         "/media/cracked/1080p/ABC-123.mp4",
-        mosaic="cracked",
+        mosaic=None,
         number="ABC-123",
         content_type=ContentType.CENSORED,
     ),
     _Case("/library/censored/HD/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
-    _Case("/media/Uncensored/MIDV-123.mp4", mosaic="uncensored", number="MIDV-123"),
-    _Case("/media/无码/MIDV-123.mp4", mosaic="uncensored", number="MIDV-123"),
-    _Case("/media/無碼/MIDV-123.mp4", mosaic="uncensored", number="MIDV-123"),
-    _Case("/media/LEAKED/MIDV-123.mp4", mosaic="leaked", number="MIDV-123"),
-    _Case("/media/破解/MIDV-123.mp4", mosaic="cracked", number="MIDV-123"),
-    _Case("/media/流出/MIDV-123.mp4", mosaic="leaked", number="MIDV-123"),
-    _Case("/media/[无码]/MIDV-123.mp4", mosaic="uncensored", number="MIDV-123"),
-    _Case("/media/【破解】/MIDV-123.mp4", mosaic="cracked", number="MIDV-123"),
+    _Case("/media/Uncensored/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/无码/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/無碼/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/LEAKED/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/破解/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/流出/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/[无码]/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/【破解】/MIDV-123.mp4", number="MIDV-123"),
     # 文件名优先于目录
     _Case("/media/cracked/MIDV-123-无码.mp4", mosaic="uncensored", number="MIDV-123"),
     _Case("/media/uncensored/MIDV-123-LEAKED.mp4", mosaic="leaked", number="MIDV-123"),
     # 近目录优先
-    _Case("/media/uncensored/流出/MIDV-123.mp4", mosaic="leaked", number="MIDV-123"),
-    _Case("/media/流出/uncensored/MIDV-123.mp4", mosaic="uncensored", number="MIDV-123"),
+    _Case("/media/uncensored/流出/MIDV-123.mp4", number="MIDV-123"),
+    _Case("/media/流出/uncensored/MIDV-123.mp4", number="MIDV-123"),
     # 马赛克目录反例: 子串 / 复合名 / 非词表 / -UC 当目录
     _Case("/media/uncensored-guide/MIDV-123.mp4", number="MIDV-123"),
     _Case("/media/JAV-uncensored/MIDV-123.mp4", number="MIDV-123"),
@@ -305,7 +307,7 @@ CASES: list[object] = [
         number="MIDV-123",
         content_type=ContentType.WESTERN,
     ),
-    _Case("/media/里番/foo-123-CD2.mp4", cd=2, content_type=ContentType.HENTAI),
+    _Case("/media/里番/foo-123-CD2.mp4", cd=2, content_type=ContentType.HENTAI, hentai=True),
     _Case(
         "/vol/data/library/sub/[破解]MIDV-123.1080p.mp4",
         mosaic="cracked",
@@ -363,6 +365,9 @@ def test_parse_file_info(case: _Case) -> None:
         assert info.number == case.number
     if case.content_type is not None:
         assert info.content_type == case.content_type
+    if case.number_content_type is not None:
+        assert info.number_content_type == case.number_content_type
+    assert info.hentai is case.hentai
 
 
 # --- 无路径: 同一 parse_file_info 的字段包装 ---
@@ -596,6 +601,35 @@ def test_mosaic_canonical_filename_roundtrip(source: str, canonical: str) -> Non
     assert again.mosaic == canonical
 
 
+
+@pytest.mark.parametrize(
+    ("filename", "rules", "expected"),
+    [
+        ("ABC-123-special.mp4", {"cracked": "special", "leaked": ""}, "cracked"),
+        ("ABC-123-leak.mp4", {"cracked": "", "leaked": "leak"}, "leaked"),
+        ("ABC-123-U.mp4", {"cracked": "", "leaked": ""}, None),
+        ("ABC-123-LTX.mp4", {"cracked": "", "leaked": ""}, "ltx"),
+    ],
+)
+def test_custom_mosaic_rules_replace_defaults(filename: str, rules: dict[str, str], expected: str | None) -> None:
+    assert parse_file_info(filename, mosaic_rules=rules).mosaic == expected
+
+
+def test_hentai_is_independent_from_number_content_type() -> None:
+    info = parse_file_info("/media/动漫/MIDV-123.mp4")
+    assert info.content_type is ContentType.HENTAI
+    assert info.number_content_type is ContentType.CENSORED
+    assert info.hentai is True
+
+
+def test_other_parent_type_keywords_are_ignored() -> None:
+    for folder in ("getchu", "裏番", "uncensored", "cracked", "leaked", "破解", "流出"):
+        info = parse_file_info(f"/media/{folder}/MIDV-123.mp4")
+        assert info.hentai is False
+        assert info.mosaic is None
+        assert info.content_type is ContentType.CENSORED
+
+
 VR_CASES: list[tuple[list[str], bool]] = [
     ([], False),
     (["単体作品", "ハイビジョン", "中出し"], False),
@@ -692,8 +726,8 @@ def test_uncensored_bd_series_do_not_match_longer_unrelated_prefixes() -> None:
         "ABC-123-LTX-U.mp4",
     ],
 )
-def test_ltx_marker_is_cracked(filename: str) -> None:
-    assert parse_file_info(filename).mosaic == "cracked"
+def test_ltx_marker_has_its_own_branch(filename: str) -> None:
+    assert parse_file_info(filename).mosaic == "ltx"
 
 
 @pytest.mark.parametrize(
@@ -704,4 +738,4 @@ def test_ltx_marker_is_cracked(filename: str) -> None:
     ],
 )
 def test_ltx_marker_requires_token_boundary(filename: str) -> None:
-    assert parse_file_info(filename).mosaic != "cracked"
+    assert parse_file_info(filename).mosaic is None

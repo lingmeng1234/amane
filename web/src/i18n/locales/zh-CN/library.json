@@ -150,6 +150,8 @@
   },
   "fieldVideoTemplate": "视频命名模板",
   "fieldVideoTemplateHint": "设置整理后视频的目录结构和文件命名规则",
+  "videoTemplateWarningTitle": "⚠️ 视频命名模板使用提醒",
+  "videoTemplateWarning": "不建议使用通用规则作为视频命名模板进行批量整理，因为这类规则可能无法保留源文件名中的 LTX 等马赛克标记。若希望整理后的文件名继续保留这些标记，建议直接使用 {raw_name}，以源视频文件名作为整理名。",
   "fieldLinkTemplate": "链路命名模板",
   "fieldLinkTemplateHint": "设置硬链接、符号链接或 STRM 的目录结构和命名规则",
   "fieldLinkTemplatePlaceholder": "例如 /local/emby/{studio}/{number}/{number}.{ext}",

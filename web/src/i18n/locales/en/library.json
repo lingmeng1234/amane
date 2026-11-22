@@ -152,6 +152,8 @@
   },
   "fieldVideoTemplate": "Video naming template",
   "fieldVideoTemplateHint": "Directory structure and file naming rules for organized videos",
+  "videoTemplateWarningTitle": "⚠️ Video naming template reminder",
+  "videoTemplateWarning": "Avoid using generic rules for bulk video organization: they may not preserve mosaic markers such as LTX from the source filename. If you want to keep these markers in organized filenames, use {raw_name} so the original video filename is retained.",
   "fieldLinkTemplate": "Link naming template",
   "fieldLinkTemplateHint": "Directory structure and naming rules for hard links, symlinks, or STRM files",
   "fieldLinkTemplatePlaceholder": "e.g. /local/emby/{studio}/{number}/{number}.{ext}",

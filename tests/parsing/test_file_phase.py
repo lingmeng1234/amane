@@ -90,12 +90,14 @@ def test_max_definition(values: tuple[str | None, ...], expected: str | None) ->
 def test_summarize_file_phases_or_across_files() -> None:
     cracked: FilePhase = {"mosaic": Mosaic.CRACKED, "has_subtitle": True, "definition": "1080p"}
     leaked: FilePhase = {"mosaic": Mosaic.LEAKED, "has_subtitle": False, "definition": "4K"}
-    summary = summarize_file_phases((cracked, leaked), ContentType.CENSORED)
+    ltx: FilePhase = {"mosaic": Mosaic.LTX, "has_subtitle": False, "definition": "8K"}
+    western: FilePhase = {"mosaic": Mosaic.WESTERN, "has_subtitle": False, "definition": "720p"}
+    summary = summarize_file_phases((cracked, leaked, ltx, western), ContentType.CENSORED)
     assert summary.censored is False
     assert summary.uncensored is True
     assert summary.has_subtitle is True
-    assert summary.mosaics == (Mosaic.CRACKED, Mosaic.LEAKED)
-    assert summary.definition == "4K"
+    assert summary.mosaics == (Mosaic.CRACKED, Mosaic.LEAKED, Mosaic.LTX, Mosaic.WESTERN)
+    assert summary.definition == "8K"
 
 
 @pytest.mark.parametrize(

@@ -440,6 +440,18 @@ async def test_write_nfo_uses_aggregated_resource_phases(tmp_path: Path):
             "definition": "720p",
             "number_content_type": ContentType.CENSORED,
         },
+        {
+            "mosaic": Mosaic.LTX,
+            "has_subtitle": False,
+            "definition": "8K",
+            "number_content_type": ContentType.CENSORED,
+        },
+        {
+            "mosaic": Mosaic.WESTERN,
+            "has_subtitle": False,
+            "definition": "1080p",
+            "number_content_type": ContentType.CENSORED,
+        },
     )
     summary = summarize_file_phases(phases, ContentType.CENSORED)
     output = NfoOutputConfig.model_validate(
@@ -464,7 +476,7 @@ async def test_write_nfo_uses_aggregated_resource_phases(tmp_path: Path):
     )
 
     root = ET.parse(nfo_path).getroot()
-    assert [node.text for node in root.findall("genre")] == ["无码", "破解", "流出", "4K", "中文字幕"]
+    assert [node.text for node in root.findall("genre")] == ["无码", "破解", "流出", "LTX", "欧美", "8K", "中文字幕"]
     assert "有码" not in [node.text for node in root.findall("genre")]
 
 

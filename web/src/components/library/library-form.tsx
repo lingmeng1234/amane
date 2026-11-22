@@ -1,5 +1,6 @@
 import {
   Accordion,
+  Alert,
   Anchor,
   Badge,
   Button,
@@ -542,6 +543,9 @@ export function LibraryFormFields({ value, onChange, showCreateOnly }: LibraryFo
         value={value.video_template}
         onChange={(e) => onChange({ ...value, video_template: e.currentTarget.value })}
       />
+      <Alert color="orange" variant="light" title={t("videoTemplateWarningTitle")}>
+        {t("videoTemplateWarning")}
+      </Alert>
       <TemplateInput
         label={t("fieldLinkTemplate")}
         description={t("fieldLinkTemplateHint")}

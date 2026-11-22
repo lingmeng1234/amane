@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from ..db import TaskType
-from ..library import MEDIA_EXTENSIONS, InventoryStore, LibraryHit, LibraryScan, OrphanScan, scan_inventory
+from ..library import MEDIA_EXTENSIONS, InventoryStore, LibraryScan, OrphanScan, scan_inventory
 from ..parsing import ContentType, parse_file_info
 from ..utils.path import is_descendant, nfc_path
 from ..utils.threads import path_exists, path_is_dir
@@ -14,7 +14,7 @@ from .models import RefreshPayload, RefreshResult, ScanMode, ScrapePayload
 from .protocol import FollowupTask, TaskHandler, TaskResult
 
 if TYPE_CHECKING:
-    from ..db.models import MediaFile
+    from ..db.models import Library, MediaFile
     from ..db.repository import Repository
 
 logger = structlog.get_logger()
@@ -250,7 +250,7 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
             followups=followups,
         )
 
-    async def _sync_external_subtitle(self, media: MediaFile, library) -> int:
+    async def _sync_external_subtitle(self, media: MediaFile, library: Library) -> int:
         """按视频番号、Metadata 与同目录字幕重新计算外挂字幕标记."""
         before = media.has_external_subtitle
         await refresh_external_subtitle(self._repo, media, library)

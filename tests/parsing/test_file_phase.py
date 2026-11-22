@@ -24,7 +24,7 @@ from amane.parsing import (
         ("/media/MD0165-1.mp4", ContentType.CHINESE, None),
         ("/media/MIDV-123-U.mp4", ContentType.CENSORED, Mosaic.CRACKED),
         ("/media/MIDV-123-无码.mp4", ContentType.CENSORED, Mosaic.UNCENSORED),
-        ("/media/无码/MIDV-123.mp4", ContentType.CENSORED, Mosaic.UNCENSORED),
+        ("/media/无码/MIDV-123.mp4", ContentType.CENSORED, None),
     ],
 )
 def test_file_phase_from_path_keeps_marker_only(path: str, content_type: ContentType, mosaic: Mosaic | None) -> None:
@@ -40,7 +40,7 @@ def test_file_phase_from_path_keeps_marker_only(path: str, content_type: Content
         (Mosaic.UNCENSORED, ContentType.CENSORED, True),
         (Mosaic.CRACKED, ContentType.UNCENSORED, True),
         (None, ContentType.CENSORED, False),
-        (Mosaic.CRACKED, ContentType.CENSORED, False),
+        (Mosaic.CRACKED, ContentType.CENSORED, True),
         # 未绑定条目的文件只看自身标记
         (None, None, False),
         (Mosaic.UNCENSORED, None, True),
@@ -59,6 +59,7 @@ def test_shows_uncensored(mosaic: Mosaic | None, content_type: ContentType | Non
         (Mosaic.CRACKED, ContentType.UNCENSORED, MosaicNature.CRACKED),
         (Mosaic.LEAKED, ContentType.CENSORED, MosaicNature.LEAKED),
         (None, ContentType.CHINESE, None),
+        (None, ContentType.WESTERN, MosaicNature.WESTERN),
         (None, None, None),
     ],
 )
@@ -90,8 +91,8 @@ def test_summarize_file_phases_or_across_files() -> None:
     cracked: FilePhase = {"mosaic": Mosaic.CRACKED, "has_subtitle": True, "definition": "1080p"}
     leaked: FilePhase = {"mosaic": Mosaic.LEAKED, "has_subtitle": False, "definition": "4K"}
     summary = summarize_file_phases((cracked, leaked), ContentType.CENSORED)
-    assert summary.censored is True
-    assert summary.uncensored is False
+    assert summary.censored is False
+    assert summary.uncensored is True
     assert summary.has_subtitle is True
     assert summary.mosaics == (Mosaic.CRACKED, Mosaic.LEAKED)
     assert summary.definition == "4K"
@@ -102,7 +103,7 @@ def test_summarize_file_phases_or_across_files() -> None:
     [
         (ContentType.CENSORED, True, False),
         (ContentType.UNCENSORED, False, True),
-        (ContentType.WESTERN, False, False),
+        (ContentType.WESTERN, False, True),
     ],
 )
 def test_summarize_file_phases_without_files(content_type: ContentType, censored: bool, uncensored: bool) -> None:
@@ -114,10 +115,36 @@ def test_summarize_file_phases_without_files(content_type: ContentType, censored
     assert summary.definition is None
 
 
+
+def test_summarize_file_phases_keeps_hentai_separate_from_coded_state() -> None:
+    hentai_censored: FilePhase = {
+        "mosaic": None,
+        "has_subtitle": False,
+        "definition": None,
+        "number_content_type": ContentType.CENSORED,
+        "hentai": True,
+    }
+    summary = summarize_file_phases((hentai_censored,), ContentType.HENTAI)
+    assert summary.hentai is True
+    assert summary.censored is True
+    assert summary.uncensored is False
+
+
+def test_western_type_contributes_its_own_uncensored_branch() -> None:
+    western: FilePhase = {
+        "mosaic": None,
+        "has_subtitle": False,
+        "definition": None,
+        "number_content_type": ContentType.WESTERN,
+    }
+    summary = summarize_file_phases((western,), ContentType.WESTERN)
+    assert summary.uncensored is True
+    assert summary.mosaics == (Mosaic.WESTERN,)
+
 def test_summarize_file_phases_uncensored_marker_on_censored_entry() -> None:
     """有码番的无码标记副本: 条目有码, 无码由文件标记并进来."""
     marked: FilePhase = {"mosaic": Mosaic.UNCENSORED, "has_subtitle": False, "definition": None}
     summary = summarize_file_phases((marked,), ContentType.CENSORED)
-    assert summary.censored is True
+    assert summary.censored is False
     assert summary.uncensored is True
     assert summary.mosaics == (Mosaic.UNCENSORED,)

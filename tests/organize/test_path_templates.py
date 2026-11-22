@@ -56,6 +56,8 @@ def _meta(**kwargs) -> Metadata:
     """
     defaults = {
         "number": "ABC-123",
+        # 模板测试的中性类型, 不继承默认 WESTERN 的 mosaic? 展示值.
+        "content_type": ContentType.CHINESE,
         "title": "Test Title",
         "actors": ["Actor1", "Actor2"],
         "studio": "StudioX",

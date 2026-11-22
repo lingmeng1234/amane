@@ -321,8 +321,8 @@ async def commit_organized_media_file(
             media.id,
             path=str(placed),
             mosaic=phase["mosaic"],
-            number_content_type=phase["number_content_type"],
-            hentai=phase["hentai"],
+            number_content_type=phase.get("number_content_type"),
+            hentai=phase.get("hentai", False),
             has_subtitle_in_name=phase["has_subtitle"],
             definition=phase["definition"],
         )

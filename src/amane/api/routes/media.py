@@ -80,6 +80,7 @@ async def list_media(
         search=search,
         library_id=library_id,
         has_subtitle=has_subtitle,
+        hentai=hentai,
         mosaic=mosaic,
         uncensored=uncensored,
         definition=definition,

@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import NamedTuple, Unpack
 
 from sqlalchemy import delete as sqla_delete
@@ -16,13 +16,18 @@ from ..repo_types import _MEDIA_SORT_COLUMNS, MediaFileUpdates, _apply_media_pha
 from .base import RepositoryMixinBase, chunks
 
 
-def _apply_path_phase(media: MediaFile, phase: FilePhase | None = None) -> None:
+def _apply_path_phase(
+    media: MediaFile,
+    phase: FilePhase | None = None,
+    *,
+    mosaic_rules: Mapping[str, str] | None = None,
+) -> None:
     """path 是真值, 相位列是投影; 创建与改 path 时必须回填.
 
     只回填 path 能推出的相位. 同目录字幕不是 path 的投影, 由调用方另经
     ``handlers._common.refresh_external_subtitle`` 写入.
     """
-    phase = phase or file_phase_from_path(media.path)
+    phase = phase or file_phase_from_path(media.path, mosaic_rules=mosaic_rules)
     media.mosaic = phase["mosaic"]
     media.number_content_type = phase["number_content_type"]
     media.hentai = phase["hentai"]
@@ -53,7 +58,7 @@ class MediaRepoMixin(RepositoryMixinBase):
             updates["path"] = nfc_path(path)
         async with self._session() as session:
             media = MediaFile(library_id=library_id, **updates)
-            _apply_path_phase(media, self._mosaic_rules)
+            _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
             session.add(media)
             await session.commit()
             await session.refresh(media)
@@ -74,7 +79,7 @@ class MediaRepoMixin(RepositoryMixinBase):
             if existing is not None:
                 return existing, False
             media = MediaFile(library_id=library_id, **{**updates, "path": normalized})
-            _apply_path_phase(media, self._mosaic_rules)
+            _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
             session.add(media)
             await session.commit()
             await session.refresh(media)
@@ -86,7 +91,7 @@ class MediaRepoMixin(RepositoryMixinBase):
             result = await session.exec(select(MediaFile))
             media_files = list(result.all())
             for media in media_files:
-                _apply_path_phase(media, self._mosaic_rules)
+                _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
                 media.updated_at = _utcnow()
                 session.add(media)
             await session.commit()
@@ -233,7 +238,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         # 显式赋值, 禁止 setattr; 字段集由 MediaFileUpdates 与 MediaFile 静态对齐.
         if "path" in updates:
             media.path = nfc_path(updates["path"])
-            _apply_path_phase(media, self._mosaic_rules)
+            _apply_path_phase(media, mosaic_rules=self._mosaic_rules)
         if "number" in updates:
             media.number = updates["number"]
         if "oshash" in updates:

@@ -634,4 +634,3 @@ async def test_library_automation_restricts_organize_and_scan_scrape(
     attempted_enable = await client.patch(f"libraries/{lib.id}", json={"auto_organize": True})
     assert attempted_enable.status_code == 200
     assert attempted_enable.json()["auto_organize"] is False
-

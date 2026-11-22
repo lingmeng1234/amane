@@ -7,7 +7,7 @@ from sqlalchemy import Engine, create_engine, inspect, text
 from sqlmodel import Session, col, select
 
 from amane.db.models import MediaFile
-from amane.parsing import Mosaic
+from amane.parsing import ContentType, Mosaic
 from tests.helpers import alembic_config
 
 _LIBRARY_INSERT = (
@@ -67,14 +67,23 @@ def test_media_file_phase_columns_backfill_from_path(tmp_path: Path) -> None:
             text(
                 "INSERT INTO media_files (path, status, library_id, created_at, updated_at) VALUES "
                 "('/media/MIDV-123-UC-4K.mp4', 'PENDING', :lib, '2026-01-01 00:00:00', '2026-01-01 00:00:00'), "
-                "('/media/HEYZO-1234.mp4', 'PENDING', :lib, '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
+                "('/media/HEYZO-1234.mp4', 'PENDING', :lib, '2026-01-01 00:00:00', '2026-01-01 00:00:00'), "
+                "('/media/ABC-123-LTX.mp4', 'PENDING', :lib, '2026-01-01 00:00:00', '2026-01-01 00:00:00'), "
+                "('/media/动漫/MIDV-124.mp4', 'PENDING', :lib, '2026-01-01 00:00:00', '2026-01-01 00:00:00'), "
+                "('/media/欧美/MIDV-125-4K-无码.mp4', 'PENDING', :lib, '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
             ),
             {"lib": lib_id},
         )
 
     command.upgrade(cfg, "head")
 
-    assert {"mosaic", "has_subtitle_in_name", "definition"} <= _columns(engine, "media_files")
+    assert {
+        "mosaic",
+        "has_subtitle_in_name",
+        "definition",
+        "number_content_type",
+        "hentai",
+    } <= _columns(engine, "media_files")
     assert "content_type" not in _columns(engine, "media_files")
     assert _file_phase(engine) == {
         "/media/MIDV-123-UC-4K.mp4": ("CRACKED", True, "4K"),
@@ -87,6 +96,12 @@ def test_media_file_phase_columns_backfill_from_path(tmp_path: Path) -> None:
         }
         assert loaded["/media/MIDV-123-UC-4K.mp4"].mosaic is Mosaic.CRACKED
         assert loaded["/media/HEYZO-1234.mp4"].mosaic is None
+        assert loaded["/media/HEYZO-1234.mp4"].number_content_type is ContentType.WESTERN
+        assert loaded["/media/ABC-123-LTX.mp4"].mosaic is Mosaic.LTX
+        assert loaded["/media/动漫/MIDV-124.mp4"].hentai is True
+        assert loaded["/media/动漫/MIDV-124.mp4"].number_content_type is ContentType.CENSORED
+        assert loaded["/media/欧美/MIDV-125-4K-无码.mp4"].number_content_type is ContentType.WESTERN
+        assert loaded["/media/欧美/MIDV-125-4K-无码.mp4"].mosaic is None
 
     engine.dispose()
 
@@ -123,7 +138,7 @@ def test_media_file_mosaic_type_fill_cleared(tmp_path: Path) -> None:
 
     assert _file_phase(engine) == {
         "/media/HEYZO-1234.mp4": (None, False, None),
-        "/media/HEYZO-1234-流出.mp4": ("LEAKED", False, None),
+        "/media/HEYZO-1234-流出.mp4": (None, False, None),
         "/media/MIDV-123.mp4": (None, False, None),
         "/media/MIDV-123-无码.mp4": ("UNCENSORED", False, None),
         "/media/MD0165-1.mp4": (None, False, None),

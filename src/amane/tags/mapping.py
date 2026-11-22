@@ -79,9 +79,7 @@ class TagMappingStore:
                 ]
             elif isinstance(stored, list):
                 records = [
-                    (value.get("original"), value, value.get("type"))
-                    for value in stored
-                    if isinstance(value, dict)
+                    (value.get("original"), value, value.get("type")) for value in stored if isinstance(value, dict)
                 ]
             else:
                 return

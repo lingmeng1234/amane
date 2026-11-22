@@ -8,12 +8,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listFacetsOptions } from "@/client/@tanstack/react-query.gen";
-import type { ContentType, FacetKind, LibraryResponse, Mosaic } from "@/client/types.gen";
+import type { ContentType, FacetKind, LibraryResponse } from "@/client/types.gen";
 import {
   CONTENT_TYPE_FILTERS,
   FACET_KINDS,
   FILE_DEFINITIONS,
-  MOSAICS,
+  MOSAIC_FILTERS,
 } from "@/lib/exhaustive-maps";
 import { facetIdsOf, type FacetFilters } from "@/lib/facets";
 
@@ -26,7 +26,7 @@ export type FilePhaseFilters = {
   has_subtitle: HasFilesFilter;
   hentai: HasFilesFilter;
   uncensored: HasFilesFilter;
-  mosaic: Mosaic | null;
+  mosaic: (typeof MOSAIC_FILTERS)[number] | null;
   definition: (typeof FILE_DEFINITIONS)[number] | null;
   content_type: Exclude<ContentType, "hentai"> | null;
 };
@@ -116,8 +116,8 @@ function parseTriSelect(value: string | null): HasFilesFilter {
   return null;
 }
 
-function parseMosaic(value: string | null): Mosaic | null {
-  for (const mosaic of MOSAICS) {
+function parseMosaic(value: string | null): (typeof MOSAIC_FILTERS)[number] | null {
+  for (const mosaic of MOSAIC_FILTERS) {
     if (mosaic === value) return mosaic;
   }
   return null;
@@ -235,7 +235,7 @@ export function FacetFilterControls({
           <Select
             label={t("search.mosaic")}
             placeholder={t("search.any")}
-            data={MOSAICS.map((mosaic) => ({
+            data={MOSAIC_FILTERS.map((mosaic) => ({
               value: mosaic,
               label: t(`search.mosaics.${mosaic}`),
             }))}

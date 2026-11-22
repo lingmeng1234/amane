@@ -362,6 +362,19 @@ CASES: list[object] = [
 ]
 
 
+@pytest.mark.parametrize(
+    ("marker", "expected"),
+    [("CRACKED", "cracked"), ("LEAKED", "leaked")],
+)
+def test_explicit_english_mosaic_rules_survive_western_fallback(marker: str, expected: str) -> None:
+    info = parse_file_info(
+        f"/media/欧美/Unknown Movie {marker}.mp4",
+        mosaic_rules={"cracked": "CRACKED", "leaked": "LEAKED"},
+    )
+    assert info.number_content_type is ContentType.WESTERN
+    assert info.mosaic == expected
+
+
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c.path)
 def test_parse_file_info(case: _Case) -> None:
     info = parse_file_info(case.path)

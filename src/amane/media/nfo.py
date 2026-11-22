@@ -11,7 +11,7 @@ import aiofiles
 import structlog
 
 from ..enums import ActorGender
-from ..parsing import ContentType, FileInfo, Mosaic, shows_uncensored
+from ..parsing import ContentType, FileInfo, FilePhaseSummary, Mosaic, shows_uncensored
 from ..utils.text import strip_illegal_xml_chars
 
 if TYPE_CHECKING:
@@ -60,6 +60,7 @@ async def write_nfo(
     nfo_output: NfoOutputConfig | None = None,
     actor_genders: dict[str, ActorGender] | None = None,
     file_info: FileInfo | None = None,
+    file_phase: FilePhaseSummary | None = None,
 ) -> bool:
     try:
         nfo_path.parent.mkdir(parents=True, exist_ok=True)
@@ -198,22 +199,40 @@ async def write_nfo(
             code.write(f"  <label>{_escape_xml(mapped_publisher or metadata.publisher)}</label>\n")
 
         def cover_attributes() -> list[str]:
-            if file_info is None:
+            if file_info is None and file_phase is None:
                 return []
-            values = ["无码" if shows_uncensored(file_info.mosaic, file_info.number_content_type) else "有码"]
-            if file_info.mosaic is Mosaic.CRACKED:
+            if file_phase is not None:
+                uncensored = file_phase.uncensored
+                mosaics = file_phase.mosaics
+                hentai = file_phase.hentai
+                definition = file_phase.definition
+                has_subtitle = file_phase.has_subtitle
+            else:
+                assert file_info is not None
+                uncensored = shows_uncensored(file_info.mosaic, file_info.number_content_type)
+                mosaics = (
+                    (file_info.mosaic,)
+                    if file_info.mosaic is not None
+                    else ((Mosaic.WESTERN,) if file_info.number_content_type is ContentType.WESTERN else ())
+                )
+                hentai = file_info.hentai
+                definition = file_info.definition
+                has_subtitle = file_info.has_subtitle
+            values = ["无码" if uncensored else "有码"]
+            # 聚合后可能同时存在多个分支, 必须全部写入, 不能用互斥的 elif 链.
+            if Mosaic.CRACKED in mosaics:
                 values.append("破解")
-            elif file_info.mosaic is Mosaic.LEAKED:
+            if Mosaic.LEAKED in mosaics:
                 values.append("流出")
-            elif file_info.mosaic is Mosaic.LTX:
+            if Mosaic.LTX in mosaics:
                 values.append("LTX")
-            elif file_info.number_content_type is ContentType.WESTERN:
+            if Mosaic.WESTERN in mosaics:
                 values.append("欧美")
-            if file_info.hentai:
+            if hentai:
                 values.append("里番")
-            if file_info.definition:
-                values.append(file_info.definition)
-            if file_info.has_subtitle:
+            if definition:
+                values.append(definition)
+            if has_subtitle:
                 values.append("中文字幕")
             return values
 

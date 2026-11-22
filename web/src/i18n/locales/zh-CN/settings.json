@@ -652,7 +652,10 @@
       },
       "mosaic_rules": {
         "label": "无码识别规则词",
-        "cracked": { "label": "破解关键词", "description": "英文逗号分隔；保存后完全替代默认关键词" },
+        "cracked": {
+          "label": "破解关键词",
+          "description": "英文逗号分隔；保存后完全替代默认关键词"
+        },
         "leaked": { "label": "流出关键词", "description": "英文逗号分隔；保存后完全替代默认关键词" }
       }
     },

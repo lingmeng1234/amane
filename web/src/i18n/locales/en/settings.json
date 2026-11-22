@@ -652,8 +652,14 @@
       },
       "mosaic_rules": {
         "label": "Uncensored Recognition Keywords",
-        "cracked": { "label": "Cracked Keywords", "description": "Comma-separated; replaces the defaults completely" },
-        "leaked": { "label": "Leaked Keywords", "description": "Comma-separated; replaces the defaults completely" }
+        "cracked": {
+          "label": "Cracked Keywords",
+          "description": "Comma-separated; replaces the defaults completely"
+        },
+        "leaked": {
+          "label": "Leaked Keywords",
+          "description": "Comma-separated; replaces the defaults completely"
+        }
       }
     },
     "network": {

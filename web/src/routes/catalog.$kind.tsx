@@ -275,7 +275,11 @@ function CatalogKindPage() {
             label="清除空分类"
             disabled={clearEmpty.isPending}
             onClick={() => {
-              if (window.confirm("确定清除当前分类中所有没有关联影片的记录吗？此操作不会加入剔除列表。")) {
+              if (
+                window.confirm(
+                  "确定清除当前分类中所有没有关联影片的记录吗？此操作不会加入剔除列表。",
+                )
+              ) {
                 clearEmpty.mutate();
               }
             }}

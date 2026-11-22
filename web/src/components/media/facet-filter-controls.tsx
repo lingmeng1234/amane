@@ -9,7 +9,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listFacetsOptions } from "@/client/@tanstack/react-query.gen";
 import type { ContentType, FacetKind, LibraryResponse, Mosaic } from "@/client/types.gen";
-import { CONTENT_TYPE_FILTERS, FACET_KINDS, FILE_DEFINITIONS, MOSAICS } from "@/lib/exhaustive-maps";
+import {
+  CONTENT_TYPE_FILTERS,
+  FACET_KINDS,
+  FILE_DEFINITIONS,
+  MOSAICS,
+} from "@/lib/exhaustive-maps";
 import { facetIdsOf, type FacetFilters } from "@/lib/facets";
 
 const PICKER_LIMIT = 40;

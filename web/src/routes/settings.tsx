@@ -189,7 +189,9 @@ function NfoOutputSettings({ schema, values, saving, onSave }: NfoOutputSettings
 
             return (
               <Paper key={columnKey} withBorder p="sm">
-                <Text fw={600} mb="sm">{columnTitle}</Text>
+                <Text fw={600} mb="sm">
+                  {columnTitle}
+                </Text>
                 <SchemaForm
                   key={`${columnKey}:${JSON.stringify(columnValues)}`}
                   schema={columnSchema}

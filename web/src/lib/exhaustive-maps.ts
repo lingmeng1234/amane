@@ -84,7 +84,13 @@ export const CONTENT_TYPE_FILTERS = exhaustiveTuple<Exclude<ContentType, "hentai
   "amateur",
 );
 
-export const MOSAICS = exhaustiveTuple<Mosaic>()("uncensored", "cracked", "leaked", "ltx", "western");
+export const MOSAICS = exhaustiveTuple<Mosaic>()(
+  "uncensored",
+  "cracked",
+  "leaked",
+  "ltx",
+  "western",
+);
 
 /** 顺序即优先级 (高→低). 与后端 DEFINITION_VALUES 对齐. */
 export const FILE_DEFINITIONS = exhaustiveTuple<

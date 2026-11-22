@@ -126,16 +126,22 @@ function TagMappingsPage() {
   });
   const archiveOne = useMutation({
     mutationFn: (original: string) =>
-      request<{ archived: boolean }>(`/api/tag-mappings/${encodeURIComponent(original)}/archive?type=${mappingType}`, {
-        method: "PUT",
-      }),
+      request<{ archived: boolean }>(
+        `/api/tag-mappings/${encodeURIComponent(original)}/archive?type=${mappingType}`,
+        {
+          method: "PUT",
+        },
+      ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tag-mappings"] }),
   });
   const restoreOne = useMutation({
     mutationFn: (original: string) =>
-      request<{ archived: boolean }>(`/api/tag-mappings/${encodeURIComponent(original)}/restore?type=${mappingType}`, {
-        method: "PUT",
-      }),
+      request<{ archived: boolean }>(
+        `/api/tag-mappings/${encodeURIComponent(original)}/restore?type=${mappingType}`,
+        {
+          method: "PUT",
+        },
+      ),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tag-mappings"] }),
   });
 

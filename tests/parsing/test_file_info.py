@@ -302,7 +302,7 @@ CASES: list[object] = [
     ),
     _Case(
         "/media/欧美/MIDV-123-4K-無碼.mp4",
-        mosaic="uncensored",
+        mosaic=None,
         definition="4K",
         number="MIDV-123",
         content_type=ContentType.WESTERN,

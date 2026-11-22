@@ -11,7 +11,7 @@ import type { ParseKeys } from "i18next";
 import { z } from "zod";
 import type { MetadataSortField } from "@/client/types.gen";
 import {
-  CONTENT_TYPES,
+  CONTENT_TYPE_FILTERS,
   EMBEDDING_KINDS,
   FILE_DEFINITIONS,
   METADATA_SORT_FIELDS,
@@ -75,7 +75,7 @@ export const metaSearchSchema = z.object({
   uncensored: z.enum(["true", "false"]).optional(),
   mosaic: z.enum(MOSAICS).optional(),
   definition: z.enum(FILE_DEFINITIONS).optional(),
-  content_type: z.enum(CONTENT_TYPES).optional(),
+  content_type: z.enum(CONTENT_TYPE_FILTERS).optional(),
   saved_query_id: z.coerce.number().int().positive().optional(),
 });
 

@@ -550,7 +550,6 @@ def test_actor_aliases_are_individual_person_tags_and_not_overview(mode: str, ex
     assert "别名：" not in str(updates["Overview"])
 
 
-
 def test_actor_blood_type_is_included_in_emby_profile() -> None:
     actor = Actor(name="Alice", blood_type="A型")
     person = _person("Alice")

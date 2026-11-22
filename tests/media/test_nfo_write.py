@@ -371,7 +371,7 @@ async def test_write_nfo_uses_typed_chinese_mappings_for_tags_and_merchants(tmp_
             '{"original":"Same","translation":"中文制作商","type":"maker"},'
             '{"original":"Same","translation":"中文发行商","type":"publisher"},'
             '{"original":"Same","translation":"中文系列","type":"series"}'
-            ']}'
+            "]}"
         ),
         encoding="utf-8",
     )

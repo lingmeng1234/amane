@@ -904,4 +904,3 @@ class TestMosaicAndNfoConfig:
         assert config.tag.cover_attributes is False
         assert config.tag.tags is True
         assert config.tag.publisher is True
-

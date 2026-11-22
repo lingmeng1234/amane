@@ -141,7 +141,7 @@ CASES: list[object] = [
     _Case("MIDV-123-CS.mp4", number="MIDV-123"),
     # --- 完整路径: 目录关键词决定内容类型 ---
     _Case("/media/里番/something-123.mp4", content_type=ContentType.HENTAI, hentai=True),
-    _Case("/media/裏番/something-123.mp4"),
+    _Case("/media/裏番/something-123.mp4", content_type=ContentType.HENTAI, hentai=True),
     _Case("/media/getchu/item-123.mp4"),
     _Case("/media/GETCHU/item-123.mp4"),
     _Case("/media/欧美/MIDV-123.mp4", number="MIDV-123", content_type=ContentType.CENSORED),
@@ -625,7 +625,7 @@ def test_hentai_is_independent_from_number_content_type() -> None:
 
 
 def test_other_parent_type_keywords_are_ignored() -> None:
-    for folder in ("getchu", "裏番", "uncensored", "cracked", "leaked", "破解", "流出"):
+    for folder in ("getchu", "uncensored", "cracked", "leaked", "破解", "流出"):
         info = parse_file_info(f"/media/{folder}/MIDV-123.mp4")
         assert info.hentai is False
         assert info.mosaic is None

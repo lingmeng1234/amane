@@ -79,7 +79,7 @@ class FilePhase(TypedDict):
     mosaic: Mosaic | None
     has_subtitle: bool
     definition: str | None
-    number_content_type: NotRequired[ContentType]
+    number_content_type: NotRequired[ContentType | None]
     hentai: NotRequired[bool]
 
 
@@ -453,11 +453,11 @@ def summarize_file_phases(phases: Iterable[FilePhase], content_type: ContentType
         mosaic_present.add(Mosaic.WESTERN)
     if items:
         censored = any(
-            phase.get("number_content_type", content_type) is ContentType.CENSORED and phase["mosaic"] is None
+            (phase.get("number_content_type") or content_type) is ContentType.CENSORED and phase["mosaic"] is None
             for phase in items
         )
         uncensored = any(
-            phase.get("number_content_type", content_type) in {ContentType.UNCENSORED, ContentType.WESTERN}
+            (phase.get("number_content_type") or content_type) in {ContentType.UNCENSORED, ContentType.WESTERN}
             or phase["mosaic"] is not None
             for phase in items
         )

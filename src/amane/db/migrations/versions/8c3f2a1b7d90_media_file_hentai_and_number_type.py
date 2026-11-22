@@ -34,8 +34,7 @@ def upgrade() -> None:
                 "HENTAI",
                 name="contenttype",
             ),
-            nullable=False,
-            server_default="WESTERN",
+            nullable=True,
         ),
     )
     op.add_column(

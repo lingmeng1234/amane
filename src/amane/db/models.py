@@ -228,7 +228,7 @@ class MediaFile(SQLModel, table=True):
     # 文件相位: path 的投影, 随 path 写入/更新; 不进对外 PATCH.
     mosaic: Mosaic | None = Field(default=None, index=True)
     #: 番号本身推导的有码/无码类型; 与 HENTAI 刮削路由类型独立.
-    number_content_type: ContentType = Field(default=ContentType.WESTERN, index=True)
+    number_content_type: ContentType | None = Field(default=None, index=True)
     #: 父目录是否识别为动漫/里番.
     hentai: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, index=True))
     #: 文件名带中文字幕标记, 只由 path 派生.

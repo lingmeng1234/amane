@@ -120,7 +120,8 @@ def _media_file_uncensored_predicate() -> ColumnElement[bool]:
     )
     return or_(
         col(MediaFile.mosaic).is_not(None),
-        col(MediaFile.number_content_type).in_((ContentType.UNCENSORED, ContentType.WESTERN)),
+        col(MediaFile.number_content_type).is_(ContentType.UNCENSORED),
+        col(MediaFile.number_content_type).is_(ContentType.WESTERN),
         entry_uncensored,
     )
 
@@ -138,7 +139,9 @@ def _apply_media_phase_filters(
     if has_subtitle is not None:
         flag = has_subtitle_predicate()
         stmt = stmt.where(flag if has_subtitle else ~flag)
-    if mosaic is not None:
+    if mosaic is Mosaic.WESTERN:
+        stmt = stmt.where(col(MediaFile.number_content_type).is_(ContentType.WESTERN))
+    elif mosaic is not None:
         stmt = stmt.where(col(MediaFile.mosaic) == mosaic)
     if uncensored is not None:
         flag = _media_file_uncensored_predicate()
@@ -323,7 +326,7 @@ class MediaFileUpdates(TypedDict, total=False):
     status: MediaFileStatus
     metadata_id: int | None
     mosaic: Mosaic | None
-    number_content_type: ContentType
+    number_content_type: ContentType | None
     hentai: bool
     has_subtitle_in_name: bool
     definition: str | None

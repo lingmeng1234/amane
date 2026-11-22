@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 import pytest
 
-from amane.config.manager import MoveMode
+from amane.organize import MoveMode
 from amane.db.models import Metadata
 from amane.library import DEFAULT_SUBTITLE_EXTENSIONS
 from amane.organize import discover_subtitles, place_subtitles

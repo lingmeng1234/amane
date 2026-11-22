@@ -95,10 +95,18 @@
       "categories": {
         "label": "Categories and Series",
         "genre": {
-          "label": "Genre"
+          "label": "Genre",
+          "cover_attributes": { "label": "Cover Attributes" },
+          "tags": { "label": "Existing Tags" },
+          "studio": { "label": "Studio" },
+          "publisher": { "label": "Publisher" }
         },
         "tag": {
-          "label": "Tag"
+          "label": "Tag",
+          "cover_attributes": { "label": "Cover Attributes" },
+          "tags": { "label": "Existing Tags" },
+          "studio": { "label": "Studio" },
+          "publisher": { "label": "Publisher" }
         },
         "series": {
           "label": "Series"
@@ -641,6 +649,11 @@
       },
       "number_mapping_rules": {
         "label": "Number Mapping Rules"
+      },
+      "mosaic_rules": {
+        "label": "Uncensored Recognition Keywords",
+        "cracked": { "label": "Cracked Keywords", "description": "Comma-separated; replaces the defaults completely" },
+        "leaked": { "label": "Leaked Keywords", "description": "Comma-separated; replaces the defaults completely" }
       }
     },
     "network": {
@@ -980,9 +993,9 @@
       },
       "corners": {
         "label": "Watermark position",
-        "description": "Multiple in the same corner stack in order: subtitle → uncensored → cracked → leaked → resolution",
+        "description": "Multiple in the same corner stack in order: Chinese subtitles → uncensored → cracked → leaked → LTX → Western → resolution",
         "options": {
-          "subtitle": "Subtitle",
+          "subtitle": "Chinese subtitles",
           "uncensored": "Uncensored",
           "cracked": "Cracked",
           "leaked": "Leaked",

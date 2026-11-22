@@ -45,7 +45,9 @@
     "mosaics": {
       "uncensored": "Uncensored",
       "cracked": "Cracked",
-      "leaked": "Leaked"
+      "leaked": "Leaked",
+      "ltx": "LTX",
+      "western": "Western"
     },
     "library": "Library",
     "libraryAll": "All libraries"
@@ -55,7 +57,10 @@
     "censored": "CEN",
     "uncensored": "U",
     "cracked": "CRACK",
-    "leaked": "LEAK"
+    "leaked": "LEAK",
+    "ltx": "LTX",
+    "western": "WEST",
+    "hentai": "HENTAI"
   },
   "columns": {
     "number": "Number",

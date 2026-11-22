@@ -98,6 +98,7 @@ function scrapingFieldActions(field: string, setValue: (value: unknown) => void)
     content_routes: DEFAULT_CONTENT_ROUTES,
     uncensored_streaming_number_rules: DEFAULT_UNCENSORED_STREAMING_NUMBER_RULES,
     number_mapping_rules: [],
+    mosaic_rules: { cracked: "破解,克破,CRACKED,-U,-UC", leaked: "流出,LEAKED" },
   };
 
   if (!(field in defaults)) return null;

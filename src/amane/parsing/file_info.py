@@ -340,6 +340,8 @@ def parse_file_info(
         basename = Path(text).stem.upper()
         cd = _detect_cd(basename)
         mosaic = _detect_mosaic(basename, mosaic_rules)
+        if number_content_type is ContentType.WESTERN:
+            mosaic = None
     return FileInfo(
         number=number,
         content_type=content_type,

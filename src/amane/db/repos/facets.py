@@ -127,6 +127,8 @@ async def _apply_actor_updates(
         actor.birthday = updates["birthday"]
     if "birthplace" in updates:
         actor.birthplace = updates["birthplace"]
+    if "blood_type" in updates:
+        actor.blood_type = updates["blood_type"]
     if "height" in updates:
         actor.height = updates["height"]
     if "bust" in updates:
@@ -165,6 +167,7 @@ async def _clear_person_fields(session: AsyncSession, actor: Actor) -> None:
     await replace_actor_aliases(session, actor, [])
     actor.birthday = None
     actor.birthplace = None
+    actor.blood_type = None
     actor.height = None
     actor.bust = None
     actor.waist = None

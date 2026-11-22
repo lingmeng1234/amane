@@ -115,7 +115,6 @@ def test_summarize_file_phases_without_files(content_type: ContentType, censored
     assert summary.definition is None
 
 
-
 def test_summarize_file_phases_keeps_hentai_separate_from_coded_state() -> None:
     hentai_censored: FilePhase = {
         "mosaic": None,

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from amane.db.models import Director, Publisher, Series, Studio, Tag, UserTag, FacetKind
+from amane.db.models import Director, FacetKind, Publisher, Series, Studio, Tag, UserTag
 
 if TYPE_CHECKING:
     from httpx2 import AsyncClient, Response

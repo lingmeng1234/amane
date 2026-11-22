@@ -15,10 +15,9 @@ from ..utils.text import strip_illegal_xml_chars
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from ..config.manager import NfoOutputConfig
+    from ..config.manager import NfoCategorySourcesConfig, NfoOutputConfig
     from ..db.models import Metadata
-    from ..parsing import FileInfo
-
+ 
 logger = structlog.get_logger()
 
 
@@ -185,18 +184,18 @@ async def write_nfo(
                 values.append("中文字幕")
             return values
 
-        def write_category(target: str, sources: object) -> None:
+        def write_category(target: str, sources: NfoCategorySourcesConfig | None) -> None:
             values: list[str] = []
-            if nfo_output is None:
+            if sources is None:
                 values.extend(tags)
             else:
-                if sources.cover_attributes:  # type: ignore[attr-defined]
+                if sources.cover_attributes:
                     values.extend(cover_attributes())
-                if sources.tags:  # type: ignore[attr-defined]
+                if sources.tags:
                     values.extend(tags)
-                if sources.studio and metadata.studio:  # type: ignore[attr-defined]
+                if sources.studio and metadata.studio:
                     values.append(f"制作商:{metadata.studio}")
-                if sources.publisher and metadata.publisher:  # type: ignore[attr-defined]
+                if sources.publisher and metadata.publisher:
                     values.append(f"发行商:{metadata.publisher}")
             for value in dict.fromkeys(item.strip() for item in values if item and item.strip()):
                 element = "genre" if target == "genre" else "tag"

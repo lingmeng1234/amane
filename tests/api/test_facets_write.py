@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from amane.db.models import UserTag
+from amane.db.models import Director, Publisher, Series, Studio, Tag, UserTag, FacetKind
 
 if TYPE_CHECKING:
     from httpx2 import AsyncClient, Response
@@ -332,3 +332,69 @@ async def test_facet_favorite_batch_http(client: AsyncClient, repo: Repository) 
     # 详情读到的就是批量写入的结果
     assert (await client.get(f"facets/studio/{plain_a}")).json()["is_favorite"] is True
     assert (await client.get(f"facets/studio/{plain_d}")).json()["is_favorite"] is True
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_clear_empty_facets_preserves_used_items_and_does_not_add_block_rules(
+    client: AsyncClient, repo: Repository
+) -> None:
+    used = await repo.upsert_metadata(
+        number="EMPTY-FACET-USED",
+        directors=["UsedDirector"],
+        tags=["UsedTag"],
+        studio="UsedStudio",
+        publisher="UsedPublisher",
+        series_names=["UsedSeries"],
+    )
+    assert used.id is not None
+    actor_meta = await repo.upsert_metadata(number="EMPTY-FACET-ACTOR", actors=["TaggedActor"])
+    assert actor_meta.id is not None
+
+    empty_director = Director(name="EmptyDirector")
+    empty_tag = Tag(name="EmptyTag")
+    empty_studio = Studio(name="EmptyStudio")
+    empty_publisher = Publisher(name="EmptyPublisher")
+    empty_series = Series(name="EmptySeries")
+    empty_user_tag = UserTag(name="EmptyUserTag")
+    async with repo._session() as session:
+        session.add_all(
+            [empty_director, empty_tag, empty_studio, empty_publisher, empty_series, empty_user_tag]
+        )
+        await session.flush()
+        assert empty_user_tag.id is not None
+        await session.commit()
+
+    actor_items, _ = await repo.list_facets(FacetKind.ACTOR, search="TaggedActor")
+    assert actor_items and actor_items[0].id is not None
+    await repo.apply_actor_user_tags([actor_items[0].id], [empty_user_tag.id], action="attach")
+
+    for kind in ("director", "tag", "studio", "publisher", "series", "user_tag"):
+        response = await client.delete(f"facets/{kind}/empty")
+        assert response.status_code == 200
+        assert response.json() == {"deleted": 1}
+
+    for kind, empty_id in (
+        (FacetKind.DIRECTOR, empty_director.id),
+        (FacetKind.TAG, empty_tag.id),
+        (FacetKind.STUDIO, empty_studio.id),
+        (FacetKind.PUBLISHER, empty_publisher.id),
+        (FacetKind.SERIES, empty_series.id),
+        (FacetKind.USER_TAG, empty_user_tag.id),
+    ):
+        assert empty_id is not None
+        assert await repo.get_facet(kind, empty_id) is None
+
+    for kind, used_name in (
+        (FacetKind.DIRECTOR, "UsedDirector"),
+        (FacetKind.TAG, "UsedTag"),
+        (FacetKind.STUDIO, "UsedStudio"),
+        (FacetKind.PUBLISHER, "UsedPublisher"),
+        (FacetKind.SERIES, "UsedSeries"),
+    ):
+        items, total = await repo.list_facets(kind, search=used_name)
+        assert total == 1
+        assert items[0].name == used_name
+        assert not any(rule.source_name == f"Empty{kind.value.title()}" for rule in await repo.list_facet_rules(kind))
+
+    assert await repo.list_actor_user_tags(actor_items[0].id) == []
+    assert (await client.delete("facets/actor/empty")).status_code == 400

@@ -9227,6 +9227,7 @@
           "gender",
           "birthday",
           "birthplace",
+          "blood_type",
           "height",
           "bust",
           "waist",
@@ -9487,6 +9488,17 @@
               }
             ],
             "title": "Birthplace"
+          },
+          "blood_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
           },
           "height": {
             "anyOf": [
@@ -9823,6 +9835,17 @@
               }
             ],
             "title": "Birthplace"
+          },
+          "blood_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blood Type"
           },
           "height": {
             "anyOf": [

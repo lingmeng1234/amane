@@ -5,8 +5,8 @@ from fastapi import APIRouter, HTTPException, Query, Response
 
 from ...db.models import FAVORITE_FACET_KINDS, SCRAPE_FACET_KINDS, FacetKind, FacetSortField, SortOrder
 from ...db.repo_types import FacetItem
-from ...utils.model import to_resp
 from ...tags.mapping import MappingKind
+from ...utils.model import to_resp
 from ..deps import RepoDep, RuntimeDep
 from ..models import (
     FacetBatchAction,

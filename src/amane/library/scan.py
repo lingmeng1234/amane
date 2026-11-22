@@ -81,14 +81,13 @@ class LibraryScan:
         # 预告片 → 跳过.
         if self._matches(self._trailer, path.name):
             return LibraryFileKind.SKIP
-        # glob 或扩展名命中 → 媒体; 其余不产出.
-        if self.patterns:
-            if any(path.match(p) for p in self.patterns):
-                return LibraryFileKind.MEDIA
+        # 必须先命中配置的视频扩展名; glob 只负责在视频集合中进一步筛选,
+        # 不能让字幕、图片、NFO 等伴随文件独立成为 MediaFile.
+        if path.suffix.lower() not in self.media_extensions:
             return None
-        if path.suffix.lower() in self.media_extensions:
-            return LibraryFileKind.MEDIA
-        return None
+        if self.patterns and not any(path.match(p) for p in self.patterns):
+            return None
+        return LibraryFileKind.MEDIA
 
     @staticmethod
     def _matches(patterns: list[Pattern[str]] | None, name: str) -> bool:

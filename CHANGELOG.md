@@ -37,9 +37,9 @@
 
 ### 🧪 测试
 
-- Linux 后端：4879 passed, 33 skipped。
-- Windows：4859 passed, 53 skipped。
-- Ruff、类型检查、前端检查、OpenAPI/客户端生成一致性检查全部通过。
+- Linux 后端：4884 passed, 33 skipped。
+- Windows：4864 passed, 53 skipped。
+- Ruff、格式检查、Pyright、前端 lint/格式/类型检查与构建、i18n、OpenAPI/客户端生成一致性检查全部通过。
 
 ## v0.28.1 - 定制版增量更新
 

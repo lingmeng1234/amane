@@ -13,7 +13,7 @@ permissions:
 jobs:
   retag-and-rebuild:
     # Run only for the follow-up maintenance commit after the verified PR #4 merge.
-    if: github.event.before == 'd4939b10b9fd0527c8e5a885edefcca626ca6dff'
+    if: github.event.before == '2eecb96d8a6a55b23c4fbb660e0972ef61827864'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

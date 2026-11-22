@@ -1,4 +1,4 @@
-name: Retag v0.28.2 once
+name: Retag v0.28.2 after PR #3
 
 on:
   push:
@@ -12,15 +12,15 @@ permissions:
 
 jobs:
   retag-and-rebuild:
-    # This one-time maintenance action is only valid for the first main push after v0.28.2 fixes.
-    if: github.event.before == '6eec9aa370d6c9f2b89340cb5c745c6c96b0e22e'
+    # Run only for the maintenance commit immediately following the verified PR #3 merge.
+    if: github.event.before == 'dbc140d7d58da01a261b47f16ad219168fb861ba'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Move v0.28.2 tag to the corrected main commit
+      - name: Move v0.28.2 tag to the verified PR #3 merge commit
         run: |
-          git tag -f v0.28.2 "$GITHUB_SHA"
+          git tag -f v0.28.2 dbc140d7d58da01a261b47f16ad219168fb861ba
           git push --force origin refs/tags/v0.28.2
 
       - name: Rebuild all v0.28.2 release assets

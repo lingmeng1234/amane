@@ -6,9 +6,9 @@ from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import bindparam, literal, or_, update
-from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
 from sqlalchemy import delete as sqla_delete
 from sqlalchemy import select as sa_select
+from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
 from sqlalchemy.orm import Mapped
 from sqlalchemy.sql.functions import count
 from sqlalchemy.sql.schema import Table

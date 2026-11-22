@@ -179,7 +179,31 @@ class TestFinalizeMediaFile:
 
 
 class TestRefreshMediaAssociation:
-    """WESTERN 本地身份预检查：只读核对身份，命中后恢复关联。"""
+    """番号类型与目录里番属性分离; WESTERN 仍按身份预检查."""
+
+    @pytest.mark.asyncio
+    async def test_hentai_directory_associates_by_number_content_type(
+        self, repo: Repository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        number = "MIDV-007"
+        metadata = await repo.upsert_metadata(number)
+        assert metadata.id is not None
+        media = await repo.create_media_file(library_id=1, path=str(tmp_path / "里番" / f"{number}.mp4"))
+        assert media.id is not None
+
+        monkeypatch.setattr(
+            "amane.handlers._common.parse_file_info",
+            lambda path: SimpleNamespace(
+                number=number,
+                content_type=ContentType.HENTAI,
+                number_content_type=ContentType.CENSORED,
+            ),
+        )
+
+        assert await refresh_media_association(repo, media) is True
+        stored = await repo.get_media_file(media.id)
+        assert stored is not None
+        assert stored.metadata_id == metadata.id
 
     @pytest.mark.asyncio
     async def test_matches_oshash_among_same_number_candidates(

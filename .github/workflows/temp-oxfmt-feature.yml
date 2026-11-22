@@ -1,0 +1,58 @@
+name: Temporary Oxfmt for feature branch
+
+on:
+  push:
+    branches:
+      - feature/v0281-media-attributes
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "11"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Format frontend files
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec oxfmt --write \
+            src/components/media/facet-filter-controls.tsx \
+            src/i18n/locales/en/settings.json \
+            src/i18n/locales/zh-CN/settings.json \
+            src/lib/exhaustive-maps.ts \
+            'src/routes/catalog.$kind.tsx' \
+            src/routes/dmm-mappings.tsx \
+            'src/routes/meta.$metadataId.tsx' \
+            src/routes/settings.tsx \
+            src/routes/tag-mappings.tsx
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/src/components/media/facet-filter-controls.tsx \
+            web/src/i18n/locales/en/settings.json \
+            web/src/i18n/locales/zh-CN/settings.json \
+            web/src/lib/exhaustive-maps.ts \
+            'web/src/routes/catalog.$kind.tsx' \
+            web/src/routes/dmm-mappings.tsx \
+            'web/src/routes/meta.$metadataId.tsx' \
+            web/src/routes/settings.tsx \
+            web/src/routes/tag-mappings.tsx
+          git commit -m "style: format frontend files with oxfmt"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

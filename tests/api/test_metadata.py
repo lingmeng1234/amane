@@ -46,6 +46,7 @@ class TestMetadataHttp:
             "uncensored": True,
             "mosaics": [],
             "definition": None,
+            "hentai": False,
         }
         assert items["MIDV-002"]["file_phase"]["censored"] is True
         assert items["MIDV-002"]["file_phase"]["uncensored"] is True

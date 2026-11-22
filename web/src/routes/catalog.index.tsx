@@ -59,7 +59,11 @@ function ClearEmptyFacetsAction({
       disabled={clearEmpty.isPending}
       label="清除空分类"
       onClick={() => {
-        if (window.confirm("确定清除所选分类中所有没有关联影片的记录吗？此操作不会加入剔除列表。")) {
+        if (
+          window.confirm(
+            "确定清除所选分类中所有没有关联影片的记录吗？此操作不会加入剔除列表。",
+          )
+        ) {
           clearEmpty.mutate();
         }
       }}

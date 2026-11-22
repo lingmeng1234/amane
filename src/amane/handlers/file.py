@@ -242,6 +242,7 @@ async def apply_file_operations(
     safe_dirs: Sequence[Path] | None = (),
     watermark_dir: Path | None = None,
     tag_mapping_path: Path | None = None,
+    file_phase: FilePhaseSummary | None = None,
 ) -> FileOperationsResult | None:
     """缺少 media_file_id 或对应记录时返回 None (跳过, 不视为失败).
     Library 由 MediaFile.library_id 派生.
@@ -262,8 +263,7 @@ async def apply_file_operations(
         has_external_subtitle=media_file.has_external_subtitle,
         mosaic_rules=config.scraping.mosaic_rules.model_dump(),
     )
-    file_phase = None
-    if metadata.id is not None:
+    if file_phase is None and metadata.id is not None:
         summaries = await repo.summarize_media_by_metadata([metadata])
         summary = summaries.get(metadata.id)
         if summary is not None:
@@ -657,6 +657,15 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
         # 只有移动方式会移走源文件, 复制 / 硬链接 / 符号链接不腾空目录.
         prune_candidates: set[Path] = set()
         collect_prune = payload.prune_empty_dirs and library.move_mode is MoveMode.MOVE
+        # 在整理开始前固定每部影片的资源汇总快照, 避免 MOVE 删除已整理资源记录后影响同作品后续 NFO.
+        metadata_by_id: dict[int, Metadata] = {}
+        for item in live:
+            if item.metadata_id is None or item.metadata_id in metadata_by_id:
+                continue
+            metadata = await self._repo.get_metadata(item.metadata_id)
+            if metadata is not None:
+                metadata_by_id[item.metadata_id] = metadata
+        summaries = await self._repo.summarize_media_by_metadata(list(metadata_by_id.values()))
         if total == 0:
             await self.report_progress(1, 1, "done")
         else:
@@ -669,12 +678,13 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
                     await self.report_progress(i, total, file_path.name)
                     continue
 
-                metadata = await self._repo.get_metadata(media_file.metadata_id)
+                metadata = metadata_by_id.get(media_file.metadata_id)
                 if metadata is None:
                     skipped += 1
                     await self.report_progress(i, total, file_path.name)
                     continue
 
+                metadata_summary = summaries.get(metadata.id) if metadata.id is not None else None
                 write_nfo = library.write_nfo if payload.write_nfo is None else payload.write_nfo
                 copy_resources = library.copy_resources if payload.copy_resources is None else payload.copy_resources
                 fop_result = await apply_file_operations(
@@ -689,6 +699,7 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
                     safe_dirs=self._safe_dirs,
                     watermark_dir=self._watermark_dir,
                     tag_mapping_path=self._tag_mapping_path,
+                    file_phase=metadata_summary.phase if metadata_summary is not None else None,
                 )
                 if fop_result is None:
                     skipped += 1

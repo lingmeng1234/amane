@@ -59,9 +59,9 @@ class TestScanLibrary:
         hits = scan_library.sync(
             tree,
             recursive=True,
-            scan=LibraryScan(patterns=["*.txt", "*.nfo"], trailer_pattern="(?i)trailer", blacklist_patterns=["广告"]),
+            scan=LibraryScan(patterns=["*.mp4", "*.mkv"], trailer_pattern="(?i)trailer", blacklist_patterns=["广告"]),
         )
-        assert _names(hits, LibraryFileKind.MEDIA) == {"b.txt", "d.nfo"}
+        assert _names(hits, LibraryFileKind.MEDIA) == {"a.mp4", "c.mkv"}
         assert _names(hits, LibraryFileKind.SKIP) == {"trailer.mp4"}
         assert _names(hits, LibraryFileKind.UNWANTED) == {"广告.html"}
 

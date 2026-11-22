@@ -1,8 +1,8 @@
 """同目录字幕发现: 必须精确匹配 Metadata 主番号, 不按 CD 或无番号回退."""
 
 from pathlib import Path
-from unittest.mock import MagicMock
 from typing import NamedTuple
+from unittest.mock import MagicMock
 
 import pytest
 

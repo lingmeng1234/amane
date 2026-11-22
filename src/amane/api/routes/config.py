@@ -8,7 +8,7 @@ from ...config import HotSettings, MediaServerConfig
 from ...events import Event, EventType
 from ...media_server import MediaServerClient, MediaServerError
 from ...parsing import file_phase_from_path
-from ..deps import ConfigDep, PluginManagerDep, RuntimeDep
+from ..deps import ConfigDep, PluginManagerDep, RepoDep, RuntimeDep
 
 logger = structlog.get_logger()
 
@@ -57,13 +57,14 @@ async def update_config(req: dict[str, Any], config: ConfigDep, repo: RepoDep, r
         config.update(req)
         next_rules = preview.scraping.mosaic_rules.model_dump()
         if previous_rules != next_rules:
-            media_files = await runtime.repo.list_media_files(limit=None)
+            repo.set_mosaic_rules(next_rules)
+            media_files = await repo.list_media_files(limit=None)
             phase_updates = [
                 (media.id, file_phase_from_path(media.path, mosaic_rules=next_rules))
                 for media in media_files
                 if media.id is not None
             ]
-            updated_count = await runtime.repo.update_media_file_phases(phase_updates)
+            updated_count = await repo.update_media_file_phases(phase_updates)
             logger.info("media file attributes reprojected after mosaic rule change", count=updated_count)
     except (KeyError, ValidationError, ValueError) as e:
         logger.warning("config update rejected", error=str(e), sections=changed_sections)

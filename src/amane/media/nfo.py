@@ -201,16 +201,19 @@ async def write_nfo(
         def cover_attributes() -> list[str]:
             if file_info is None and file_phase is None:
                 return []
-            uncensored = (
-                file_phase.uncensored
-                if file_phase is not None
-                else shows_uncensored(file_info.mosaic, file_info.number_content_type)
-            )
-            mosaics = (
-                file_phase.mosaics
-                if file_phase is not None
-                else ((file_info.mosaic,) if file_info is not None and file_info.mosaic is not None else ())
-            )
+            if file_phase is not None:
+                uncensored = file_phase.uncensored
+                mosaics = file_phase.mosaics
+                hentai = file_phase.hentai
+                definition = file_phase.definition
+                has_subtitle = file_phase.has_subtitle
+            else:
+                assert file_info is not None
+                uncensored = shows_uncensored(file_info.mosaic, file_info.number_content_type)
+                mosaics = (file_info.mosaic,) if file_info.mosaic is not None else ()
+                hentai = file_info.hentai
+                definition = file_info.definition
+                has_subtitle = file_info.has_subtitle
             values = ["无码" if uncensored else "有码"]
             # 聚合后可能同时存在多个分支, 必须全部写入, 不能用互斥的 elif 链.
             if Mosaic.CRACKED in mosaics:
@@ -221,12 +224,10 @@ async def write_nfo(
                 values.append("LTX")
             if Mosaic.WESTERN in mosaics:
                 values.append("欧美")
-            if file_phase.hentai if file_phase is not None else file_info.hentai:
+            if hentai:
                 values.append("里番")
-            definition = file_phase.definition if file_phase is not None else file_info.definition
             if definition:
                 values.append(definition)
-            has_subtitle = file_phase.has_subtitle if file_phase is not None else file_info.has_subtitle
             if has_subtitle:
                 values.append("中文字幕")
             return values

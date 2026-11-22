@@ -149,8 +149,13 @@ async def refresh_media_association(repo: Repository, media: MediaFile) -> bool:
     if metadata is None or metadata.id is None:
         return False
 
-    # finalize_media_file 只恢复关联，不登记或修改番号、115 ID、OSHASH。
+    # 恢复关联后立即按 Metadata 重新计算外挂字幕, 避免扫描时因尚无档案而留下假值.
     await repo.finalize_media_file(media.id, metadata.id)
+    updated = await repo.get_media_file(media.id)
+    if updated is not None:
+        library = await repo.get_library(updated.library_id)
+        if library is not None:
+            await refresh_external_subtitle(repo, updated, library)
     return True
 
 
@@ -175,3 +180,8 @@ async def finalize_media_file(repo: Repository, media_file_id: int | None, metad
     if media_file_id is None:
         return
     await repo.finalize_media_file(media_file_id, metadata_id)
+    media = await repo.get_media_file(media_file_id)
+    if media is not None:
+        library = await repo.get_library(media.library_id)
+        if library is not None:
+            await refresh_external_subtitle(repo, media, library)

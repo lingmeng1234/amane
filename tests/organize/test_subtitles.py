@@ -158,9 +158,7 @@ def test_discover_subtitles_requires_matching_metadata(tmp_path: Path) -> None:
     info = parse_file_info(video)
 
     assert discover_subtitles.sync(video, DEFAULT_SUBTITLE_EXTENSIONS, info) == []
-    assert discover_subtitles.sync(
-        video, DEFAULT_SUBTITLE_EXTENSIONS, info, metadata_number="SSIS-456"
-    ) == []
+    assert discover_subtitles.sync(video, DEFAULT_SUBTITLE_EXTENSIONS, info, metadata_number="SSIS-456") == []
 
 
 def test_unmatched_subtitle_stays_in_place_when_video_was_not_placed(tmp_path: Path) -> None:

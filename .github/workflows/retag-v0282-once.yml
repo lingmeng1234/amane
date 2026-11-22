@@ -9,12 +9,11 @@ on:
 permissions:
   contents: write
   actions: write
-  workflows: write
 
 jobs:
   retag-and-rebuild:
     # Run only for the follow-up maintenance commit after the verified PR #4 merge.
-    if: github.event.before == 'a124ac02f4591b529eb8a1feeb84adf4ea6d3fcb'
+    if: github.event.before == 'd4939b10b9fd0527c8e5a885edefcca626ca6dff'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,7 +22,7 @@ jobs:
 
       - name: Move v0.28.2 tag to the verified PR #4 merge commit
         run: |
-          git tag -f v0.28.2 eed44199181642a2d76324f310ef967d262c3a4b
+          git tag -f v0.28.2 537f351610d5b8da8ac5b9c7ccb2b9393afcc633
           git push --force origin refs/tags/v0.28.2
 
       - name: Rebuild all v0.28.2 release assets

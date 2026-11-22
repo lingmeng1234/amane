@@ -48,6 +48,7 @@ export const ActorFieldSchema = {
         'gender',
         'birthday',
         'birthplace',
+        'blood_type',
         'height',
         'bust',
         'waist',
@@ -316,6 +317,17 @@ export const ActorResponseSchema = {
                 }
             ],
             title: 'Birthplace'
+        },
+        blood_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Blood Type'
         },
         height: {
             anyOf: [
@@ -658,6 +670,17 @@ export const ActorUpdateRequestSchema = {
                 }
             ],
             title: 'Birthplace'
+        },
+        blood_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Blood Type'
         },
         height: {
             anyOf: [

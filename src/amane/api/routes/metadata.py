@@ -19,6 +19,7 @@ from ...media.file_type import detect_media_type_bytes
 from ...parsing import ContentType, summarize_file_phases
 from ...parsing import FilePhaseSummary as ParsedFilePhase
 from ...semantic import SemanticUnavailable
+from ...tags.mapping import MappingKind
 from ...utils.collections import unique_ids
 from ...utils.dates import normalize_calendar_date
 from ...utils.model import to_resp
@@ -160,7 +161,7 @@ async def _mapped_facet_ids(
     """把展示用代表 ID 扩展为该中文名称下的全部原始分类 ID."""
     if not selected_ids:
         return None
-    mapping_kind = {
+    mapping_kind: MappingKind | None = {
         FacetKind.STUDIO: "maker",
         FacetKind.PUBLISHER: "publisher",
         FacetKind.SERIES: "series",

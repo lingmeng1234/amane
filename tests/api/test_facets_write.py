@@ -357,9 +357,7 @@ async def test_clear_empty_facets_preserves_used_items_and_does_not_add_block_ru
     empty_series = Series(name="EmptySeries")
     empty_user_tag = UserTag(name="EmptyUserTag")
     async with repo._session() as session:
-        session.add_all(
-            [empty_director, empty_tag, empty_studio, empty_publisher, empty_series, empty_user_tag]
-        )
+        session.add_all([empty_director, empty_tag, empty_studio, empty_publisher, empty_series, empty_user_tag])
         await session.flush()
         assert empty_user_tag.id is not None
         await session.commit()

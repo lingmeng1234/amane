@@ -16,13 +16,13 @@ from ..repo_types import _MEDIA_SORT_COLUMNS, MediaFileUpdates, _apply_media_pha
 from .base import RepositoryMixinBase, chunks
 
 
-def _apply_path_phase(media: MediaFile) -> None:
+def _apply_path_phase(media: MediaFile, phase: FilePhase | None = None) -> None:
     """path 是真值, 相位列是投影; 创建与改 path 时必须回填.
 
     只回填 path 能推出的相位. 同目录字幕不是 path 的投影, 由调用方另经
     ``handlers._common.refresh_external_subtitle`` 写入.
     """
-    phase = file_phase_from_path(media.path)
+    phase = phase or file_phase_from_path(media.path)
     media.mosaic = phase["mosaic"]
     media.number_content_type = phase["number_content_type"]
     media.hentai = phase["hentai"]
@@ -284,6 +284,23 @@ class MediaRepoMixin(RepositoryMixinBase):
             await session.commit()
             await session.refresh(media)
             return media
+
+    async def update_media_file_phases(self, updates: Sequence[tuple[int, FilePhase]]) -> int:
+        """在单一事务中批量重算 path 派生的文件属性."""
+        if not updates:
+            return 0
+        async with self._session() as session:
+            updated = 0
+            for media_id, phase in updates:
+                media = await session.get(MediaFile, media_id)
+                if media is None:
+                    continue
+                _apply_path_phase(media, phase)
+                media.updated_at = _utcnow()
+                session.add(media)
+                updated += 1
+            await session.commit()
+            return updated
 
     async def delete_media_file(self, media_id: int) -> bool:
         async with self._session() as session:

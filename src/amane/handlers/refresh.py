@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -9,7 +9,7 @@ from ..library import MEDIA_EXTENSIONS, InventoryStore, LibraryScan, OrphanScan,
 from ..parsing import ContentType, parse_file_info
 from ..utils.path import is_descendant, nfc_path
 from ..utils.threads import path_exists, path_is_dir
-from ._common import LibraryTaskLocks, refresh_external_subtitle, refresh_media_association, register_media_file
+from ._common import LibraryTaskLocks, refresh_external_subtitle, refresh_file_phase, refresh_media_association, register_media_file
 from .models import RefreshPayload, RefreshResult, ScanMode, ScrapePayload
 from .protocol import FollowupTask, TaskHandler, TaskResult
 
@@ -31,12 +31,14 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
         media_extensions: Sequence[str] | None = None,
         inventory_store: InventoryStore | None = None,
         library_locks: LibraryTaskLocks | None = None,
+        mosaic_rules: Mapping[str, str] | None = None,
     ):
         super().__init__(payload_t=RefreshPayload, result_t=RefreshResult)
         self._repo = repo
         self._media_extensions = frozenset(media_extensions) if media_extensions else MEDIA_EXTENSIONS
         self._inventory_store = inventory_store
         self._library_locks = library_locks if library_locks is not None else LibraryTaskLocks()
+        self._mosaic_rules = mosaic_rules
 
     async def handle(self, payload: RefreshPayload) -> TaskResult[RefreshResult]:
         # 同一媒体库的全量/单目录扫描共用锁，避免多个 REFRESH worker 同时遍历同一库的不同磁盘。
@@ -167,7 +169,13 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
                                 requested_library_id=payload.library_id,
                             )
                             continue
-                        media = await register_media_file(self._repo, payload.library_id, file_path, library=library)
+                        media = await register_media_file(
+                            self._repo,
+                            payload.library_id,
+                            file_path,
+                            library=library,
+                            mosaic_rules=self._mosaic_rules,
+                        )
                         if media is None:
                             continue
                         existing_by_path[path_key] = media
@@ -253,5 +261,6 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
     async def _sync_external_subtitle(self, media: MediaFile, library: Library) -> int:
         """按视频番号、Metadata 与同目录字幕重新计算外挂字幕标记."""
         before = media.has_external_subtitle
+        await refresh_file_phase(self._repo, media, self._mosaic_rules)
         await refresh_external_subtitle(self._repo, media, library)
         return int(before != media.has_external_subtitle)

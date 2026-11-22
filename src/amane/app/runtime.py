@@ -593,7 +593,11 @@ def build_handlers(
         inventory_store = InventoryStore()
     handlers: dict[TaskType, TaskHandler[Any, Any]] = {
         TaskType.REFRESH: RefreshHandler(
-            repo, hot.watcher.media_extensions, inventory_store, library_locks=library_locks
+            repo,
+            hot.watcher.media_extensions,
+            inventory_store,
+            library_locks=library_locks,
+            mosaic_rules=hot.scraping.mosaic_rules.model_dump(),
         ),
         TaskType.SCRAPE: ScrapeHandler(
             repo,

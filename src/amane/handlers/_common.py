@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,7 @@ from ..db import Library
 from ..db.models import MediaIdentityType
 from ..library import LibraryHit, LibraryScan
 from ..organize import discover_subtitles
-from ..parsing import ContentType, parse_file_info
+from ..parsing import ContentType, file_phase_from_path, parse_file_info
 from ..utils.litepan_strm import read_litepan_115_file_id
 from ..utils.oshash import compute_oshash
 from ..utils.threads import existing_disk_path, in_thread
@@ -61,7 +62,12 @@ def scan_library(scan_dir: Path, *, recursive: bool, scan: LibraryScan) -> list[
 
 
 async def register_media_file(
-    repo: Repository, library_id: int, path: Path, *, library: Library | None = None
+    repo: Repository,
+    library_id: int,
+    path: Path,
+    *,
+    library: Library | None = None,
+    mosaic_rules: Mapping[str, str] | None = None,
 ) -> MediaFile | None:
     """按全局路径唯一性登记; 已被其它媒体库登记时不重复插入、不自动转移."""
     media, created = await repo.create_media_file_if_absent(library_id=library_id, path=str(path))
@@ -73,9 +79,36 @@ async def register_media_file(
             requested_library_id=library_id,
         )
         return None
-    if created and library is not None:
-        await refresh_external_subtitle(repo, media, library)
+    if created:
+        await refresh_file_phase(repo, media, mosaic_rules)
+        if library is not None:
+            await refresh_external_subtitle(repo, media, library)
     return media
+
+
+async def refresh_file_phase(
+    repo: Repository,
+    media: MediaFile,
+    mosaic_rules: Mapping[str, str] | None = None,
+) -> None:
+    """按当前无码识别规则重新计算并持久化 path 派生属性."""
+    if media.id is None:
+        return
+    phase = file_phase_from_path(media.path, mosaic_rules=mosaic_rules)
+    updated = await repo.update_media_file(
+        media.id,
+        mosaic=phase["mosaic"],
+        number_content_type=phase["number_content_type"],
+        hentai=phase["hentai"],
+        has_subtitle_in_name=phase["has_subtitle"],
+        definition=phase["definition"],
+    )
+    if updated is not None:
+        media.mosaic = updated.mosaic
+        media.number_content_type = updated.number_content_type
+        media.hentai = updated.hentai
+        media.has_subtitle_in_name = updated.has_subtitle_in_name
+        media.definition = updated.definition
 
 
 async def refresh_external_subtitle(repo: Repository, media: MediaFile, library: Library) -> None:

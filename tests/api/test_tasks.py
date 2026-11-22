@@ -625,9 +625,7 @@ async def test_library_automation_restricts_organize_and_scan_scrape(
     assert update_scan.status_code == 202
     assert update_scan.json()["payload"]["scrape"] == []
 
-    remove_scan = await client.post(
-        "tasks", json={"type": "refresh", "library_id": lib.id, "scan": ["remove"]}
-    )
+    remove_scan = await client.post("tasks", json={"type": "refresh", "library_id": lib.id, "scan": ["remove"]})
     assert remove_scan.status_code == 202
     assert remove_scan.json()["payload"]["scrape"] == []
 

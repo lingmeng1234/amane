@@ -452,13 +452,16 @@ async def test_write_nfo_uses_aggregated_resource_phases(tmp_path: Path):
     )
     nfo_path = tmp_path / "MIXED-PHASES.nfo"
 
-    assert await write_nfo(
-        metadata,
-        nfo_path,
-        nfo_output=output,
-        file_info=parse_file_info("/media/MIXED-PHASES.mp4"),
-        file_phase=summary,
-    ) is True
+    assert (
+        await write_nfo(
+            metadata,
+            nfo_path,
+            nfo_output=output,
+            file_info=parse_file_info("/media/MIXED-PHASES.mp4"),
+            file_phase=summary,
+        )
+        is True
+    )
 
     root = ET.parse(nfo_path).getroot()
     assert [node.text for node in root.findall("genre")] == ["无码", "破解", "流出", "4K", "中文字幕"]

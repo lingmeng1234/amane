@@ -1,12 +1,15 @@
 """同目录字幕发现: 必须精确匹配 Metadata 主番号, 不按 CD 或无番号回退."""
 
 from pathlib import Path
+from unittest.mock import MagicMock
 from typing import NamedTuple
 
 import pytest
 
+from amane.config.manager import MoveMode
+from amane.db.models import Metadata
 from amane.library import DEFAULT_SUBTITLE_EXTENSIONS
-from amane.organize import discover_subtitles
+from amane.organize import discover_subtitles, place_subtitles
 from amane.parsing import parse_file_info
 
 
@@ -153,3 +156,43 @@ def test_discover_subtitles_requires_matching_metadata(tmp_path: Path) -> None:
     assert discover_subtitles.sync(
         video, DEFAULT_SUBTITLE_EXTENSIONS, info, metadata_number="SSIS-456"
     ) == []
+
+
+def test_unmatched_subtitle_stays_in_place_when_video_was_not_placed(tmp_path: Path) -> None:
+    video_source = _touch(tmp_path / "source" / "MIDV-123.mp4")
+    subtitle = _touch(tmp_path / "source" / "MIDV-123.srt")
+    video_dest = tmp_path / "organized" / "MIDV-123.mp4"
+
+    moved = place_subtitles.sync(
+        [subtitle],
+        video_source=video_source,
+        video_dest=video_dest,
+        library=MagicMock(),
+        metadata=Metadata(number="MIDV-123"),
+        file_info=parse_file_info(video_source),
+        mode=MoveMode.MOVE,
+    )
+
+    assert moved == []
+    assert subtitle.exists()
+    assert not video_dest.exists()
+
+
+def test_subtitle_stays_in_place_when_metadata_number_does_not_match(tmp_path: Path) -> None:
+    video_source = _touch(tmp_path / "source" / "MIDV-123.mp4")
+    subtitle = _touch(tmp_path / "source" / "MIDV-123.srt")
+    video_dest = _touch(tmp_path / "organized" / "MIDV-123.mp4")
+
+    moved = place_subtitles.sync(
+        [subtitle],
+        video_source=video_source,
+        video_dest=video_dest,
+        library=MagicMock(),
+        metadata=Metadata(number="SSIS-456"),
+        file_info=parse_file_info(video_source),
+        mode=MoveMode.MOVE,
+    )
+
+    assert moved == []
+    assert subtitle.exists()
+

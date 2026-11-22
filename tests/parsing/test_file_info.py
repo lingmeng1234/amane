@@ -609,7 +609,6 @@ def test_mosaic_canonical_filename_roundtrip(source: str, canonical: str) -> Non
     assert again.mosaic == canonical
 
 
-
 @pytest.mark.parametrize(
     ("filename", "rules", "expected"),
     [
@@ -747,7 +746,6 @@ def test_ltx_marker_has_its_own_branch(filename: str) -> None:
 )
 def test_ltx_marker_requires_token_boundary(filename: str) -> None:
     assert parse_file_info(filename).mosaic is None
-
 
 
 def test_western_directory_is_fallback_for_unrecognized_number() -> None:

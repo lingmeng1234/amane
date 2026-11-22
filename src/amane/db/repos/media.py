@@ -29,8 +29,8 @@ def _apply_path_phase(
     """
     phase = phase or file_phase_from_path(media.path, mosaic_rules=mosaic_rules)
     media.mosaic = phase["mosaic"]
-    media.number_content_type = phase["number_content_type"]
-    media.hentai = phase["hentai"]
+    media.number_content_type = phase.get("number_content_type")
+    media.hentai = phase.get("hentai", False)
     media.has_subtitle_in_name = phase["has_subtitle"]
     media.definition = phase["definition"]
 

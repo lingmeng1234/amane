@@ -106,8 +106,7 @@ class TagMappingStore:
             "version": 2,
             "enabled": self._enabled,
             "entries": [
-                asdict(entry)
-                for _, entry in sorted(self._entries.items(), key=lambda item: (item[0][0], item[0][1]))
+                asdict(entry) for _, entry in sorted(self._entries.items(), key=lambda item: (item[0][0], item[0][1]))
             ],
         }
         fd, name = tempfile.mkstemp(prefix="tag-mappings-", suffix=".json", dir=self.path.parent)

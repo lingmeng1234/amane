@@ -56,6 +56,15 @@ jobs:
       - name: just ci-static
         run: just ci-static
 
+      - name: Upload regenerated OpenAPI and client files
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-openapi-client
+          path: |
+            web/openapi.json
+            web/src/client/
+
   test:
     name: just ci-test
     runs-on: ubuntu-latest

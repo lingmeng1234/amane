@@ -328,6 +328,8 @@ def parse_file_info(
         if cd is None and dirs:
             cd = _detect_cd_from_parent(dirs[-1])
         mosaic = _detect_mosaic(basename, mosaic_rules)
+        if number_content_type is ContentType.WESTERN:
+            mosaic = None
     else:
         # 文本: 只执行番号规则; 未命中则 number 为 None, 相位只依据该字符串.
         assert text is not None

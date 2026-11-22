@@ -181,6 +181,27 @@ async def batch_facets(kind: FacetKind, req: FacetBatchRequest, repo: RepoDep) -
     return FacetBatchResponse(changed=result.changed, unchanged=result.unchanged, missing=result.missing)
 
 
+@router.delete("/{kind}/empty")
+async def delete_empty_facets(kind: FacetKind, repo: RepoDep) -> dict[str, int]:
+    """清除没有关联影片的分类实体; 不写入剔除规则."""
+    allowed = {
+        FacetKind.DIRECTOR,
+        FacetKind.TAG,
+        FacetKind.STUDIO,
+        FacetKind.PUBLISHER,
+        FacetKind.SERIES,
+        FacetKind.USER_TAG,
+    }
+    if kind not in allowed:
+        raise HTTPException(status_code=400, detail="该分类不支持清除空分类")
+    try:
+        deleted = await repo.delete_empty_facets(kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    logger.info("empty facets deleted", kind=kind, deleted=deleted)
+    return {"deleted": deleted}
+
+
 @router.get("/{kind}/{facet_id}")
 async def get_facet(kind: FacetKind, facet_id: int, repo: RepoDep, runtime: RuntimeDep) -> FacetResponse:
     item = await repo.get_facet(kind, facet_id)

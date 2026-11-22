@@ -19,6 +19,7 @@ export type HasFilesFilter = boolean | null;
 
 export type FilePhaseFilters = {
   has_subtitle: HasFilesFilter;
+  hentai: HasFilesFilter;
   uncensored: HasFilesFilter;
   mosaic: Mosaic | null;
   definition: (typeof FILE_DEFINITIONS)[number] | null;
@@ -205,6 +206,15 @@ export function FacetFilterControls({
             data={triData}
             value={triSelectValue(filePhase.has_subtitle)}
             onChange={(v) => onFilePhaseChange({ ...filePhase, has_subtitle: parseTriSelect(v) })}
+            clearable
+            size="sm"
+          />
+          <Select
+            label={t("search.hentai")}
+            placeholder={t("search.any")}
+            data={triData}
+            value={triSelectValue(filePhase.hentai)}
+            onChange={(v) => onFilePhaseChange({ ...filePhase, hentai: parseTriSelect(v) })}
             clearable
             size="sm"
           />

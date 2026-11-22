@@ -111,7 +111,7 @@ class TestMediaHttp:
         # 带无码标记的副本: 性质是无码, 不再同时挂有码
         assert (rows[marked.id]["censored"], rows[marked.id]["uncensored"]) == (False, True)
         assert (rows[inherited.id]["censored"], rows[inherited.id]["uncensored"]) == (False, True)
-        assert (rows[orphan.id]["censored"], rows[orphan.id]["uncensored"]) == (False, False)
+        assert (rows[orphan.id]["censored"], rows[orphan.id]["uncensored"]) == (False, True)
         assert rows[marked.id]["mosaic"] == "uncensored"
 
         single = await client.get(f"media/{inherited.id}")

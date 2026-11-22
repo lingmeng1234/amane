@@ -219,7 +219,7 @@ class TagMappingStore:
             for original, facet_id in values.items():
                 entry = self._entries.get(self._key(kind, original)) if self._enabled else None
                 display = (entry.translation if entry else None) or original
-                mapped.setdefault(display, facet_id)
+                mapped[display] = min(mapped.get(display, facet_id), facet_id)
         return mapped
 
     def list(

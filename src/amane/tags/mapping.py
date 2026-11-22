@@ -62,7 +62,7 @@ class TagMappingStore:
         return kind, original
 
     @staticmethod
-    def _valid_kind(value: object) -> bool:
+    def _valid_kind(value: object) -> TypeGuard[MappingKind]:
         return value in MAPPING_KINDS
 
     def _load(self) -> None:

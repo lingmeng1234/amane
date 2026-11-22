@@ -905,4 +905,3 @@ class TestMosaicAndNfoConfig:
         assert config.tag.tags is True
         assert config.tag.publisher is True
 
-

@@ -59,6 +59,25 @@ class TestMediaHttp:
         assert deleted.status_code == 204
         assert (await client.delete("media/9999")).status_code == 404
 
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_file_exposes_western_branch_and_hentai_is_independent(
+        self, client: AsyncClient, repo: Repository
+    ):
+        western = await repo.create_media_file(library_id=1, path="/v/欧美/Studio.26.10.16.mp4")
+        mixed = await repo.create_media_file(library_id=1, path="/v/动漫/Vixen.23.04.15.mp4")
+        assert western.id is not None and mixed.id is not None
+
+        western_response = await client.get(f"media/{western.id}")
+        assert western_response.status_code == 200
+        assert western_response.json()["mosaic"] == "western"
+        assert western_response.json()["uncensored"] is True
+
+        mixed_response = await client.get(f"media/{mixed.id}")
+        assert mixed_response.status_code == 200
+        assert mixed_response.json()["mosaic"] == "western"
+        assert mixed_response.json()["hentai"] is True
+
     @pytest.mark.asyncio(loop_scope="function")
     async def test_phase_derived_from_entry_type(self, client: AsyncClient, repo: Repository):
         """文件行的有码 / 无码按条目类型派生; 未绑定条目的文件只看自身标记."""

@@ -26,6 +26,7 @@ interface ActorDraft {
   gender: ActorGender;
   birthday: string;
   birthplace: string;
+  bloodType: string;
   height: number | string;
   bust: number | string;
   waist: number | string;
@@ -42,6 +43,7 @@ function draftFromActor(actor: ActorResponse): ActorDraft {
     gender: actor.gender ?? "unknown",
     birthday: actor.birthday ?? "",
     birthplace: actor.birthplace ?? "",
+    bloodType: actor.blood_type ?? "",
     height: actor.height ?? "",
     bust: actor.bust ?? "",
     waist: actor.waist ?? "",
@@ -72,6 +74,8 @@ function patchFromDraft(draft: ActorDraft, actor: ActorResponse): ActorUpdateReq
   if (draft.birthday.trim() !== initial.birthday) patch.birthday = draft.birthday.trim() || null;
   if (draft.birthplace.trim() !== initial.birthplace)
     patch.birthplace = draft.birthplace.trim() || null;
+  if (draft.bloodType.trim() !== initial.bloodType)
+    patch.blood_type = draft.bloodType.trim() || null;
   if (numOrNull(draft.height) !== numOrNull(initial.height)) patch.height = numOrNull(draft.height);
   if (numOrNull(draft.bust) !== numOrNull(initial.bust)) patch.bust = numOrNull(draft.bust);
   if (numOrNull(draft.waist) !== numOrNull(initial.waist)) patch.waist = numOrNull(draft.waist);
@@ -185,6 +189,11 @@ export function ActorEditDialog({
               label={t("browse.person.cup")}
               value={draft.cup}
               onChange={(e) => patchDraft({ cup: e.currentTarget.value })}
+            />
+            <TextInput
+              label={t("browse.person.bloodType")}
+              value={draft.bloodType}
+              onChange={(e) => patchDraft({ bloodType: e.currentTarget.value })}
             />
           </Group>
         </SimpleGrid>

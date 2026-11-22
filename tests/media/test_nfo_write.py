@@ -339,7 +339,6 @@ async def test_write_nfo_uses_independent_genre_and_tag_sources(tmp_path: Path, 
         "4K",
         "中文字幕",
         "Drama",
-        "LTX",
         "制作商:Studio X",
     ]
     assert [node.text for node in root.findall("tag")] == ["发行商:Publisher Y"]

@@ -1,0 +1,33 @@
+name: Retag v0.28.2 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/retag-v0282-once.yml"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  retag-and-rebuild:
+    # This one-time maintenance action is only valid for the first main push after v0.28.2 fixes.
+    if: github.event.before == '6eec9aa370d6c9f2b89340cb5c745c6c96b0e22e'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Move v0.28.2 tag to the corrected main commit
+        run: |
+          git tag -f v0.28.2 "$GITHUB_SHA"
+          git push --force origin refs/tags/v0.28.2
+
+      - name: Rebuild all v0.28.2 release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run cli-release.yaml --ref main -f tag=v0.28.2
+          gh workflow run windows-app.yml --ref v0.28.2
+          gh workflow run macos-app.yml --ref v0.28.2
+          gh workflow run docker.yml --ref v0.28.2

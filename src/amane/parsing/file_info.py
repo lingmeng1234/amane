@@ -255,8 +255,6 @@ _ESCAPE_MARKERS = (
 
 _ROOT_PARTS = frozenset({"/", ".", ""})
 _CD_DIR = re.compile(r"^(?:CD|PART)(\d{1,2})$", re.IGNORECASE)
-_DIR_BRACKET_STRIP = "[]【】()（）"
-
 DEFAULT_MOSAIC_RULES: dict[str, str] = {
     "cracked": "破解,克破,CRACKED,-U,-UC",
     "leaked": "流出,LEAKED",

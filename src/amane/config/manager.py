@@ -380,6 +380,22 @@ class SiteConfig(BaseModel):
         return languages
 
 
+class MosaicRulesConfig(BaseModel):
+    """视频文件名中的破解/流出识别词; 保存内容完全替代默认值."""
+
+    cracked: str = Field(default="破解,克破,CRACKED,-U,-UC", title="破解", description="英文逗号分隔; 留空表示关闭此类关键词")
+    leaked: str = Field(default="流出,LEAKED", title="流出", description="英文逗号分隔; 留空表示关闭此类关键词")
+
+    @model_validator(mode="after")
+    def _unique_keywords(self) -> MosaicRulesConfig:
+        cracked = {item.strip().casefold() for item in self.cracked.split(",") if item.strip()}
+        leaked = {item.strip().casefold() for item in self.leaked.split(",") if item.strip()}
+        overlap = cracked & leaked
+        if overlap:
+            raise ValueError(f"无码识别关键词不能同时属于破解和流出: {', '.join(sorted(overlap))}")
+        return self
+
+
 class ScrapingConfig(BaseModel):
     download_resources: list[DownloadableResource] = Field(
         default_factory=lambda: [r for r in DownloadableResource if r != DownloadableResource.trailer],
@@ -422,6 +438,8 @@ class ScrapingConfig(BaseModel):
         json_schema_extra={"x-ordered": True},
         description="通用番号映射规则; 每行格式为完整匹配正则表达式 => 替换表达式, 仅自动非欧美非无码流媒体刮削使用.",
     )
+
+    mosaic_rules: MosaicRulesConfig = Field(default_factory=MosaicRulesConfig, title="无码识别规则词")
 
     field_priority: dict[MetadataField, list[str]] = Field(
         default_factory=dict,

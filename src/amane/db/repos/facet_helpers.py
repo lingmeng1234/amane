@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import bindparam, literal, or_, update
+from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
 from sqlalchemy import delete as sqla_delete
 from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Mapped
@@ -742,7 +743,7 @@ async def _load_linked_facet_values(
             metadata_table.c.publisher,
         ).where(relevant)
         for metadata_id, actors, directors, tags, series_names, series, studio, publisher in (
-            await session.exec(stmt)
+            await cast(SQLAlchemyAsyncSession, session).execute(stmt)
         ).all():
             if metadata_id is None:
                 continue

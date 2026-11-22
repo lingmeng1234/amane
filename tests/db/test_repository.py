@@ -259,10 +259,14 @@ class TestMediaFileRepo:
         subs = await repo.list_media_files(has_subtitle=True, limit=None)
         assert {f.path for f in subs} == {"/v/MIDV-001-C.mp4"}
         uncensored = await repo.list_media_files(uncensored=True, limit=None)
-        assert {f.path for f in uncensored} == {"/v/MIDV-002-无码.mp4"}
+        assert {f.path for f in uncensored} == {
+            "/v/MIDV-002-无码.mp4",
+            "/v/HEYZO-1234.mp4",
+            "/v/MIDV-003-U.mp4",
+        }
         cracked = await repo.list_media_files(mosaic=Mosaic.CRACKED, limit=None)
         assert [f.path for f in cracked] == ["/v/MIDV-003-U.mp4"]
-        assert await repo.count_media_files(uncensored=True) == 1
+        assert await repo.count_media_files(uncensored=True) == 3
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_list_media_files_uncensored_joins_entry_type(self, repo: Repository):

@@ -59,6 +59,7 @@ class TestActorsApi:
             f"actors/{filled_id}",
             json={
                 "overview": "edited bio",
+                "blood_type": "A型",
                 "gender": "female",
                 "image_urls": ["https://img.example/b.jpg", "https://img.example/a.jpg"],
                 "birthday": None,
@@ -67,6 +68,8 @@ class TestActorsApi:
         assert patched.status_code == 200
         body = patched.json()
         assert body["overview"] == "edited bio"
+        assert body["blood_type"] == "A型"
+        assert "blood_type" in body["locked_fields"]
         assert body["gender"] == "female"
         assert body["image_urls"][0] == "https://img.example/b.jpg"
         assert body["birthday"] is None

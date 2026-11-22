@@ -6,10 +6,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from amane.config.manager import NfoOutputConfig
-from amane.config.manager import NfoOutputConfig
 from amane.db.models import Metadata
 from amane.media import write_nfo
-from amane.parsing import ContentType, parse_file_info, parse_file_info
+from amane.parsing import ContentType, parse_file_info
 
 if TYPE_CHECKING:
     from pathlib import Path

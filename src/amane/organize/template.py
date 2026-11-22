@@ -365,7 +365,12 @@ def _build_variables(
         "sub?": "C" if file_info is not None and file_info.has_subtitle else "",
         "content_type": str(metadata.content_type),
         "mosaic?": str(nature)
-        if (nature := mosaic_nature(file_info.mosaic if file_info else None, metadata.content_type))
+        if (
+            nature := mosaic_nature(
+                file_info.mosaic if file_info else None,
+                file_info.number_content_type if file_info else metadata.content_type,
+            )
+        )
         else "",
         "def?": file_info.definition if file_info is not None and file_info.definition else "",
         "video_dir": _UNKNOWN,

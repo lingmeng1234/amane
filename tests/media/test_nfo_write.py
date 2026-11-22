@@ -429,7 +429,7 @@ async def test_write_nfo_global_switch_disables_all_mapping_categories(tmp_path:
             '{"original":"Same","translation":"中文制作商","type":"maker"},'
             '{"original":"Same","translation":"中文发行商","type":"publisher"},'
             '{"original":"Same","translation":"中文系列","type":"series"}'
-            ']}'
+            "]}"
         ),
         encoding="utf-8",
     )

@@ -642,6 +642,7 @@ class Actor(SQLModel, table=True):
     gender: ActorGender = Field(default=ActorGender.UNKNOWN, index=True)
     birthday: str | None = None
     birthplace: str | None = None
+    blood_type: str | None = None
     height: int | None = None
     bust: int | None = None
     waist: int | None = None

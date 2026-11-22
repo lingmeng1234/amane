@@ -92,6 +92,14 @@ export const MOSAICS = exhaustiveTuple<Mosaic>()(
   "western",
 );
 
+/** 片库无码分支筛选: 普通无码由独立的「无码 是/否」条件覆盖, 不作为分支选项. */
+export const MOSAIC_FILTERS = exhaustiveTuple<Exclude<Mosaic, "uncensored">>()(
+  "cracked",
+  "leaked",
+  "ltx",
+  "western",
+);
+
 /** 顺序即优先级 (高→低). 与后端 DEFINITION_VALUES 对齐. */
 export const FILE_DEFINITIONS = exhaustiveTuple<
   "8K" | "4K" | "1440p" | "1080p" | "720p" | "480p"

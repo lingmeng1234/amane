@@ -529,3 +529,23 @@ def test_actor_gender_is_written_to_person_overview(gender: ActorGender, expecte
         assert "Overview" not in updates
     else:
         assert updates["Overview"] == expected
+@pytest.mark.parametrize(
+    ("mode", "expected_overview"),
+    [
+        ("incremental", "简介：existing"),
+        ("full", "简介：new bio"),
+    ],
+)
+def test_actor_aliases_are_individual_person_tags_and_not_overview(
+    mode: str, expected_overview: str
+) -> None:
+    actor = Actor(name="Alice", overview="new bio")
+    person = _person("Alice", overview="别名：OldA、OldB\\n简介：existing")
+    person.raw["Tags"] = ["Existing", "A"]
+
+    updates = _profile_updates(actor, person, ["A", "B", "A"], mode=mode)
+
+    assert updates["Tags"] == ["Existing", "A", "B"]
+    assert updates["Overview"] == expected_overview
+    assert "别名：" not in str(updates["Overview"])
+

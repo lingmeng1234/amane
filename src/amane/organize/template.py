@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING, TypedDict, cast
 from ..enums import ActorGender
 from ..parsing.file_info import (
     CONTENT_TYPE_VALUES,
-    ContentType,
     DEFINITION_VALUES,
     MOSAIC_NATURE_VALUES,
+    ContentType,
     FileInfo,
     mosaic_nature,
     split_number,

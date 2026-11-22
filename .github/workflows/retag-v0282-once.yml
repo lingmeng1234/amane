@@ -13,7 +13,7 @@ permissions:
 jobs:
   retag-and-rebuild:
     # Run only for the follow-up maintenance commit after the verified PR #4 merge.
-    if: github.event.before == '7313bccd07445732edca1a9e59e28a10de34965c'
+    if: github.event.before == 'eed44199181642a2d76324f310ef967d262c3a4b'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -30,6 +30,3 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run cli-release.yaml --ref main -f tag=v0.28.2
-          gh workflow run windows-app.yml --ref v0.28.2
-          gh workflow run macos-app.yml --ref v0.28.2
-          gh workflow run docker.yml --ref v0.28.2

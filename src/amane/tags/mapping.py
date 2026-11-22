@@ -189,7 +189,7 @@ class TagMappingStore:
             return self._enabled
 
     def map_values(self, kind: MappingKind, values: builtins.list[str]) -> builtins.list[str]:
-        """按类别映射并在映射后去重; 未映射词条原样保留."""
+        """按归属类型映射并在映射后去重; UI、片库响应与 NFO 共用此映射词典, 未映射词条原样保留."""
         with self._lock:
             if not self._enabled:
                 return list(dict.fromkeys(value for value in values if value))

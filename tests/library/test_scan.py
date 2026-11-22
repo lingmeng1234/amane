@@ -53,7 +53,6 @@ class TestClassify:
         assert scan.classify(Path("/tmp/a.mkv")) is LibraryFileKind.MEDIA
         assert scan.classify(Path("/tmp/a.mp4")) is None
 
-
     def test_patterns_never_promote_companion_files_to_media(self):
         scan = LibraryScan(patterns=["*"])
         for name in ("subtitle.srt", "cover.jpg", "movie.nfo", "metadata.xml"):

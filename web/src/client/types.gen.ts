@@ -6755,9 +6755,15 @@ export type ListMediaData = {
         /**
          * Has Subtitle
          *
-         * Filter by subtitle marker
+         * Filter by Chinese-subtitle marker
          */
         has_subtitle?: boolean | null;
+        /**
+         * Hentai
+         *
+         * Filter by hentai directory attribute
+         */
+        hentai?: boolean | null;
         /**
          * Mosaic
          *

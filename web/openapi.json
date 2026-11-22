@@ -578,10 +578,28 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by subtitle marker",
+              "description": "Filter by Chinese-subtitle marker",
               "title": "Has Subtitle"
             },
-            "description": "Filter by subtitle marker"
+            "description": "Filter by Chinese-subtitle marker"
+          },
+          {
+            "name": "hentai",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by hentai directory attribute",
+              "title": "Hentai"
+            },
+            "description": "Filter by hentai directory attribute"
           },
           {
             "name": "mosaic",

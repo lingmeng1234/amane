@@ -244,9 +244,7 @@ class TestMediaFileRepo:
         normal = await repo.create_media_file(library_id=1, path="/v/MIDV-002.mp4")
 
         assert {item.path for item in await repo.list_media_files(hentai=True, limit=None)} == {hentai.path}
-        assert {item.path for item in await repo.list_media_files(mosaic=Mosaic.WESTERN, limit=None)} == {
-            western.path
-        }
+        assert {item.path for item in await repo.list_media_files(mosaic=Mosaic.WESTERN, limit=None)} == {western.path}
         assert normal.path not in {item.path for item in await repo.list_media_files(hentai=True, limit=None)}
 
     @pytest.mark.asyncio(loop_scope="function")

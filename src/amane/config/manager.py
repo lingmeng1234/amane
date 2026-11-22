@@ -387,7 +387,7 @@ class MosaicRulesConfig(BaseModel):
     leaked: str = Field(default="流出,LEAKED", title="流出", description="英文逗号分隔; 留空表示关闭此类关键词")
 
     @model_validator(mode="after")
-    def _unique_keywords(self) -> MosaicRulesConfig:
+    def _unique_keywords(self):
         cracked = {item.strip().casefold() for item in self.cracked.split(",") if item.strip()}
         leaked = {item.strip().casefold() for item in self.leaked.split(",") if item.strip()}
         overlap = cracked & leaked
@@ -998,12 +998,34 @@ class NfoPeopleConfig(BaseModel):
     publisher: bool = Field(default=True, description="发行商")
 
 
+class NfoCategorySourcesConfig(BaseModel):
+    """Genre 或 Tag 各自可选的数据来源."""
+
+    cover_attributes: bool = Field(default=False, title="封面属性")
+    tags: bool = Field(default=True, title="原有标签")
+    studio: bool = Field(default=False, title="制作商")
+    publisher: bool = Field(default=False, title="发行商")
+
+
 class NfoCategoriesConfig(BaseModel):
     """NFO 分类与系列输出选项."""
 
-    genre: bool = Field(default=True, description="分类")
-    tag: bool = Field(default=True, description="类型")
+    genre: NfoCategorySourcesConfig = Field(default_factory=NfoCategorySourcesConfig, title="分类")
+    tag: NfoCategorySourcesConfig = Field(default_factory=NfoCategorySourcesConfig, title="类型")
     series: bool = Field(default=True, description="系列")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_switches(cls, value: Any) -> Any:
+        """旧配置的 genre/tag 布尔值迁移为仅控制原有标签来源."""
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        for key in ("genre", "tag"):
+            legacy = normalized.get(key)
+            if isinstance(legacy, bool):
+                normalized[key] = {"tags": legacy}
+        return normalized
 
 
 class NfoImagesConfig(BaseModel):

@@ -9,7 +9,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeGuard
 
 LanguageCode = Literal["ja", "en", "zh", "other"]
 

@@ -18,13 +18,20 @@ logger = structlog.get_logger()
 
 
 @in_thread
-def discover_subtitles(video_path: Path, extensions: Sequence[str], video: FileInfo) -> list[Path]:
-    """只检查直接父目录, 不递归; 扩展名大小写不敏感. 空扩展名列表不发现. 多个字幕全部返回, 不挑主字幕.
+def discover_subtitles(
+    video_path: Path,
+    extensions: Sequence[str],
+    video: FileInfo,
+    *,
+    metadata_number: str | None = None,
+) -> list[Path]:
+    """只发现能精确归属当前已入库作品的外挂字幕.
 
-    字幕只解析文件名 (`parse_file_info(text=...)`, 不依据目录、不使用路径回退).
-    解析出番号时必须与当前视频番号相同 (忽略大小写), 再按分集配对;
-    解析不出番号时回退独立目录规则: 有分集标记的跟当前视频同号, 解析不出的跟无分集或 CD1.
+    字幕必须解析出主番号, 与视频主番号及现有 Metadata 番号一致; 不比较 CD 分集.
+    无番号、无对应 Metadata 或扩展名未启用的字幕一律不参与匹配.
     """
+    if not metadata_number or not video.number or metadata_number.casefold() != video.number.casefold():
+        return []
     exts = {e.lower() for e in extensions}
     if not exts:
         return []
@@ -68,7 +75,14 @@ def place_subtitles(
 ) -> list[SubtitleConflict]:
     """失败与冲突只记日志, 不抛异常; 返回被占用而跳过的字幕源与其目标."""
     conflicted: list[SubtitleConflict] = []
+    # 字幕绝不能脱离实际落盘的视频单独移动.
+    if not video_dest.is_file() or not metadata.number or not file_info.number:
+        return conflicted
+    if metadata.number.casefold() != file_info.number.casefold():
+        return conflicted
     for sub in sources:
+        if not _belongs(file_info, parse_file_info(text=sub.name), metadata.number):
+            continue
         dest = resolve_subtitle_path(
             library,
             metadata,
@@ -101,13 +115,9 @@ def place_subtitles(
     return conflicted
 
 
-def _belongs(video: FileInfo, sub: FileInfo) -> bool:
-    if sub.number is not None and (video.number is None or sub.number.casefold() != video.number.casefold()):
+def _belongs(video: FileInfo, sub: FileInfo, metadata_number: str | None = None) -> bool:
+    """只按主番号精确归属; 不允许无番号回退, CD 分集不参与字幕归属."""
+    if not metadata_number or not video.number or not sub.number:
         return False
-    return _cd_belongs(video.cd, sub.cd)
-
-
-def _cd_belongs(video_cd: int | None, sub_cd: int | None) -> bool:
-    if sub_cd == video_cd:
-        return True
-    return video_cd == 1 and sub_cd is None
+    expected = video.number.casefold()
+    return metadata_number.casefold() == expected and sub.number.casefold() == expected

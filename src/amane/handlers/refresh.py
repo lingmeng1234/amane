@@ -9,7 +9,7 @@ from ..library import MEDIA_EXTENSIONS, InventoryStore, LibraryHit, LibraryScan,
 from ..parsing import ContentType, parse_file_info
 from ..utils.path import is_descendant, nfc_path
 from ..utils.threads import path_exists, path_is_dir
-from ._common import LibraryTaskLocks, refresh_media_association, register_media_file
+from ._common import LibraryTaskLocks, refresh_external_subtitle, refresh_media_association, register_media_file
 from .models import RefreshPayload, RefreshResult, ScanMode, ScrapePayload
 from .protocol import FollowupTask, TaskHandler, TaskResult
 
@@ -176,7 +176,8 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
                             associated += 1
                     else:
                         existing_media = existing_by_path[path_key]
-                        subtitles += await self._sync_external_subtitle(existing_media, hit)
+                        if library is not None:
+                            subtitles += await self._sync_external_subtitle(existing_media, library)
                         if payload.associate and await refresh_media_association(self._repo, existing_media):
                             associated += 1
                 if added:
@@ -249,13 +250,8 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
             followups=followups,
         )
 
-    async def _sync_external_subtitle(self, media: MediaFile, hit: LibraryHit) -> int:
-        """按本次遍历所见回写已登记行的外挂字幕标记; 未变化返回 0.
-
-        标记的其它写入点是视频登记与换 path, 二者都不覆盖存量行, 因此库扫描是存量行唯一的补齐途径.
-        """
-        if media.has_external_subtitle == hit.has_companion_subtitle:
-            return 0
-        assert media.id is not None
-        await self._repo.update_media_file(media.id, has_external_subtitle=hit.has_companion_subtitle)
-        return 1
+    async def _sync_external_subtitle(self, media: MediaFile, library) -> int:
+        """按视频番号、Metadata 与同目录字幕重新计算外挂字幕标记."""
+        before = media.has_external_subtitle
+        await refresh_external_subtitle(self._repo, media, library)
+        return int(before != media.has_external_subtitle)

@@ -1,4 +1,4 @@
-"""同目录字幕发现: 番号匹配与分集回退."""
+"""同目录字幕发现: 必须精确匹配 Metadata 主番号, 不按 CD 或无番号回退."""
 
 from pathlib import Path
 from typing import NamedTuple
@@ -41,7 +41,7 @@ _NUMBER_CD_FILES: tuple[str, ...] = (
 CASES: tuple[_Case, ...] = (
     _Case(
         "single-video-keeps-all-names",
-        ("MIDV-123.mp4", "chs.srt", "MIDV-123.zh.ass", "notes.txt"),
+        ("MIDV-123.mp4", "MIDV-123.zh.ass", "notes.txt"),
         "MIDV-123.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
         ("chs.srt", "MIDV-123.zh.ass"),
@@ -79,14 +79,14 @@ CASES: tuple[_Case, ...] = (
         ("MIDV-123-CD1.mp4", "MIDV-123-CD2.mp4", "a-CD1.srt", "b-CD2.ass", "chs.srt"),
         "MIDV-123-CD1.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("a-CD1.srt", "chs.srt"),
+        (),
     ),
     _Case(
         "cd2-takes-only-matching",
         ("MIDV-123-CD1.mp4", "MIDV-123-CD2.mp4", "a-CD1.srt", "b-CD2.ass", "chs.srt"),
         "MIDV-123-CD2.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("b-CD2.ass",),
+        (),
     ),
     _Case(
         "cd2-does-not-take-unparsed",
@@ -100,14 +100,14 @@ CASES: tuple[_Case, ...] = (
         ("MIDV-123.mp4", "MIDV-123-CD2.mp4", "chs.srt", "b-CD2.ass"),
         "MIDV-123.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("chs.srt",),
+        (),
     ),
     _Case(
         "cd1-ignores-sibling-trailer",
         ("MIDV-123-CD1.mp4", "trailer.mp4", "chs.srt", "a-CD1.srt"),
         "MIDV-123-CD1.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("a-CD1.srt", "chs.srt"),
+        (),
     ),
     _Case(
         "flat-takes-only-same-number",
@@ -131,11 +131,11 @@ CASES: tuple[_Case, ...] = (
         (),
     ),
     _Case(
-        "same-number-wrong-cd-rejected",
+        "same-number-different-cd-still-matches",
         ("MIDV-123-CD1.mp4", "MIDV-123-CD2.srt"),
         "MIDV-123-CD1.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        (),
+        ("MIDV-123-CD2.srt",),
     ),
     _Case(
         "same-number-same-cd-rejects-other",
@@ -163,21 +163,21 @@ CASES: tuple[_Case, ...] = (
         ("MIDV-123.mp4", "012.ass"),
         "MIDV-123.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("012.ass",),
+        (),
     ),
     _Case(
         "number1-cd1-takes-own-langs-not-other-number-or-cd",
         _NUMBER_CD_FILES,
         "ABC-123-CD1.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("ABC-123-CD1.chs.srt", "ABC-123-CD1.en.srt"),
+        ("ABC-123-CD1.chs.srt", "ABC-123-CD1.en.srt", "ABC-123-CD2.chs.srt", "ABC-123-CD2.en.srt"),
     ),
     _Case(
         "number1-cd2-takes-own-langs-not-cd1",
         _NUMBER_CD_FILES,
         "ABC-123-CD2.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("ABC-123-CD2.chs.srt", "ABC-123-CD2.en.srt"),
+        ("ABC-123-CD1.chs.srt", "ABC-123-CD1.en.srt", "ABC-123-CD2.chs.srt", "ABC-123-CD2.en.srt"),
     ),
     _Case(
         "number2-cd1-takes-own-not-number1",
@@ -201,7 +201,7 @@ CASES: tuple[_Case, ...] = (
         ),
         "ABC-123-CD1.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("ABC-123-CD1.chs.srt", "ABC-123-CD1.en.srt", "ABC-123.srt"),
+        ("ABC-123-CD1.chs.srt", "ABC-123-CD1.en.srt", "ABC-123-CD2.chs.srt", "ABC-123-CD2.en.srt", "ABC-123.srt"),
     ),
     _Case(
         "same-number-unmarked-rejected-by-cd2",
@@ -211,7 +211,7 @@ CASES: tuple[_Case, ...] = (
         ),
         "ABC-123-CD2.mp4",
         DEFAULT_SUBTITLE_EXTENSIONS,
-        ("ABC-123-CD2.chs.srt", "ABC-123-CD2.en.srt"),
+        ("ABC-123-CD1.chs.srt", "ABC-123-CD1.en.srt", "ABC-123-CD2.chs.srt", "ABC-123-CD2.en.srt", "ABC-123.srt"),
     ),
 )
 
@@ -222,5 +222,11 @@ def test_discover_subtitles(case: _Case, tmp_path: Path) -> None:
     for rel in case.files:
         _touch(folder / rel)
     video = folder / case.video
-    found = discover_subtitles.sync(video, case.extensions, parse_file_info(video))
+    info = parse_file_info(video)
+    found = discover_subtitles.sync(
+        video,
+        case.extensions,
+        info,
+        metadata_number=info.number,
+    )
     assert [p.name for p in found] == list(case.expected)

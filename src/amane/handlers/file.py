@@ -149,7 +149,12 @@ async def execute_file_operations(
     # 发现字幕: 必须在视频移动前检查同目录.
     subtitles: list[Path] = []
     if library is not None:
-        subtitles = await discover_subtitles(source_path, library.subtitle_extensions, file_info)
+        subtitles = await discover_subtitles(
+            source_path,
+            library.subtitle_extensions,
+            file_info,
+            metadata_number=metadata.number,
+        )
 
     org_result = await execute_organize(
         source=source_path,

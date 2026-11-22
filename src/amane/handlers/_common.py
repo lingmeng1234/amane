@@ -8,7 +8,8 @@ import structlog
 
 from ..db import Library
 from ..db.models import MediaIdentityType
-from ..library import LibraryHit, LibraryScan, has_companion_subtitle
+from ..library import LibraryHit, LibraryScan
+from ..organize import discover_subtitles
 from ..parsing import ContentType, parse_file_info
 from ..utils.litepan_strm import read_litepan_115_file_id
 from ..utils.oshash import compute_oshash
@@ -78,13 +79,31 @@ async def register_media_file(
 
 
 async def refresh_external_subtitle(repo: Repository, media: MediaFile, library: Library) -> None:
-    """按视频当前所在目录检查一次外挂字幕, 写回 ``MediaFile.has_external_subtitle``.
+    """按主番号与现有 Metadata 精确匹配同目录外挂字幕, 写回文件级标记.
 
-    库 ``subtitle_extensions`` 为空表示关闭发现, 此时写入假值, 早先命中的角标随之熄灭.
+    不使用目录级存在性判断: 无法解析番号、没有对应 Metadata 或属于其它作品的字幕均不命中.
     """
     extensions = library.subtitle_extensions or []
-    found = await has_companion_subtitle(Path(media.path), extensions)
+    parsed = parse_file_info(media.path)
+    found = False
+    if extensions and parsed.number:
+        if parsed.content_type is ContentType.WESTERN:
+            metadata_exists = bool(await repo.list_western_metadata_by_number(parsed.number))
+        else:
+            metadata_exists = (
+                await repo.get_metadata_by_number(parsed.number, content_type=parsed.content_type)
+            ) is not None
+        if metadata_exists:
+            found = bool(
+                await discover_subtitles(
+                    Path(media.path),
+                    extensions,
+                    parsed,
+                    metadata_number=parsed.number,
+                )
+            )
     if media.id is None:
+        media.has_external_subtitle = found
         return
     media.has_external_subtitle = found
     await repo.update_media_file(media.id, has_external_subtitle=found)

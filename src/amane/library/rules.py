@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated, TYPE_CHECKING
 
 from pydantic import AfterValidator
 

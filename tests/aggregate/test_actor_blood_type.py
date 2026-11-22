@@ -1,6 +1,6 @@
 from amane.aggregate.actor import AggregatedActor, merge_actor_metadata
-from amane.db.actor_person import filter_locked_person_data
 from amane.crawlers.actor.models import ActorMetadata
+from amane.db.actor_person import filter_locked_person_data
 from amane.enums import ActorField, SiteName
 
 

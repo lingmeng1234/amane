@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 import os
 import re
@@ -103,7 +104,7 @@ class DmmTextMappingStore:
             self._atomic_write(self.file, dict(sorted(data.items())))
             return True
 
-    def delete_many(self, sources: list[str]) -> int:
+    def delete_many(self, sources: builtins.list[str]) -> int:
         with self._lock:
             data = self.list()
             count = 0
@@ -115,7 +116,7 @@ class DmmTextMappingStore:
                 self._atomic_write(self.file, dict(sorted(data.items())))
             return count
 
-    def list_conflicts(self) -> list[dict[str, Any]]:
+    def list_conflicts(self) -> builtins.list[dict[str, Any]]:
         with self._lock:
             try:
                 items = json.loads(self.exceptions_file.read_text(encoding="utf-8"))
@@ -125,7 +126,7 @@ class DmmTextMappingStore:
                 raise ValueError("DMM和谐映射冲突文件必须是 JSON 数组")
             return items
 
-    def _write_conflicts(self, items: list[dict[str, Any]]) -> None:
+    def _write_conflicts(self, items: builtins.list[dict[str, Any]]) -> None:
         normalized = []
         for index, item in enumerate(items, 1):
             row = dict(item)
@@ -133,14 +134,14 @@ class DmmTextMappingStore:
             normalized.append(row)
         self._atomic_write(self.exceptions_file, normalized)
 
-    def add_conflicts(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def add_conflicts(self, items: builtins.list[dict[str, Any]]) -> builtins.list[dict[str, Any]]:
         with self._lock:
             current = self.list_conflicts()
             current.extend(items)
             self._write_conflicts(current)
             return self.list_conflicts()
 
-    def update_conflict(self, group_id: int, side: str, entry: dict[str, str] | None) -> list[dict[str, Any]]:
+    def update_conflict(self, group_id: int, side: str, entry: dict[str, str] | None) -> builtins.list[dict[str, Any]]:
         if side not in {"old", "new"}:
             raise ValueError("冲突记录侧别无效")
         with self._lock:
@@ -158,7 +159,7 @@ class DmmTextMappingStore:
             self._write_conflicts(items)
             return self.list_conflicts()
 
-    def save_conflict_entry(self, group_id: int, side: str, source: str, target: str) -> list[dict[str, Any]]:
+    def save_conflict_entry(self, group_id: int, side: str, source: str, target: str) -> builtins.list[dict[str, Any]]:
         if side not in {"old", "new"}:
             raise ValueError("冲突记录侧别无效")
         with self._lock:
@@ -177,17 +178,17 @@ class DmmTextMappingStore:
             raise ValueError("导入内容必须是以原和谐词为键的 JSON 对象")
         return self.import_merge_rows(list(incoming.items()))
 
-    def import_merge_rows(self, rows: list[tuple[Any, Any]]) -> dict[str, Any]:
-        grouped: dict[str, list[str]] = {}
+    def import_merge_rows(self, rows: builtins.list[tuple[Any, Any]]) -> dict[str, Any]:
+        grouped: dict[str, builtins.list[str]] = {}
         for raw_source, raw_target in rows:
             source = str(raw_source).strip()
             target = self._validate(source, raw_target)
             grouped.setdefault(source, []).append(target)
         with self._lock:
             current = self.list()
-            added: list[str] = []
-            unchanged: list[str] = []
-            conflicts: list[dict[str, Any]] = []
+            added: builtins.list[str] = []
+            unchanged: builtins.list[str] = []
+            conflicts: builtins.list[dict[str, Any]] = []
             for source, targets in grouped.items():
                 distinct_targets = list(dict.fromkeys(targets))
                 existing_target = current.get(source)
@@ -220,7 +221,7 @@ class DmmTextMappingStore:
             raise ValueError("导入内容必须是以原和谐词为键的 JSON 对象")
         return self.replace_rows(list(incoming.items()))
 
-    def replace_rows(self, rows: list[tuple[Any, Any]]) -> int:
+    def replace_rows(self, rows: builtins.list[tuple[Any, Any]]) -> int:
         normalized: dict[str, str] = {}
         for raw_source, target in rows:
             source = str(raw_source).strip()

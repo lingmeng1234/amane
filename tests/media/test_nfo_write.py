@@ -359,7 +359,6 @@ async def test_write_nfo_cover_attributes_do_not_require_existing_tags(tmp_path:
     assert root.findall("tag") == []
 
 
-
 @pytest.mark.asyncio(loop_scope="function")
 async def test_write_nfo_uses_typed_chinese_mappings_for_tags_and_merchants(tmp_path: Path):
     """同一原文在四种归属中可独立映射; Genre/Tag/Series 写入中文值, 独立 studio 字段保留原文."""

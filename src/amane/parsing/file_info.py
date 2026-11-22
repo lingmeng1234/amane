@@ -335,9 +335,8 @@ def parse_file_info(
         cd = _detect_cd(basename)
         if cd is None and dirs:
             cd = _detect_cd_from_parent(dirs[-1])
+        # 显式文件名分支标记优先于未知番号的 WESTERN 兜底类型.
         mosaic = _detect_mosaic(basename, mosaic_rules)
-        if number_content_type is ContentType.WESTERN:
-            mosaic = None
     else:
         # 文本: 只执行番号规则; 未命中则 number 为 None, 相位只依据该字符串.
         assert text is not None
@@ -347,9 +346,8 @@ def parse_file_info(
         hentai = False
         basename = Path(text).stem.upper()
         cd = _detect_cd(basename)
+        # 显式文件名分支标记优先于未知番号的 WESTERN 兜底类型.
         mosaic = _detect_mosaic(basename, mosaic_rules)
-        if number_content_type is ContentType.WESTERN:
-            mosaic = None
     return FileInfo(
         number=number,
         content_type=content_type,
@@ -466,20 +464,25 @@ def summarize_file_phases(phases: Iterable[FilePhase], content_type: ContentType
     """有码/无码和里番按文件属性聚合; 没有文件时回退条目类型."""
     items = list(phases)
     mosaic_present = {phase["mosaic"] for phase in items if phase["mosaic"] is not None}
-    if (
-        any((phase.get("number_content_type") or content_type) is ContentType.WESTERN for phase in items)
-        if items
-        else content_type is ContentType.WESTERN
-    ):
-        mosaic_present.add(Mosaic.WESTERN)
-    if items:
-        censored = any(
-            (phase.get("number_content_type") or content_type) is ContentType.CENSORED and phase["mosaic"] is None
+    western_without_explicit_branch = (
+        any(
+            (phase.get("number_content_type") or content_type) is ContentType.WESTERN and phase["mosaic"] is None
             for phase in items
         )
+        if items
+        else content_type is ContentType.WESTERN
+    )
+    if western_without_explicit_branch:
+        mosaic_present.add(Mosaic.WESTERN)
+    if items:
         uncensored = any(
             (phase.get("number_content_type") or content_type) in {ContentType.UNCENSORED, ContentType.WESTERN}
             or phase["mosaic"] is not None
+            for phase in items
+        )
+        # 条目级展示以无码优先: 同一作品只要有一份无码资源, 不再同时标记有码.
+        censored = not uncensored and any(
+            (phase.get("number_content_type") or content_type) is ContentType.CENSORED and phase["mosaic"] is None
             for phase in items
         )
     else:

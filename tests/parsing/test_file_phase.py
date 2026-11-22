@@ -140,6 +140,7 @@ def test_western_type_contributes_its_own_uncensored_branch() -> None:
     assert summary.uncensored is True
     assert summary.mosaics == (Mosaic.WESTERN,)
 
+
 def test_summarize_file_phases_uncensored_marker_on_censored_entry() -> None:
     """有码番的无码标记副本: 条目有码, 无码由文件标记并进来."""
     marked: FilePhase = {"mosaic": Mosaic.UNCENSORED, "has_subtitle": False, "definition": None}

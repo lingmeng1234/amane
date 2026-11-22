@@ -312,15 +312,21 @@ def parse_file_info(
         p = Path(path)
         stem = p.stem
         dirs = _dir_names(p)
-        number, number_content_type = _identify(stem.strip(), dirs, escape, fallback=True)
+        number, number_content_type = _identify(stem.strip(), dirs, escape, fallback=False)
         path_type = _classify_from_path(dirs)
         hentai = _is_hentai_dir(dirs)
-        if number is None and path_type is ContentType.HENTAI:
-            number_content_type = ContentType.CENSORED
-            content_type = ContentType.HENTAI
-        elif number is None and path_type is ContentType.WESTERN:
-            number_content_type = ContentType.WESTERN
-            content_type = ContentType.WESTERN
+        if number is None:
+            # 只有文件名/父目录均未识别出番号时才使用路径兜底; Hentai 目录不应被通用文件名回退误判为欧美.
+            number, fallback_type = _identify(stem.strip(), dirs, escape, fallback=True)
+            if path_type is ContentType.HENTAI:
+                number_content_type = ContentType.CENSORED
+                content_type = ContentType.HENTAI
+            elif path_type is ContentType.WESTERN:
+                number_content_type = ContentType.WESTERN
+                content_type = ContentType.WESTERN
+            else:
+                number_content_type = fallback_type
+                content_type = fallback_type
         elif path_type is ContentType.HENTAI and number_content_type is not ContentType.WESTERN:
             content_type = ContentType.HENTAI
         else:

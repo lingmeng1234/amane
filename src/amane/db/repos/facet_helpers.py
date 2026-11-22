@@ -742,7 +742,7 @@ async def _load_linked_facet_values(
             metadata_table.c.publisher,
         ).where(relevant)
         for metadata_id, actors, directors, tags, series_names, series, studio, publisher in (
-            await session.exec(stmt)
+            await session.execute(stmt)
         ).all():
             if metadata_id is None:
                 continue

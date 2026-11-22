@@ -11,6 +11,7 @@ import {
   Table,
   Text,
   TextInput,
+  Tabs,
   Title,
   Tooltip,
 } from "@mantine/core";
@@ -21,8 +22,10 @@ import { apiFetch } from "@/lib/api-token";
 
 export const Route = createFileRoute("/tag-mappings")({ component: TagMappingsPage });
 
+type MappingType = "tag" | "maker" | "publisher" | "series";
 type Entry = {
   original: string;
+  type: MappingType;
   translation: string | null;
   language: string;
   usage_count: number;
@@ -48,6 +51,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 function TagMappingsPage() {
   const qc = useQueryClient();
+  const [mappingType, setMappingType] = useState<MappingType>("tag");
   const [status, setStatus] = useState("pending");
   const [language, setLanguage] = useState("all");
   const [frequency, setFrequency] = useState("all");
@@ -74,10 +78,10 @@ function TagMappingsPage() {
     },
   });
   const query = useQuery({
-    queryKey: ["tag-mappings", status, language, frequency, search, page],
+    queryKey: ["tag-mappings", mappingType, status, language, frequency, search, page],
     queryFn: () =>
       request<Result>(
-        `/api/tag-mappings?status=${status}&language=${language}&frequency=${frequency}&search=${encodeURIComponent(search)}&offset=${(page - 1) * PAGE_SIZE}&limit=${PAGE_SIZE}`,
+        `/api/tag-mappings?type=${mappingType}&status=${status}&language=${language}&frequency=${frequency}&search=${encodeURIComponent(search)}&offset=${(page - 1) * PAGE_SIZE}&limit=${PAGE_SIZE}`,
       ),
   });
   const save = useMutation({
@@ -87,6 +91,7 @@ function TagMappingsPage() {
         body: JSON.stringify({
           original: entry.original,
           translation: edits[entry.original] ?? entry.translation,
+          type: entry.type,
         }),
       }),
     onSuccess: (_result, entry) => {
@@ -103,7 +108,7 @@ function TagMappingsPage() {
     mutationFn: (originals: string[]) =>
       request<{ suggestions: Record<string, string> }>("/api/tag-mappings/suggest", {
         method: "POST",
-        body: JSON.stringify({ originals }),
+        body: JSON.stringify({ originals, type: mappingType }),
       }),
     onSuccess: (result) => {
       setEdits((old) => ({ ...old, ...result.suggestions }));
@@ -121,14 +126,14 @@ function TagMappingsPage() {
   });
   const archiveOne = useMutation({
     mutationFn: (original: string) =>
-      request<{ archived: boolean }>(`/api/tag-mappings/${encodeURIComponent(original)}/archive`, {
+      request<{ archived: boolean }>(`/api/tag-mappings/${encodeURIComponent(original)}/archive?type=${mappingType}`, {
         method: "PUT",
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tag-mappings"] }),
   });
   const restoreOne = useMutation({
     mutationFn: (original: string) =>
-      request<{ archived: boolean }>(`/api/tag-mappings/${encodeURIComponent(original)}/restore`, {
+      request<{ archived: boolean }>(`/api/tag-mappings/${encodeURIComponent(original)}/restore?type=${mappingType}`, {
         method: "PUT",
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["tag-mappings"] }),
@@ -143,7 +148,7 @@ function TagMappingsPage() {
       targets.map((original) =>
         request<Entry>("/api/tag-mappings", {
           method: "PUT",
-          body: JSON.stringify({ original, translation: edits[original] }),
+          body: JSON.stringify({ original, translation: edits[original], type: mappingType }),
         }),
       ),
     );
@@ -169,7 +174,7 @@ function TagMappingsPage() {
         "/api/tag-mappings/archive",
         {
           method: "POST",
-          body: JSON.stringify({ originals: selected }),
+          body: JSON.stringify({ originals: selected, type: mappingType }),
         },
       );
       setSelected([]);
@@ -188,7 +193,7 @@ function TagMappingsPage() {
     try {
       const result = await request<{ restored: number }>("/api/tag-mappings/restore", {
         method: "POST",
-        body: JSON.stringify({ originals: selected }),
+        body: JSON.stringify({ originals: selected, type: mappingType }),
       });
       setSelected([]);
       selectionAnchor.current = null;
@@ -207,7 +212,7 @@ function TagMappingsPage() {
       <Group justify="space-between" align="center">
         <div>
           <Group align="center" gap="sm">
-            <Title order={2}>标签中文映射</Title>
+            <Title order={2}>中文映射表</Title>
             <Button
               size="sm"
               variant={mappingEnabled ? "filled" : "light"}
@@ -220,11 +225,10 @@ function TagMappingsPage() {
             </Button>
           </Group>
           <Text c="dimmed" size="sm">
-            原始标签保留不变；确认映射后，影片标签展示使用中文结果。
+            原始名称保留不变；确认映射后，片库展示及对应 NFO 输出使用中文名称。
           </Text>
           <Text c="dimmed" size="xs">
-            开启：已映射标签显示中文，未映射标签保留原文。关闭：所有标签均显示原文，NFO
-            也写入原文；映射词典不会被删除。
+            开启：已映射词条使用中文名称，未映射词条保留原文。关闭：所有类别均使用原文；映射词典不会被删除。
           </Text>
         </div>
         <Group>
@@ -259,6 +263,41 @@ function TagMappingsPage() {
           </Button>
         </Group>
       </Group>
+      <Tabs
+        value={mappingType === "tag" ? "tag" : "merchant"}
+        onChange={(value) => {
+          if (value !== "tag" && value !== "merchant") return;
+          setMappingType(value === "tag" ? "tag" : "maker");
+          setPage(1);
+          setSelected([]);
+          setEdits({});
+          selectionAnchor.current = null;
+        }}
+      >
+        <Tabs.List>
+          <Tabs.Tab value="tag">标签中文映射</Tabs.Tab>
+          <Tabs.Tab value="merchant">片商中文映射</Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
+      {mappingType !== "tag" && (
+        <Tabs
+          value={mappingType}
+          onChange={(value) => {
+            if (value !== "maker" && value !== "publisher" && value !== "series") return;
+            setMappingType(value);
+            setPage(1);
+            setSelected([]);
+            setEdits({});
+            selectionAnchor.current = null;
+          }}
+        >
+          <Tabs.List>
+            <Tabs.Tab value="maker">制作商</Tabs.Tab>
+            <Tabs.Tab value="publisher">发行商</Tabs.Tab>
+            <Tabs.Tab value="series">系列</Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
+      )}
       <Group grow align="end">
         <Select
           label="词条状态"
@@ -390,7 +429,7 @@ function TagMappingsPage() {
                   }}
                 />
               </Table.Th>
-              <Table.Th>原始标签</Table.Th>
+              <Table.Th>原始名称</Table.Th>
               <Table.Th>语言</Table.Th>
               <Table.Th>使用次数</Table.Th>
               <Table.Th>来源</Table.Th>
@@ -536,8 +575,8 @@ function TagMappingsPage() {
         />
       </Group>
       <Alert color="blue" variant="light">
-        LLM
-        建议只填入编辑框，不会自动保存；现有片库词条在打开列表时从标签分类表同步，并按引用次数排序。
+        LLM 建议只填入编辑框，不会自动保存；各类别词条从对应片库分类同步，并按引用次数排序。
+        归档、批量操作和导入导出均沿用同一套映射管理机制。
       </Alert>
     </Stack>
   );

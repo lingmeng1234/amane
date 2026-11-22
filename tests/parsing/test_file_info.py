@@ -761,3 +761,10 @@ def test_hentai_directory_keeps_number_derived_censored_type() -> None:
     assert info.content_type is ContentType.HENTAI
     assert info.number_content_type is ContentType.CENSORED
     assert info.hentai is True
+
+
+def test_hentai_directory_classifies_generic_filename_as_hentai() -> None:
+    info = parse_file_info("/media/动漫/movie.mp4")
+    assert info.content_type is ContentType.HENTAI
+    assert info.number_content_type is ContentType.CENSORED
+    assert info.hentai is True

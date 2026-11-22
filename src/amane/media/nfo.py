@@ -68,6 +68,53 @@ async def write_nfo(
         code.write('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n')
         code.write("<movie>\n")
 
+        # 同一份映射词典按 type 区分四类来源; 旧版仅标签字典仍按 tag 读取.
+        translations: dict[tuple[str, str], str] = {}
+        if tag_mapping_path is not None and tag_mapping_path.is_file():
+            try:
+                mapping_data = json.loads(tag_mapping_path.read_text(encoding="utf-8"))
+                entries = mapping_data.get("entries", {})
+                if mapping_data.get("enabled", True):
+                    if isinstance(entries, list):
+                        records = entries
+                    elif isinstance(entries, dict):
+                        records = [
+                            {"original": original, **entry, "type": entry.get("type", "tag")}
+                            for original, entry in entries.items()
+                            if isinstance(entry, dict)
+                        ]
+                    else:
+                        records = []
+                    for entry in records:
+                        if not isinstance(entry, dict):
+                            continue
+                        kind = entry.get("type")
+                        original = entry.get("original")
+                        translation = entry.get("translation")
+                        if (
+                            kind in {"tag", "maker", "publisher", "series"}
+                            and isinstance(original, str)
+                            and isinstance(translation, str)
+                            and translation.strip()
+                        ):
+                            translations[(kind, original)] = translation.strip()
+            except OSError, ValueError, TypeError:
+                logger.warning(
+                    "Chinese mapping dictionary could not be read; writing original values",
+                    path=str(tag_mapping_path),
+                )
+
+        def map_values(kind: str, values: list[str]) -> list[str]:
+            return list(dict.fromkeys(translations.get((kind, value), value) for value in values if value))
+
+        tags = map_values("tag", [tag for tag in metadata.tags if tag])
+        mapped_studio = map_values("maker", [metadata.studio])[0] if metadata.studio else None
+        mapped_publisher = map_values("publisher", [metadata.publisher])[0] if metadata.publisher else None
+
+        series_values = metadata.series_names or ([metadata.series] if metadata.series else [])
+        series_names = map_values("series", list(dict.fromkeys(name for name in series_values if name)))
+
+
         if (nfo_output is None or nfo_output.plot_release.plot) and metadata.plot:
             # 长文本按纯文本写出: 转义后 "]]>" 不可能出现, CDATA 只带来非法 XML 的风险.
             plot_escaped = _escape_xml(metadata.plot)
@@ -136,9 +183,6 @@ async def write_nfo(
         if (nfo_output is None or nfo_output.plot_release.runtime) and metadata.runtime is not None:
             code.write(f"  <runtime>{metadata.runtime}</runtime>\n")
 
-        series_values = metadata.series_names or ([metadata.series] if metadata.series else [])
-        series_names = list(dict.fromkeys(name for name in series_values if name))
-        series_names = map_values("series", series_names)
         if (nfo_output is None or nfo_output.categories.series) and series_names:
             # Kodi Movie NFO 的 <set> 是单值字段; 保留首项, 多系列完整数据仍保存在 Amane 数据库中.
             code.write(f"  <series>{_escape_xml(series_names[0])}</series>\n")
@@ -147,55 +191,12 @@ async def write_nfo(
             code.write("  </set>\n")
 
         if (nfo_output is None or nfo_output.people.studio) and metadata.studio:
-            code.write(f"  <studio>{_escape_xml(metadata.studio)}</studio>\n")
-            code.write(f"  <maker>{_escape_xml(metadata.studio)}</maker>\n")
+            code.write(f"  <studio>{_escape_xml(mapped_studio or metadata.studio)}</studio>\n")
+            code.write(f"  <maker>{_escape_xml(mapped_studio or metadata.studio)}</maker>\n")
 
         if (nfo_output is None or nfo_output.people.publisher) and metadata.publisher:
-            code.write(f"  <publisher>{_escape_xml(metadata.publisher)}</publisher>\n")
-            code.write(f"  <label>{_escape_xml(metadata.publisher)}</label>\n")
-
-        # 同一份映射词典按 type 区分四类来源; 旧版仅标签字典仍按 tag 读取.
-        translations: dict[tuple[str, str], str] = {}
-        if tag_mapping_path is not None and tag_mapping_path.is_file():
-            try:
-                mapping_data = json.loads(tag_mapping_path.read_text(encoding="utf-8"))
-                entries = mapping_data.get("entries", {})
-                if mapping_data.get("enabled", True):
-                    if isinstance(entries, list):
-                        records = entries
-                    elif isinstance(entries, dict):
-                        records = [
-                            {"original": original, **entry, "type": entry.get("type", "tag")}
-                            for original, entry in entries.items()
-                            if isinstance(entry, dict)
-                        ]
-                    else:
-                        records = []
-                    for entry in records:
-                        if not isinstance(entry, dict):
-                            continue
-                        kind = entry.get("type")
-                        original = entry.get("original")
-                        translation = entry.get("translation")
-                        if (
-                            kind in {"tag", "maker", "publisher", "series"}
-                            and isinstance(original, str)
-                            and isinstance(translation, str)
-                            and translation.strip()
-                        ):
-                            translations[(kind, original)] = translation.strip()
-            except OSError, ValueError, TypeError:
-                logger.warning(
-                    "Chinese mapping dictionary could not be read; writing original values",
-                    path=str(tag_mapping_path),
-                )
-
-        def map_values(kind: str, values: list[str]) -> list[str]:
-            return list(dict.fromkeys(translations.get((kind, value), value) for value in values if value))
-
-        tags = map_values("tag", [tag for tag in metadata.tags if tag])
-        mapped_studio = map_values("maker", [metadata.studio])[0] if metadata.studio else None
-        mapped_publisher = map_values("publisher", [metadata.publisher])[0] if metadata.publisher else None
+            code.write(f"  <publisher>{_escape_xml(mapped_publisher or metadata.publisher)}</publisher>\n")
+            code.write(f"  <label>{_escape_xml(mapped_publisher or metadata.publisher)}</label>\n")
 
         def cover_attributes() -> list[str]:
             if file_info is None:

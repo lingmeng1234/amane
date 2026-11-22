@@ -8,7 +8,7 @@ import pytest
 from amane.config.manager import NfoOutputConfig
 from amane.db.models import Metadata
 from amane.media import write_nfo
-from amane.parsing import ContentType, parse_file_info
+from amane.parsing import ContentType, FilePhase, Mosaic, parse_file_info, summarize_file_phases
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -416,6 +416,53 @@ async def test_write_nfo_uses_typed_chinese_mappings_for_tags_and_merchants(tmp_
     assert root.findtext("maker") == "中文制作商"
     assert root.findtext("publisher") == "中文发行商"
     assert root.findtext("label") == "中文发行商"
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_uses_aggregated_resource_phases(tmp_path: Path):
+    metadata = Metadata(number="MIXED-PHASES", title="Mixed resources")
+    phases: tuple[FilePhase, ...] = (
+        {
+            "mosaic": None,
+            "has_subtitle": False,
+            "definition": "1080p",
+            "number_content_type": ContentType.CENSORED,
+        },
+        {
+            "mosaic": Mosaic.CRACKED,
+            "has_subtitle": False,
+            "definition": "4K",
+            "number_content_type": ContentType.CENSORED,
+        },
+        {
+            "mosaic": Mosaic.LEAKED,
+            "has_subtitle": True,
+            "definition": "720p",
+            "number_content_type": ContentType.CENSORED,
+        },
+    )
+    summary = summarize_file_phases(phases, ContentType.CENSORED)
+    output = NfoOutputConfig.model_validate(
+        {
+            "categories": {
+                "genre": {"cover_attributes": True, "tags": False},
+                "tag": {"cover_attributes": False, "tags": False},
+            }
+        }
+    )
+    nfo_path = tmp_path / "MIXED-PHASES.nfo"
+
+    assert await write_nfo(
+        metadata,
+        nfo_path,
+        nfo_output=output,
+        file_info=parse_file_info("/media/MIXED-PHASES.mp4"),
+        file_phase=summary,
+    ) is True
+
+    root = ET.parse(nfo_path).getroot()
+    assert [node.text for node in root.findall("genre")] == ["无码", "破解", "流出", "4K", "中文字幕"]
+    assert "有码" not in [node.text for node in root.findall("genre")]
 
 
 @pytest.mark.asyncio(loop_scope="function")

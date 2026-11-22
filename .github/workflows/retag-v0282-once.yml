@@ -9,11 +9,12 @@ on:
 permissions:
   contents: write
   actions: write
+  workflows: write
 
 jobs:
   retag-and-rebuild:
     # Run only for the follow-up maintenance commit after the verified PR #4 merge.
-    if: github.event.before == 'ed5c6e55e21946eefc7ed2fb91d82e0ad849094c'
+    if: github.event.before == 'a124ac02f4591b529eb8a1feeb84adf4ea6d3fcb'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

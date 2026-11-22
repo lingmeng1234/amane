@@ -114,7 +114,6 @@ async def write_nfo(
         series_values = metadata.series_names or ([metadata.series] if metadata.series else [])
         series_names = map_values("series", list(dict.fromkeys(name for name in series_values if name)))
 
-
         if (nfo_output is None or nfo_output.plot_release.plot) and metadata.plot:
             # 长文本按纯文本写出: 转义后 "]]>" 不可能出现, CDATA 只带来非法 XML 的风险.
             plot_escaped = _escape_xml(metadata.plot)

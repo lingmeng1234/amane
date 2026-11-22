@@ -15,7 +15,7 @@ import {
   EMBEDDING_KINDS,
   FILE_DEFINITIONS,
   METADATA_SORT_FIELDS,
-  MOSAICS,
+  MOSAIC_FILTERS,
   SORT_ORDERS,
 } from "@/lib/exhaustive-maps";
 import { coerceIdList } from "@/lib/facets";
@@ -73,7 +73,7 @@ export const metaSearchSchema = z.object({
   hentai: z.enum(["true", "false"]).optional(),
   vr: z.enum(["true", "false"]).optional(),
   uncensored: z.enum(["true", "false"]).optional(),
-  mosaic: z.enum(MOSAICS).optional(),
+  mosaic: z.enum(MOSAIC_FILTERS).optional(),
   definition: z.enum(FILE_DEFINITIONS).optional(),
   content_type: z.enum(CONTENT_TYPE_FILTERS).optional(),
   saved_query_id: z.coerce.number().int().positive().optional(),

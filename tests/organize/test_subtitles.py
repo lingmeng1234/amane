@@ -6,10 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from amane.organize import MoveMode
 from amane.db.models import Metadata
 from amane.library import DEFAULT_SUBTITLE_EXTENSIONS
-from amane.organize import discover_subtitles, place_subtitles
+from amane.organize import MoveMode, discover_subtitles, place_subtitles
 from amane.parsing import parse_file_info
 
 

@@ -1263,7 +1263,7 @@ class TestMetadataRepo:
         assert summaries[sub.id].phase.has_subtitle is True
         assert summaries[uncensored.id].file_count == 0
         assert summaries[uncensored.id].phase.uncensored is True
-        assert summaries[marked.id].phase.censored is True
+        assert summaries[marked.id].phase.censored is False
         assert summaries[marked.id].phase.uncensored is True
         assert summaries[plain.id].phase.uncensored is False
 

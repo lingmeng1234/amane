@@ -529,6 +529,8 @@ def test_actor_gender_is_written_to_person_overview(gender: ActorGender, expecte
         assert "Overview" not in updates
     else:
         assert updates["Overview"] == expected
+
+
 @pytest.mark.parametrize(
     ("mode", "expected_overview"),
     [
@@ -546,6 +548,7 @@ def test_actor_aliases_are_individual_person_tags_and_not_overview(mode: str, ex
     assert updates["Tags"] == ["Existing", "A", "B"]
     assert updates["Overview"] == expected_overview
     assert "别名：" not in str(updates["Overview"])
+
 
 
 def test_actor_blood_type_is_included_in_emby_profile() -> None:

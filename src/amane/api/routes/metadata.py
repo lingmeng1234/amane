@@ -204,9 +204,7 @@ async def _mapped_facet_ids(
     return list(dict.fromkeys(expanded))
 
 
-async def _mapped_facet_id(
-    repo: RepoDep, runtime: RuntimeDep, kind: FacetKind, facet_id: int | None
-) -> int | None:
+async def _mapped_facet_id(repo: RepoDep, runtime: RuntimeDep, kind: FacetKind, facet_id: int | None) -> int | None:
     if facet_id is None:
         return None
     expanded = await _mapped_facet_ids(repo, runtime, kind, [facet_id])

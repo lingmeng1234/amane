@@ -198,3 +198,24 @@ def test_subtitle_stays_in_place_when_metadata_number_does_not_match(tmp_path: P
 
     assert moved == []
     assert subtitle.exists()
+
+@pytest.mark.parametrize("subtitle_name", ["a-CD1.srt", "chs.srt", "012.ass"])
+def test_unparsed_subtitle_stays_in_place_during_organize(
+    subtitle_name: str, tmp_path: Path
+) -> None:
+    video_source = _touch(tmp_path / "source" / "MIDV-123-CD1.mp4")
+    subtitle = _touch(tmp_path / "source" / subtitle_name)
+    video_dest = _touch(tmp_path / "organized" / "MIDV-123-CD1.mp4")
+
+    moved = place_subtitles.sync(
+        [subtitle],
+        video_source=video_source,
+        video_dest=video_dest,
+        library=MagicMock(),
+        metadata=Metadata(number="MIDV-123"),
+        file_info=parse_file_info(video_source),
+        mode=MoveMode.MOVE,
+    )
+
+    assert moved == []
+    assert subtitle.exists()

@@ -624,9 +624,7 @@ class FacetsRepoMixin(RepositoryMixinBase):
                 entity = Series
                 ids = (
                     await session.exec(
-                        select(Series.id).where(
-                            ~exists().where(col(MetadataSeries.series_id) == col(Series.id))
-                        )
+                        select(Series.id).where(~exists().where(col(MetadataSeries.series_id) == col(Series.id)))
                     )
                 ).all()
             else:

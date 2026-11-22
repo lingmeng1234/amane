@@ -48,7 +48,7 @@ class TestMetadataHttp:
             "definition": None,
             "hentai": False,
         }
-        assert items["MIDV-002"]["file_phase"]["censored"] is True
+        assert items["MIDV-002"]["file_phase"]["censored"] is False
         assert items["MIDV-002"]["file_phase"]["uncensored"] is True
         assert items["MIDV-002"]["file_phase"]["mosaics"] == ["uncensored"]
 

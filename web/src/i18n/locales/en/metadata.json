@@ -25,6 +25,7 @@
     "hasFilesYes": "Has files",
     "hasFilesNo": "No files",
     "hasSubtitle": "Chinese subtitles",
+    "hentai": "Hentai",
     "vr": "VR",
     "uncensored": "Uncensored",
     "mosaic": "Mosaic mark",
@@ -53,7 +54,7 @@
     "libraryAll": "All libraries"
   },
   "filePhase": {
-    "subtitle": "SUB",
+    "subtitle": "Chinese subtitles",
     "censored": "CEN",
     "uncensored": "U",
     "cracked": "CRACK",

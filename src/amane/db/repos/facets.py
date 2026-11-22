@@ -287,7 +287,11 @@ class FacetsRepoMixin(RepositoryMixinBase):
             if ids:
                 stmt = stmt.where(col(id_col).in_(ids))
             rows = await session.exec(stmt)
-            return [(int(facet_id), int(metadata_id)) for facet_id, metadata_id in rows.all()]
+            return [
+                (int(facet_id), int(metadata_id))
+                for facet_id, metadata_id in rows.all()
+                if facet_id is not None and metadata_id is not None
+            ]
 
     async def list_tag_metadata_links(self, tag_ids: Sequence[int] | None = None) -> list[tuple[int, int]]:
         """兼容旧调用方; 返回指定标签与影片的关联对."""

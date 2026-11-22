@@ -219,12 +219,14 @@ function TagMappingsPage() {
     publisher: "发行商",
     series: "系列",
   }[mappingType];
-  const mappingTypeColor = {
-    tag: "teal",
-    maker: "blue",
-    publisher: "cyan",
-    series: "orange",
-  }[mappingType];
+  const mappingTypeColor = (
+    {
+      tag: "teal",
+      maker: "blue",
+      publisher: "cyan",
+      series: "orange",
+    } as const
+  )[mappingType];
   return (
     <Stack gap="md" pb={120}>
       <Group justify="space-between" align="center">

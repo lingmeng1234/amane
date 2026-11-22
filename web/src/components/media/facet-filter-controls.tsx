@@ -123,7 +123,7 @@ function parseMosaic(value: string | null): Mosaic | null {
   return null;
 }
 
-function parseContentType(value: string | null): ContentType | null {
+function parseContentType(value: string | null): Exclude<ContentType, "hentai"> | null {
   for (const contentType of CONTENT_TYPE_FILTERS) {
     if (contentType === value) return contentType;
   }

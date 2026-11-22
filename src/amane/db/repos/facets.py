@@ -2,7 +2,8 @@ from collections.abc import Collection, Sequence
 from datetime import datetime
 from typing import Unpack, cast
 
-from sqlalchemy import asc, delete as sqla_delete, exists
+from sqlalchemy import asc, exists
+from sqlalchemy import delete as sqla_delete
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession

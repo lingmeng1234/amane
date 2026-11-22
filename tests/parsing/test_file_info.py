@@ -208,11 +208,11 @@ CASES: list[object] = [
     _Case("/media/010115-001/video.mp4", number="010115-001", content_type=ContentType.UNCENSORED),
     _Case("/media/38-068.mp4", number="38-068", content_type=ContentType.WESTERN),
     _Case("/media/欧美/T38-068.mp4", number="T38-068", content_type=ContentType.WESTERN),
-    _Case("/media/欧美/010115-001.mp4", number="010115-001", content_type=ContentType.WESTERN),
+    _Case("/media/欧美/010115-001.mp4", number="010115-001", content_type=ContentType.UNCENSORED),
     _Case("/media/SSNI00321.mp4", number="SSNI-321", content_type=ContentType.CENSORED),
     _Case("/media/Mywife No.1234.mp4", number="Mywife No.1234", content_type=ContentType.CENSORED),
     _Case("/media/Vixen.23.04.15.mp4", content_type=ContentType.WESTERN),
-    # --- 完整路径: 马赛克可从目录名整段补; 分辨率仍只看文件名 ---
+    # --- 完整路径: 父目录不再补马赛克; 分辨率仍只看文件名 ---
     _Case(
         "/media/uncensored/4K/MIDV-123.mp4",
         mosaic=None,
@@ -237,7 +237,7 @@ CASES: list[object] = [
     # 文件名优先于目录
     _Case("/media/cracked/MIDV-123-无码.mp4", mosaic="uncensored", number="MIDV-123"),
     _Case("/media/uncensored/MIDV-123-LEAKED.mp4", mosaic="leaked", number="MIDV-123"),
-    # 近目录优先
+    # 父目录马赛克关键词完全不参与识别
     _Case("/media/uncensored/流出/MIDV-123.mp4", number="MIDV-123"),
     _Case("/media/流出/uncensored/MIDV-123.mp4", number="MIDV-123"),
     # 马赛克目录反例: 子串 / 复合名 / 非词表 / -UC 当目录

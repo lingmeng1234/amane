@@ -134,3 +134,60 @@ async def test_typed_mapping_api_uses_one_export_with_distinct_ownership(
         json={"version": 2, "entries": [{"original": "Bad", "translation": "错误", "type": "unknown"}]},
     )
     assert invalid.status_code == 400
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_merchant_mappings_apply_to_facet_display_metadata_and_filters(
+    client: AsyncClient, app: FastAPI, repo: Repository
+) -> None:
+    first = await repo.upsert_metadata(
+        number="MERCHANT-MAP-001",
+        studio="Studio A",
+        publisher="Publisher A",
+        series_names=["Series A"],
+    )
+    second = await repo.upsert_metadata(
+        number="MERCHANT-MAP-002",
+        studio="Studio B",
+        publisher="Publisher B",
+        series_names=["Series B"],
+    )
+    assert first.id is not None and second.id is not None
+
+    store = app.state.runtime.tag_mappings
+    store.upsert("Studio A", "中文制作商", "maker")
+    store.upsert("Studio B", "中文制作商", "maker")
+    store.upsert("Publisher A", "中文发行商", "publisher")
+    store.upsert("Publisher B", "中文发行商", "publisher")
+    store.upsert("Series A", "中文系列", "series")
+    store.upsert("Series B", "中文系列", "series")
+
+    for kind, display in (
+        ("studio", "中文制作商"),
+        ("publisher", "中文发行商"),
+        ("series", "中文系列"),
+    ):
+        facets = await client.get(f"facets/{kind}?search={display}")
+        assert facets.status_code == 200
+        assert facets.json()["total"] == 1
+        assert facets.json()["items"][0]["name"] == display
+        assert facets.json()["items"][0]["count"] == 2
+        representative_id = facets.json()["items"][0]["id"]
+        filtered = await client.get(f"metadata?{kind}_id={representative_id}")
+        assert filtered.status_code == 200
+        assert {item["number"] for item in filtered.json()["items"]} == {
+            "MERCHANT-MAP-001",
+            "MERCHANT-MAP-002",
+        }
+
+    detail = await client.get(f"metadata/{first.id}")
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body["metadata"]["studio"] == "中文制作商"
+    assert body["metadata"]["publisher"] == "中文发行商"
+    assert body["metadata"]["series"] == "中文系列"
+    assert body["metadata"]["series_names"] == ["中文系列"]
+    assert body["studio_id"] is not None
+    assert body["publisher_id"] is not None
+    assert body["series_id"] is not None
+    assert body["series_ids"] == {"中文系列": body["series_id"]}

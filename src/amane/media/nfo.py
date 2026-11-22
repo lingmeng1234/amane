@@ -1,5 +1,7 @@
 """Kodi ``<movie>`` NFO, 供 Emby / Jellyfin / Kodi 读取."""
 
+from __future__ import annotations
+
 import json
 import re
 from io import StringIO

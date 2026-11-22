@@ -18,6 +18,7 @@ import { z } from "zod";
 import { listFacetsOptions } from "@/client/@tanstack/react-query.gen";
 import type { FacetKind, FacetResponse, FacetSortField } from "@/client/types.gen";
 import { BrowsePageShell } from "@/components/common/browse-page-shell";
+import { HintedActionIcon } from "@/components/common/hinted-action-icon";
 import { ListPagination } from "@/components/common/list-pagination";
 import { PageSizeSelect } from "@/components/common/page-size-select";
 import { SortMenu } from "@/components/common/sort-menu";

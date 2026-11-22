@@ -88,6 +88,9 @@ def test_media_file_phase_columns_backfill_from_path(tmp_path: Path) -> None:
     assert _file_phase(engine) == {
         "/media/MIDV-123-UC-4K.mp4": ("CRACKED", True, "4K"),
         "/media/HEYZO-1234.mp4": (None, False, None),
+        "/media/ABC-123-LTX.mp4": ("LTX", False, None),
+        "/media/动漫/MIDV-124.mp4": (None, False, None),
+        "/media/欧美/MIDV-125-4K-无码.mp4": ("UNCENSORED", False, "4K"),
     }
 
     with Session(engine) as session:

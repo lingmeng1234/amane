@@ -138,6 +138,7 @@ async def write_nfo(
 
         series_values = metadata.series_names or ([metadata.series] if metadata.series else [])
         series_names = list(dict.fromkeys(name for name in series_values if name))
+        series_names = map_values("series", series_names)
         if (nfo_output is None or nfo_output.categories.series) and series_names:
             # Kodi Movie NFO 的 <set> 是单值字段; 保留首项, 多系列完整数据仍保存在 Amane 数据库中.
             code.write(f"  <series>{_escape_xml(series_names[0])}</series>\n")
@@ -153,18 +154,48 @@ async def write_nfo(
             code.write(f"  <publisher>{_escape_xml(metadata.publisher)}</publisher>\n")
             code.write(f"  <label>{_escape_xml(metadata.publisher)}</label>\n")
 
-        tags = [tag for tag in metadata.tags if tag]
+        # 同一份映射词典按 type 区分四类来源; 旧版仅标签字典仍按 tag 读取.
+        translations: dict[tuple[str, str], str] = {}
         if tag_mapping_path is not None and tag_mapping_path.is_file():
             try:
                 mapping_data = json.loads(tag_mapping_path.read_text(encoding="utf-8"))
                 entries = mapping_data.get("entries", {})
                 if mapping_data.get("enabled", True):
-                    tags = list(dict.fromkeys(entries.get(tag, {}).get("translation") or tag for tag in tags))
+                    if isinstance(entries, list):
+                        records = entries
+                    elif isinstance(entries, dict):
+                        records = [
+                            {"original": original, **entry, "type": entry.get("type", "tag")}
+                            for original, entry in entries.items()
+                            if isinstance(entry, dict)
+                        ]
+                    else:
+                        records = []
+                    for entry in records:
+                        if not isinstance(entry, dict):
+                            continue
+                        kind = entry.get("type")
+                        original = entry.get("original")
+                        translation = entry.get("translation")
+                        if (
+                            kind in {"tag", "maker", "publisher", "series"}
+                            and isinstance(original, str)
+                            and isinstance(translation, str)
+                            and translation.strip()
+                        ):
+                            translations[(kind, original)] = translation.strip()
             except OSError, ValueError, TypeError:
                 logger.warning(
-                    "tag mapping dictionary could not be read; writing original tags",
+                    "Chinese mapping dictionary could not be read; writing original values",
                     path=str(tag_mapping_path),
                 )
+
+        def map_values(kind: str, values: list[str]) -> list[str]:
+            return list(dict.fromkeys(translations.get((kind, value), value) for value in values if value))
+
+        tags = map_values("tag", [tag for tag in metadata.tags if tag])
+        mapped_studio = map_values("maker", [metadata.studio])[0] if metadata.studio else None
+        mapped_publisher = map_values("publisher", [metadata.publisher])[0] if metadata.publisher else None
 
         def cover_attributes() -> list[str]:
             if file_info is None:
@@ -196,9 +227,9 @@ async def write_nfo(
                 if sources.tags:
                     values.extend(tags)
                 if sources.studio and metadata.studio:
-                    values.append(f"制作商:{metadata.studio}")
+                    values.append(f"制作商:{mapped_studio or metadata.studio}")
                 if sources.publisher and metadata.publisher:
-                    values.append(f"发行商:{metadata.publisher}")
+                    values.append(f"发行商:{mapped_publisher or metadata.publisher}")
             for value in dict.fromkeys(item.strip() for item in values if item and item.strip()):
                 element = "genre" if target == "genre" else "tag"
                 code.write(f"  <{element}>{_escape_xml(value)}</{element}>\n")

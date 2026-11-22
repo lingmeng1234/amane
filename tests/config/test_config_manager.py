@@ -655,7 +655,7 @@ class TestConfigManagerUpdate:
         # 未修改的选项仍然保留默认值。
         assert reloaded.hot.nfo_output.basic_info.title is True
         assert reloaded.hot.nfo_output.people.male is False
-        assert reloaded.hot.nfo_output.categories.tag is True
+        assert reloaded.hot.nfo_output.categories.tag.tags is True
 
     def test_unknown_section_ignored(self, mgr: ConfigManager):
         """未知 section 被 Pydantic extra=forbid 拒绝"""

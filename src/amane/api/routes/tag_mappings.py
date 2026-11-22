@@ -172,8 +172,7 @@ async def suggest_mappings(req: SuggestRequest, runtime: RuntimeDep):
     subject = {"tag": "影片标签", "maker": "制作商", "publisher": "发行商", "series": "系列"}[req.type]
     prompt = (
         f"将以下{subject}逐条翻译为简体中文。保留原有含义，不要合并，不要解释。"
-        "只返回 JSON 对象，键为原文，值为中文译名。\n"
-        + json.dumps(originals, ensure_ascii=False)
+        "只返回 JSON 对象，键为原文，值为中文译名。\n" + json.dumps(originals, ensure_ascii=False)
     )
     try:
         # 复用现有 LLM 的 API 类型、地址、密钥、模型、代理和速率配置；不依赖标题/剧情翻译开关.

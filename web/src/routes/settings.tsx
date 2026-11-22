@@ -195,7 +195,7 @@ function NfoOutputSettings({ schema, values, saving, onSave }: NfoOutputSettings
                 <SchemaForm
                   key={`${columnKey}:${JSON.stringify(columnValues)}`}
                   schema={columnSchema}
-                  prefix={isSeries ? "categories" : `categories.${columnKey}`}
+                  prefix={isSeries ? "categories" : columnKey}
                   values={columnValues}
                   i18nPrefix="settings:fields.nfo_output"
                   actionsPlacement="affix"

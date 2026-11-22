@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from ..config.manager import NfoCategorySourcesConfig, NfoOutputConfig
     from ..db.models import Metadata
- 
+
 logger = structlog.get_logger()
 
 

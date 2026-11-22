@@ -463,7 +463,7 @@ INFER_CONTENT_TYPE_CASES: list[tuple[str, str | None, ContentType]] = [
     ("VIDEO", None, ContentType.WESTERN),
     ("Weekly Update", None, ContentType.WESTERN),
     ("just a movie title", None, ContentType.WESTERN),
-    ("MIDV-123", "/media/欧美/MIDV-123.mp4", ContentType.WESTERN),
+    ("MIDV-123", "/media/欧美/MIDV-123.mp4", ContentType.CENSORED),
     ("MIDV-123", "/media/MIDV-123.mp4", ContentType.CENSORED),
 ]
 

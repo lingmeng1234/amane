@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from amane.config.manager import NfoOutputConfig
+from amane.config.manager import NfoOutputConfig
 from amane.db.models import Metadata
 from amane.media import write_nfo
-from amane.parsing.file_info import ContentType, parse_file_info
+from amane.parsing import ContentType, parse_file_info, parse_file_info
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -298,3 +299,64 @@ async def test_write_nfo_cover_attributes_without_existing_tags(tmp_path: Path):
     root = ET.parse(nfo_path).getroot()
     assert [item.text for item in root.findall("genre")] == ["有码", "里番"]
     assert root.findall("tag") == []
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_uses_independent_genre_and_tag_sources(tmp_path: Path, metadata: Metadata):
+    metadata.publisher = "Publisher Y"
+    metadata.tags = ["Drama", "LTX", "Drama"]
+    file_info = parse_file_info(
+        "/media/动漫/MIDV-123-LTX-4K-C.mp4",
+        has_external_subtitle=True,
+    )
+    output = NfoOutputConfig.model_validate(
+        {
+            "categories": {
+                "genre": {
+                    "cover_attributes": True,
+                    "tags": True,
+                    "studio": True,
+                    "publisher": False,
+                },
+                "tag": {
+                    "cover_attributes": False,
+                    "tags": False,
+                    "studio": False,
+                    "publisher": True,
+                },
+            }
+        }
+    )
+    nfo_path = tmp_path / "MIDV-123.nfo"
+
+    assert await write_nfo(metadata, nfo_path, nfo_output=output, file_info=file_info)
+
+    root = ET.parse(nfo_path).getroot()
+    assert [node.text for node in root.findall("genre")] == [
+        "无码",
+        "LTX",
+        "里番",
+        "4K",
+        "中文字幕",
+        "Drama",
+        "LTX",
+        "制作商:Studio X",
+    ]
+    assert [node.text for node in root.findall("tag")] == ["发行商:Publisher Y"]
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_cover_attributes_do_not_require_existing_tags(tmp_path: Path):
+    metadata = Metadata(number="MIDV-123", tags=[])
+    file_info = parse_file_info("/media/MIDV-123.mp4")
+    output = NfoOutputConfig.model_validate(
+        {"categories": {"genre": {"cover_attributes": True, "tags": False}, "tag": {"tags": False}}}
+    )
+    nfo_path = tmp_path / "MIDV-123.nfo"
+
+    assert await write_nfo(metadata, nfo_path, nfo_output=output, file_info=file_info)
+
+    root = ET.parse(nfo_path).getroot()
+    assert [node.text for node in root.findall("genre")] == ["有码"]
+    assert root.findall("tag") == []
+

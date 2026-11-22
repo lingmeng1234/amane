@@ -227,6 +227,7 @@ class TestMediaFileRepo:
         assert updated.has_external_subtitle is True
 
         future = await repo.create_media_file(library_id=1, path="/v/MIDV-002-custom.mp4")
+        assert future.id is not None
         assert future.mosaic is Mosaic.CRACKED
 
         repo.set_mosaic_rules({"cracked": "", "leaked": ""})

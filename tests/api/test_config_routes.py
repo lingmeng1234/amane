@@ -177,7 +177,8 @@ class TestMosaicRuleReprojection:
         assert updated.has_external_subtitle is True
 
         future = await repo.create_media_file(library_id=1, path="/media/MIDV-124-custom.mp4")
-        assert future.mosaic.value == "cracked"
+        assert future.id is not None
+        assert future.mosaic is not None and future.mosaic.value == "cracked"
 
         response = await client.patch(
             "config",

@@ -2,7 +2,7 @@ from collections.abc import Collection, Sequence
 from datetime import datetime
 from typing import Unpack, cast
 
-from sqlalchemy import asc
+from sqlalchemy import asc, delete as sqla_delete, exists
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -29,6 +29,8 @@ from ..models import (
     FacetRule,
     FacetSortField,
     Metadata,
+    MetadataDirector,
+    MetadataSeries,
     MetadataTag,
     MetadataUserTag,
     Publisher,
@@ -549,6 +551,81 @@ class FacetsRepoMixin(RepositoryMixinBase):
             if ok:
                 await session.commit()
             return ok
+
+    async def delete_empty_facets(self, kind: FacetKind) -> int:
+        """删除没有关联影片的分类实体; 不写 block/alias 规则, 不修改 Metadata 真值."""
+        if kind not in {
+            FacetKind.DIRECTOR,
+            FacetKind.TAG,
+            FacetKind.STUDIO,
+            FacetKind.PUBLISHER,
+            FacetKind.SERIES,
+            FacetKind.USER_TAG,
+        }:
+            raise ValueError(f"facet kind {kind} 不支持清除空分类")
+
+        async with self._session() as session:
+            await acquire_write_lock(session)
+            if kind == FacetKind.DIRECTOR:
+                entity = Director
+                ids = (
+                    await session.exec(
+                        select(Director.id).where(
+                            ~exists().where(col(MetadataDirector.director_id) == col(Director.id))
+                        )
+                    )
+                ).all()
+            elif kind == FacetKind.TAG:
+                entity = Tag
+                ids = (
+                    await session.exec(
+                        select(Tag.id).where(~exists().where(col(MetadataTag.tag_id) == col(Tag.id)))
+                    )
+                ).all()
+            elif kind == FacetKind.STUDIO:
+                entity = Studio
+                ids = (
+                    await session.exec(
+                        select(Studio.id).where(~exists().where(col(Metadata.studio) == col(Studio.name)))
+                    )
+                ).all()
+            elif kind == FacetKind.PUBLISHER:
+                entity = Publisher
+                ids = (
+                    await session.exec(
+                        select(Publisher.id).where(~exists().where(col(Metadata.publisher) == col(Publisher.name)))
+                    )
+                ).all()
+            elif kind == FacetKind.SERIES:
+                entity = Series
+                ids = (
+                    await session.exec(
+                        select(Series.id).where(
+                            ~exists().where(col(MetadataSeries.series_id) == col(Series.id))
+                        )
+                    )
+                ).all()
+            else:
+                entity = UserTag
+                ids = (
+                    await session.exec(
+                        select(UserTag.id).where(
+                            ~exists().where(col(MetadataUserTag.user_tag_id) == col(UserTag.id))
+                        )
+                    )
+                ).all()
+
+            clean_ids = [facet_id for facet_id in ids if facet_id is not None]
+            if not clean_ids:
+                return 0
+            if kind == FacetKind.USER_TAG:
+                # 用户标签也可能挂在演员上; 清理无影片引用的标签时同步清除演员挂载.
+                await session.exec(
+                    sqla_delete(ActorUserTag).where(col(ActorUserTag.user_tag_id).in_(clean_ids))
+                )
+            await session.exec(sqla_delete(entity).where(col(entity.id).in_(clean_ids)))
+            await session.commit()
+            return len(clean_ids)
 
     async def list_facet_rules(self, kind: FacetKind) -> list[FacetRule]:
         if kind not in SCRAPE_FACET_KINDS:

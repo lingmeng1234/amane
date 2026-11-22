@@ -33,7 +33,7 @@ class TestMetadataHttp:
         """有码 / 无码取番号类别: 没有挂载文件也亮, 无码再并上文件的无码标记."""
         uncensored = await repo.upsert_metadata(number="HEYZO-1234")
         marked = await repo.upsert_metadata(number="MIDV-002")
-        western = await repo.upsert_metadata(number="WESTERN-1", content_type=ContentType.WESTERN)
+        western = await repo.upsert_western_metadata("western-uuid", "WESTERN-1")
         assert uncensored.id is not None and marked.id is not None and western.id is not None
         media = await repo.create_media_file(library_id=1, path="/video/MIDV-002-无码.mp4")
         assert media.id is not None

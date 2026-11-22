@@ -59,7 +59,6 @@ class TestMediaHttp:
         assert deleted.status_code == 204
         assert (await client.delete("media/9999")).status_code == 404
 
-
     @pytest.mark.asyncio(loop_scope="function")
     async def test_western_file_exposes_western_branch_and_hentai_is_independent(
         self, client: AsyncClient, repo: Repository

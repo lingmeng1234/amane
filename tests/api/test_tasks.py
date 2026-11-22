@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from amane.api.models.tasks import ScrapeRequest, TaskResultPayload
 from amane.db.models import MediaFile, TaskType
-from amane.enums import DownloadableResource
+from amane.enums import DownloadableResource, LibraryAutomation
 from amane.handlers import models as handler_models
 
 if TYPE_CHECKING:
@@ -588,3 +588,51 @@ class TestTaskRecord:
 
         assert submitted.status_code == 202
         assert submitted.json()["payload"]["path"] == str(real / "sub")
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_library_automation_restricts_organize_and_scan_scrape(
+    client: AsyncClient, repo: Repository, safe_path, stop_worker: None
+) -> None:
+    lib = await repo.create_library(
+        name="archive",
+        path=str(safe_path),
+        automation=LibraryAutomation.SCRAPE,
+        auto_organize=True,
+    )
+    assert lib.id is not None
+
+    # 离开 scrape 模式时服务端持久化关闭自动整理, 其它整理配置不受影响.
+    changed = await client.patch(f"libraries/{lib.id}", json={"automation": "refresh"})
+    assert changed.status_code == 200
+    assert changed.json()["automation"] == "refresh"
+    assert changed.json()["auto_organize"] is False
+
+    # 即使绕过前端, 也不能提交整理或新文件刮削.
+    organize = await client.post("tasks", json={"type": "organize", "library_id": lib.id})
+    assert organize.status_code == 403
+
+    scrape_scan = await client.post(
+        "tasks",
+        json={"type": "refresh", "library_id": lib.id, "scan": ["add"], "scrape": ["pending"]},
+    )
+    assert scrape_scan.status_code == 403
+
+    # 普通扫描更新与清理失效记录仍可用, 且不会在后台派生刮削.
+    update_scan = await client.post(
+        "tasks",
+        json={"type": "refresh", "library_id": lib.id, "scan": ["add"], "associate": True},
+    )
+    assert update_scan.status_code == 202
+    assert update_scan.json()["payload"]["scrape"] == []
+
+    remove_scan = await client.post(
+        "tasks", json={"type": "refresh", "library_id": lib.id, "scan": ["remove"]}
+    )
+    assert remove_scan.status_code == 202
+    assert remove_scan.json()["payload"]["scrape"] == []
+
+    # 非 scrape 模式下即使直接请求开启开关, 服务端仍保持关闭.
+    attempted_enable = await client.patch(f"libraries/{lib.id}", json={"auto_organize": True})
+    assert attempted_enable.status_code == 200
+    assert attempted_enable.json()["auto_organize"] is False
+

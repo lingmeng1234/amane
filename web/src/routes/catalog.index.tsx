@@ -1,11 +1,14 @@
 import { Badge, Group, Stack, Text, Title } from "@mantine/core";
-import { IconStar } from "@tabler/icons-react";
-import { useQuery } from "@tanstack/react-query";
+import { notifications } from "@mantine/notifications";
+import { IconStar, IconTrash } from "@tabler/icons-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { listFacetsOptions } from "@/client/@tanstack/react-query.gen";
 import type { FacetResponse } from "@/client/types.gen";
+import { HintedActionIcon } from "@/components/common/hinted-action-icon";
 import { FacetFavoriteMark } from "@/components/media/facet-favorite-star";
+import { apiFetch } from "@/lib/api-token";
 import { CATALOG_FACET_KINDS, FAVORITE_FACET_KINDS } from "@/lib/exhaustive-maps";
 import { FACET_KIND_ICON } from "@/lib/facets";
 
@@ -17,6 +20,54 @@ const FAVORITE_PREVIEW = 24;
 
 type CatalogKind = (typeof CATALOG_FACET_KINDS)[number];
 type FavoriteKind = (typeof FAVORITE_FACET_KINDS)[number];
+
+const EMPTY_FACET_KINDS = ["director", "tag", "studio", "publisher", "series"] as const;
+
+/** 清理当前标题所代表的分类; 分类浏览标题一次清理全部五类, 不包含用户标签. */
+function ClearEmptyFacetsAction({
+  kinds,
+  size = 24,
+}: {
+  kinds: readonly (typeof EMPTY_FACET_KINDS)[number][];
+  size?: number;
+}) {
+  const queryClient = useQueryClient();
+  const clearEmpty = useMutation({
+    mutationFn: async () => {
+      let deleted = 0;
+      for (const kind of kinds) {
+        const response = await apiFetch(`/api/facets/${kind}/empty`, { method: "DELETE" });
+        if (!response.ok) throw new Error(await response.text());
+        const result = (await response.json()) as { deleted: number };
+        deleted += result.deleted;
+      }
+      return deleted;
+    },
+    onSuccess: (deleted) => {
+      void queryClient.invalidateQueries();
+      notifications.show({ message: `已清除 ${deleted} 个空分类`, color: "blue" });
+    },
+    onError: (error) =>
+      notifications.show({ message: `清除空分类失败：${String(error)}`, color: "red" }),
+  });
+
+  return (
+    <HintedActionIcon
+      size={size}
+      variant="subtle"
+      color="red"
+      disabled={clearEmpty.isPending}
+      label="清除空分类"
+      onClick={() => {
+        if (window.confirm("确定清除所选分类中所有没有关联影片的记录吗？此操作不会加入剔除列表。")) {
+          clearEmpty.mutate();
+        }
+      }}
+    >
+      <IconTrash size={15} stroke={1.8} />
+    </HintedActionIcon>
+  );
+}
 
 function FacetChip({ kind, facet }: { kind: CatalogKind; facet: FacetResponse }) {
   return (
@@ -147,21 +198,24 @@ function KindSection({ kind }: { kind: CatalogKind }) {
 
   return (
     <Stack gap="sm">
-      <Link
-        to="/catalog/$kind"
-        params={{ kind }}
-        style={{ textDecoration: "none", color: "inherit", width: "fit-content" }}
-      >
-        <Group gap="xs" style={{ cursor: "pointer" }}>
-          <Icon size={18} stroke={1.5} />
-          <Text fw={600}>
-            {t(`browse.kinds.${kind}`)}
-            <Text span c="dimmed" fw={400} ml={6}>
-              ({total})
+      <Group gap={4} align="center" wrap="nowrap">
+        <Link
+          to="/catalog/$kind"
+          params={{ kind }}
+          style={{ textDecoration: "none", color: "inherit", width: "fit-content" }}
+        >
+          <Group gap="xs" style={{ cursor: "pointer" }}>
+            <Icon size={18} stroke={1.5} />
+            <Text fw={600}>
+              {t(`browse.kinds.${kind}`)}
+              <Text span c="dimmed" fw={400} ml={6}>
+                ({total})
+              </Text>
             </Text>
-          </Text>
-        </Group>
-      </Link>
+          </Group>
+        </Link>
+        {kind !== "user_tag" && <ClearEmptyFacetsAction kinds={[kind]} size={22} />}
+      </Group>
 
       {isLoading && (
         <Text size="sm" c="dimmed">
@@ -191,7 +245,10 @@ function CatalogIndexPage() {
   return (
     <Stack gap="xl">
       <div>
-        <Title order={2}>{t("browse.title")}</Title>
+        <Group gap={4} align="center">
+          <Title order={2}>{t("browse.title")}</Title>
+          <ClearEmptyFacetsAction kinds={EMPTY_FACET_KINDS} size={28} />
+        </Group>
         <Text c="dimmed" size="sm">
           {t("browse.subtitle")}
         </Text>

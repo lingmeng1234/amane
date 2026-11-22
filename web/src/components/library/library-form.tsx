@@ -663,15 +663,28 @@ export function LibraryFormFields({ value, onChange, showCreateOnly }: LibraryFo
           <EnumToggle
             options={LIBRARY_AUTOMATIONS}
             value={value.automation}
-            onChange={(automation) => onChange({ ...value, automation })}
+            onChange={(automation) =>
+              onChange({
+                ...value,
+                automation,
+                auto_organize: automation === "scrape" ? value.auto_organize : false,
+              })
+            }
             getLabel={(level) => t(`automation.${level}`)}
           />
         </FieldChrome>
         <FieldChrome label={t("autoOrganize.label")} description={t("autoOrganize.hint")}>
           <Switch
-            checked={value.auto_organize}
+            checked={value.auto_organize && value.automation === "scrape"}
             onChange={(e) => {
               const enabled = e.target instanceof HTMLInputElement && e.target.checked;
+              if (enabled && value.automation !== "scrape") {
+                notifications.show({
+                  color: "red",
+                  message: "自动整理仅在监控 + 刮削模式下允许开启",
+                });
+                return;
+              }
               const configuredPaths = value.organize_paths
                 .map((path) => path.trim())
                 .filter(Boolean);

@@ -656,6 +656,8 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
             if library is None:
                 current().debug("auto organize skipped: library missing", library_id=file.library_id)
                 return []
+            if library.automation != "scrape":
+                return []
             organize_paths = library.organize_paths or ([library.organize_path] if library.organize_path else [])
             # 自动整理只允许唯一落盘根目录; 多目录配置仅用于扫描/监控/刷新/刮削.
             if not library.auto_organize or len(organize_paths) != 1:

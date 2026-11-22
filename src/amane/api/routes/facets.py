@@ -54,13 +54,19 @@ async def list_facets(
     # 传了参数就要求该分类支持收藏, 与取值无关; 静默忽略会让调用方以为筛选生效.
     if favorite is not None and kind not in FAVORITE_FACET_KINDS:
         raise HTTPException(status_code=400, detail="该分类不支持收藏")
-    if kind != FacetKind.TAG:
+    mapping_kind = {
+        FacetKind.TAG: "tag",
+        FacetKind.STUDIO: "maker",
+        FacetKind.PUBLISHER: "publisher",
+        FacetKind.SERIES: "series",
+    }.get(kind)
+    if mapping_kind is None:
         items, total = await repo.list_facets(
             kind, search=search, favorite=favorite, offset=offset, limit=limit, sort_by=sort_by, order=order
         )
         return FacetListResponse(items=[_facet_response(item) for item in items], total=total)
 
-    # 标签先映射再搜索、分组和分页，确保搜索 CCC 能找到 AAA/BBB。
+    # 标签与片商分类统一先映射再搜索、分组和分页; 同一中文名称只显示一条.
     all_items: list[FacetItem] = []
     cursor = 0
     while True:
@@ -78,7 +84,7 @@ async def list_facets(
 
     groups: dict[str, list[FacetItem]] = {}
     for item in all_items:
-        display = runtime.tag_mappings.display_name(item.name)
+        display = runtime.tag_mappings.display_name(item.name, mapping_kind)
         if search and search.casefold() not in display.casefold() and search.casefold() not in item.name.casefold():
             continue
         groups.setdefault(display, []).append(item)
@@ -89,12 +95,12 @@ async def list_facets(
             if any(member.is_favorite for member in members) is favorite
         }
 
-    # 同一影片可能同时拥有 AAA 和 BBB，按 metadata_id 集合去重后再计数。
-    display_by_tag_id = {member.id: display for display, members in groups.items() for member in members}
+    # 同一影片可能关联多个映射前的原始名称; 按 metadata_id 集合去重后再计数.
+    display_by_facet_id = {member.id: display for display, members in groups.items() for member in members}
     counts_by_display: dict[str, set[int]] = {}
     all_group_ids = [member.id for members in groups.values() for member in members]
-    for tag_id, metadata_id in await repo.list_tag_metadata_links(all_group_ids):
-        display = display_by_tag_id.get(tag_id)
+    for facet_id, metadata_id in await repo.list_facet_metadata_links(kind, all_group_ids):
+        display = display_by_facet_id.get(facet_id)
         if display is not None:
             counts_by_display.setdefault(display, set()).add(metadata_id)
 
@@ -208,9 +214,15 @@ async def get_facet(kind: FacetKind, facet_id: int, repo: RepoDep, runtime: Runt
     if item is None:
         raise HTTPException(status_code=404, detail="分类不存在")
     response = _facet_response(item)
+    mapping_kind = {
+        FacetKind.TAG: "tag",
+        FacetKind.STUDIO: "maker",
+        FacetKind.PUBLISHER: "publisher",
+        FacetKind.SERIES: "series",
+    }.get(kind)
     return (
-        response.model_copy(update={"name": runtime.tag_mappings.map_tags([response.name])[0]})
-        if kind == FacetKind.TAG
+        response.model_copy(update={"name": runtime.tag_mappings.display_name(response.name, mapping_kind)})
+        if mapping_kind is not None
         else response
     )
 
@@ -226,9 +238,15 @@ async def merge_facets(kind: FacetKind, req: FacetMergeRequest, repo: RepoDep, r
         raise HTTPException(status_code=404, detail="分类不存在")
     logger.info("facets merged", kind=kind, target_id=req.target_id, source_ids=req.source_ids)
     response = _facet_response(item)
+    mapping_kind = {
+        FacetKind.TAG: "tag",
+        FacetKind.STUDIO: "maker",
+        FacetKind.PUBLISHER: "publisher",
+        FacetKind.SERIES: "series",
+    }.get(kind)
     return (
-        response.model_copy(update={"name": runtime.tag_mappings.map_tags([response.name])[0]})
-        if kind == FacetKind.TAG
+        response.model_copy(update={"name": runtime.tag_mappings.display_name(response.name, mapping_kind)})
+        if mapping_kind is not None
         else response
     )
 
@@ -248,7 +266,18 @@ async def rename_facet(
     if item is None:
         raise HTTPException(status_code=404, detail="分类不存在")
     logger.info("facet renamed", kind=kind, facet_id=facet_id, name=name)
-    return _facet_response(item)
+    response = _facet_response(item)
+    mapping_kind = {
+        FacetKind.TAG: "tag",
+        FacetKind.STUDIO: "maker",
+        FacetKind.PUBLISHER: "publisher",
+        FacetKind.SERIES: "series",
+    }.get(kind)
+    return (
+        response.model_copy(update={"name": runtime.tag_mappings.display_name(response.name, mapping_kind)})
+        if mapping_kind is not None
+        else response
+    )
 
 
 @router.delete("/{kind}/{facet_id}", status_code=204)

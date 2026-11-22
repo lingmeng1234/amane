@@ -335,9 +335,9 @@ def _build_variables(
         # 欧美日期番号的识别前缀可能包含空格 (True Anal.26.10.21);
         # raw_prefix 应取日期前的完整前缀, 而不是 split_number 返回的首个字母段.
         western_number = metadata.number
-        if re.match(r"^[A-Za-z]{2,}\\d{2,}-", western_number):
+        if re.match(r"^[A-Za-z]{2,}\d{2,}-", western_number):
             western_number = western_number.split("-", 1)[1]
-        western_match = re.match(r"^(.+?)[-_.]2?0?\\d{2}[-.]\\d{2}[-.]\\d{2}", western_number)
+        western_match = re.match(r"^(.+?)[-_.]2?0?\d{2}[-.]\d{2}[-.]\d{2}", western_number)
         if western_match:
             raw_prefix = western_match.group(1).rstrip("-_. ")
         else:

@@ -130,7 +130,7 @@ RENDER_CASES: tuple[_RenderCase, ...] = (
     _RenderCase("[破解]MIDV-123.mp4", "{mosaic?}/{number}.{ext}", "cracked/ABC-123.mp4"),
     _RenderCase("[流出]MIDV-123.mp4", "{mosaic?}/{number}.{ext}", "leaked/ABC-123.mp4"),
     _RenderCase("MIDV-123_4K_无码.mp4", "{mosaic?}/{def?}/{number}.{ext}", "uncensored/4K/ABC-123.mp4"),
-    _RenderCase("/media/uncensored/MIDV-123.mp4", "{mosaic?}/{def?}/{number}.{ext}", "uncensored/ABC-123.mp4"),
+    _RenderCase("/media/uncensored/MIDV-123.mp4", "{mosaic?}/{def?}/{number}.{ext}", "ABC-123.mp4"),
     _RenderCase("/media/4K/MIDV-123.mp4", "{mosaic?}/{def?}/{number}.{ext}", "ABC-123.mp4"),
     _RenderCase(None, "{mosaic?}/{def?}/{number}.{ext}", "ABC-123.mp4"),
     _RenderCase("HEYZO-123-流出.mp4", "{mosaic?}/{number}.{ext}", "leaked/ABC-123.mp4"),

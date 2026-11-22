@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, TypedDict, cast
 from ..enums import ActorGender
 from ..parsing.file_info import (
     CONTENT_TYPE_VALUES,
+    ContentType,
     DEFINITION_VALUES,
     MOSAIC_NATURE_VALUES,
     FileInfo,
@@ -368,7 +369,11 @@ def _build_variables(
         if (
             nature := mosaic_nature(
                 file_info.mosaic if file_info else None,
-                file_info.number_content_type if file_info else metadata.content_type,
+                (
+                    file_info.number_content_type
+                    if file_info is not None and file_info.content_type is ContentType.HENTAI
+                    else metadata.content_type
+                ),
             )
         )
         else "",

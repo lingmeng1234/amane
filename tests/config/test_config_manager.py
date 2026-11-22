@@ -640,7 +640,7 @@ class TestConfigManagerUpdate:
         assert data["nfo_output"]["people"]["actors"] is False
         assert data["nfo_output"]["people"]["female"] is True
         assert data["nfo_output"]["people"]["transgender_female"] is True
-        assert data["nfo_output"]["categories"]["genre"] is False
+        assert data["nfo_output"]["categories"]["genre"]["tags"] is False
 
         # 重新加载配置，验证保存的选项能够恢复。
         reloaded = ConfigManager.with_cold(mgr.cold)
@@ -650,7 +650,7 @@ class TestConfigManagerUpdate:
         assert reloaded.hot.nfo_output.people.actors is False
         assert reloaded.hot.nfo_output.people.female is True
         assert reloaded.hot.nfo_output.people.transgender_female is True
-        assert reloaded.hot.nfo_output.categories.genre is False
+        assert reloaded.hot.nfo_output.categories.genre.tags is False
 
         # 未修改的选项仍然保留默认值。
         assert reloaded.hot.nfo_output.basic_info.title is True

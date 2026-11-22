@@ -229,8 +229,10 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
             assert f.id is not None
             assert parsed.number is not None
 
+            # 使用番号识别出的真实类型; HENTAI 目录属性不能改变 Metadata 的番号类型。
+            number_content_type = parsed.number_content_type
             # WESTERN 先执行只读本地身份预检查；命中则恢复关联，不再创建刮削任务。
-            if parsed.content_type == ContentType.WESTERN and await refresh_media_association(self._repo, f):
+            if number_content_type == ContentType.WESTERN and await refresh_media_association(self._repo, f):
                 associated += 1
                 continue
 
@@ -241,7 +243,7 @@ class RefreshHandler(TaskHandler[RefreshPayload, RefreshResult]):
                     payload=ScrapePayload(
                         media_file_id=f.id,
                         number=parsed.number,
-                        content_type=parsed.content_type,
+                        content_type=number_content_type,
                         use_cache=payload.use_cache,
                     ).model_dump(mode="json"),
                 )

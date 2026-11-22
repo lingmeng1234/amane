@@ -28,7 +28,7 @@
     "hentai": "Hentai",
     "vr": "VR",
     "uncensored": "Uncensored",
-    "mosaic": "Mosaic mark",
+    "mosaic": "Uncensored branch",
     "definition": "Resolution",
     "contentType": "Content type",
     "any": "Any",
@@ -44,7 +44,7 @@
       "hentai": "Hentai"
     },
     "mosaics": {
-      "uncensored": "Uncensored",
+      "uncensored": "Regular uncensored",
       "cracked": "Cracked",
       "leaked": "Leaked",
       "ltx": "LTX",

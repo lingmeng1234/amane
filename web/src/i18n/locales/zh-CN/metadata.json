@@ -28,7 +28,7 @@
     "hentai": "里番",
     "vr": "VR",
     "uncensored": "无码",
-    "mosaic": "马赛克标记",
+    "mosaic": "无码分支",
     "definition": "分辨率",
     "contentType": "类型",
     "any": "不限",
@@ -44,7 +44,7 @@
       "hentai": "里番"
     },
     "mosaics": {
-      "uncensored": "无码",
+      "uncensored": "普通无码",
       "cracked": "破解",
       "leaked": "流出",
       "ltx": "LTX",

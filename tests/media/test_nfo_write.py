@@ -417,3 +417,45 @@ async def test_write_nfo_uses_typed_chinese_mappings_for_tags_and_merchants(tmp_
     assert root.findtext("maker") == "Same"
     assert root.findtext("publisher") == "Same"
     assert root.findtext("label") == "Same"
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_write_nfo_global_switch_disables_all_mapping_categories(tmp_path: Path):
+    mapping_path = tmp_path / "tag_mappings.json"
+    mapping_path.write_text(
+        (
+            '{"version":2,"enabled":false,"entries":['
+            '{"original":"Same","translation":"中文标签","type":"tag"},'
+            '{"original":"Same","translation":"中文制作商","type":"maker"},'
+            '{"original":"Same","translation":"中文发行商","type":"publisher"},'
+            '{"original":"Same","translation":"中文系列","type":"series"}'
+            ']}'
+        ),
+        encoding="utf-8",
+    )
+    metadata = Metadata(
+        number="MAP-OFF-1",
+        tags=["Same"],
+        studio="Same",
+        publisher="Same",
+        series="Same",
+        series_names=["Same"],
+    )
+    output = NfoOutputConfig.model_validate(
+        {
+            "categories": {
+                "genre": {"tags": True, "studio": True, "publisher": True},
+                "tag": {"tags": True, "studio": True, "publisher": True},
+                "series": True,
+            }
+        }
+    )
+    nfo_path = tmp_path / "MAP-OFF-1.nfo"
+
+    assert await write_nfo(metadata, nfo_path, tag_mapping_path=mapping_path, nfo_output=output) is True
+
+    root = ET.parse(nfo_path).getroot()
+    expected = ["Same", "制作商:Same", "发行商:Same"]
+    assert [node.text for node in root.findall("genre")] == expected
+    assert [node.text for node in root.findall("tag")] == expected
+    assert root.findtext("series") == "Same"

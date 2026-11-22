@@ -323,9 +323,20 @@ def _profile_updates(
 ) -> dict[str, object]:
     """生成演员资料更新; full 覆盖 Amane 有值字段, incremental 仅补目标空字段。"""
     updates: dict[str, object] = {}
+    alias_tags = list(dict.fromkeys(alias.strip() for alias in aliases if alias.strip()))
+    if alias_tags:
+        raw_tags = person.raw.get("Tags")
+        current_tags = (
+            list(dict.fromkeys(tag.strip() for tag in raw_tags if isinstance(tag, str) and tag.strip()))
+            if isinstance(raw_tags, list)
+            else []
+        )
+        merged_tags = list(dict.fromkeys([*current_tags, *alias_tags]))
+        if merged_tags != current_tags:
+            updates["Tags"] = merged_tags
+
     overview_lines: list[str] = []
     values = [
-        ("别名", "、".join(dict.fromkeys(a.strip() for a in aliases if a.strip()))),
         ("性别", {"female": "女", "transgender_female": "跨性别女性", "male": "男"}.get(str(actor.gender), "")),
         ("生日", actor.birthday or ""),
         ("出生地", actor.birthplace or ""),
@@ -343,8 +354,20 @@ def _profile_updates(
     ]
     overview_lines.extend(f"{label}：{value}" for label, value in values if value)
     overview = "\n".join(overview_lines)
-    if overview and (mode == "full" or not _has_text(person.overview)):
+    existing_overview = person.overview or ""
+    # 旧版本把别名写成简介首行; 更新时清理该专用行, 但保留 Emby 其它简介内容.
+    cleaned_overview = "\n".join(
+        line for line in existing_overview.splitlines() if not line.lstrip().startswith(("别名：", "别名:"))
+    )
+    if mode == "full":
+        if overview:
+            updates["Overview"] = overview
+        elif cleaned_overview != existing_overview:
+            updates["Overview"] = cleaned_overview
+    elif overview and not _has_text(cleaned_overview):
         updates["Overview"] = overview
+    elif cleaned_overview != existing_overview:
+        updates["Overview"] = cleaned_overview
 
     if actor.birthday and _ISO_DATE.fullmatch(actor.birthday):
         if mode == "full" or not person.premiere_date:

@@ -878,7 +878,9 @@ class TestMosaicAndNfoConfig:
 
     def test_mosaic_rules_reject_cross_branch_duplicates(self):
         with pytest.raises(ValidationError, match="不能同时属于破解和流出"):
-            ScrapingConfig.model_validate({"mosaic_rules": {"cracked": "CRACKED,custom", "leaked": "CUSTOM"}})
+            ScrapingConfig.model_validate(
+                {"mosaic_rules": {"cracked": "CRACKED,custom", "leaked": "CUSTOM"}}
+            )
 
     def test_nfo_legacy_boolean_switches_are_migrated(self):
         from amane.config.manager import NfoCategoriesConfig

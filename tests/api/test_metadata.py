@@ -9,6 +9,7 @@ from PIL import Image
 
 from amane.db.models import MediaFileStatus, Metadata
 from amane.enums import ActorGender
+from amane.parsing import ContentType
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,7 +33,8 @@ class TestMetadataHttp:
         """有码 / 无码取番号类别: 没有挂载文件也亮, 无码再并上文件的无码标记."""
         uncensored = await repo.upsert_metadata(number="HEYZO-1234")
         marked = await repo.upsert_metadata(number="MIDV-002")
-        assert uncensored.id is not None and marked.id is not None
+        western = await repo.upsert_metadata(number="WESTERN-1", content_type=ContentType.WESTERN)
+        assert uncensored.id is not None and marked.id is not None and western.id is not None
         media = await repo.create_media_file(library_id=1, path="/video/MIDV-002-无码.mp4")
         assert media.id is not None
         await repo.update_media_file(media.id, metadata_id=marked.id)
@@ -40,6 +42,9 @@ class TestMetadataHttp:
         listed = await client.get("metadata?sort_by=number&order=asc")
         items = {item["number"]: item for item in listed.json()["items"]}
         assert items["HEYZO-1234"]["file_count"] == 0
+        assert items["WESTERN-1"]["file_count"] == 0
+        assert items["WESTERN-1"]["file_phase"]["uncensored"] is True
+        assert items["WESTERN-1"]["file_phase"]["mosaics"] == ["western"]
         assert items["HEYZO-1234"]["file_phase"] == {
             "has_subtitle": False,
             "censored": False,
@@ -57,7 +62,7 @@ class TestMetadataHttp:
         assert detail.json()["files"] == []
 
         uncensored_filtered = await client.get("metadata?uncensored=true")
-        assert {item["number"] for item in uncensored_filtered.json()["items"]} == {"HEYZO-1234", "MIDV-002"}
+        assert {item["number"] for item in uncensored_filtered.json()["items"]} == {"HEYZO-1234", "MIDV-002", "WESTERN-1"}
         by_type = await client.get("metadata?content_type=uncensored")
         assert [item["number"] for item in by_type.json()["items"]] == ["HEYZO-1234"]
         by_mosaic = await client.get("metadata?mosaic=uncensored")

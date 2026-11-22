@@ -314,9 +314,14 @@ def parse_file_info(
         dirs = _dir_names(p)
         number, number_content_type = _identify(stem.strip(), dirs, escape, fallback=True)
         path_type = _classify_from_path(dirs)
-        content_type = path_type or number_content_type
         if path_type is ContentType.WESTERN:
             number_content_type = ContentType.WESTERN
+            content_type = ContentType.WESTERN
+        elif number_content_type is ContentType.WESTERN:
+            # 已识别的欧美番号不应被「动漫/里番」目录覆盖刮削类型; hentai 仍独立保留.
+            content_type = ContentType.WESTERN
+        else:
+            content_type = path_type or number_content_type
         hentai = _is_hentai_dir(dirs)
         basename = stem.upper()
         cd = _detect_cd(basename)

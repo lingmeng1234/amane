@@ -16,8 +16,7 @@ from amane.crawlers.base import Crawler, CrawlerProfile
 from amane.crawlers.factory import CrawlerFactory
 from amane.crawlers.models import MediaMetadata
 from amane.db.models import MediaFileStatus, TaskType
-from amane.enums import LibraryAutomation
-from amane.enums import SiteName
+from amane.enums import LibraryAutomation, SiteName
 from amane.handlers import (
     FollowupTask,
     OrganizeHandler,

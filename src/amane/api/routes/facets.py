@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from ...db.models import FAVORITE_FACET_KINDS, SCRAPE_FACET_KINDS, FacetKind, FacetSortField, SortOrder
 from ...db.repo_types import FacetItem
 from ...utils.model import to_resp
+from ...tags.mapping import MappingKind
 from ..deps import RepoDep, RuntimeDep
 from ..models import (
     FacetBatchAction,
@@ -25,6 +26,13 @@ from ..models import (
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/facets", tags=["facets"])
+
+_MAPPING_KIND_BY_FACET: dict[FacetKind, MappingKind] = {
+    FacetKind.TAG: "tag",
+    FacetKind.STUDIO: "maker",
+    FacetKind.PUBLISHER: "publisher",
+    FacetKind.SERIES: "series",
+}
 
 
 def _facet_response(item: FacetItem) -> FacetResponse:
@@ -54,12 +62,7 @@ async def list_facets(
     # 传了参数就要求该分类支持收藏, 与取值无关; 静默忽略会让调用方以为筛选生效.
     if favorite is not None and kind not in FAVORITE_FACET_KINDS:
         raise HTTPException(status_code=400, detail="该分类不支持收藏")
-    mapping_kind = {
-        FacetKind.TAG: "tag",
-        FacetKind.STUDIO: "maker",
-        FacetKind.PUBLISHER: "publisher",
-        FacetKind.SERIES: "series",
-    }.get(kind)
+    mapping_kind = _MAPPING_KIND_BY_FACET.get(kind)
     if mapping_kind is None:
         items, total = await repo.list_facets(
             kind, search=search, favorite=favorite, offset=offset, limit=limit, sort_by=sort_by, order=order
@@ -214,12 +217,7 @@ async def get_facet(kind: FacetKind, facet_id: int, repo: RepoDep, runtime: Runt
     if item is None:
         raise HTTPException(status_code=404, detail="分类不存在")
     response = _facet_response(item)
-    mapping_kind = {
-        FacetKind.TAG: "tag",
-        FacetKind.STUDIO: "maker",
-        FacetKind.PUBLISHER: "publisher",
-        FacetKind.SERIES: "series",
-    }.get(kind)
+    mapping_kind = _MAPPING_KIND_BY_FACET.get(kind)
     return (
         response.model_copy(update={"name": runtime.tag_mappings.display_name(response.name, mapping_kind)})
         if mapping_kind is not None
@@ -238,12 +236,7 @@ async def merge_facets(kind: FacetKind, req: FacetMergeRequest, repo: RepoDep, r
         raise HTTPException(status_code=404, detail="分类不存在")
     logger.info("facets merged", kind=kind, target_id=req.target_id, source_ids=req.source_ids)
     response = _facet_response(item)
-    mapping_kind = {
-        FacetKind.TAG: "tag",
-        FacetKind.STUDIO: "maker",
-        FacetKind.PUBLISHER: "publisher",
-        FacetKind.SERIES: "series",
-    }.get(kind)
+    mapping_kind = _MAPPING_KIND_BY_FACET.get(kind)
     return (
         response.model_copy(update={"name": runtime.tag_mappings.display_name(response.name, mapping_kind)})
         if mapping_kind is not None
@@ -267,12 +260,7 @@ async def rename_facet(
         raise HTTPException(status_code=404, detail="分类不存在")
     logger.info("facet renamed", kind=kind, facet_id=facet_id, name=name)
     response = _facet_response(item)
-    mapping_kind = {
-        FacetKind.TAG: "tag",
-        FacetKind.STUDIO: "maker",
-        FacetKind.PUBLISHER: "publisher",
-        FacetKind.SERIES: "series",
-    }.get(kind)
+    mapping_kind = _MAPPING_KIND_BY_FACET.get(kind)
     return (
         response.model_copy(update={"name": runtime.tag_mappings.display_name(response.name, mapping_kind)})
         if mapping_kind is not None

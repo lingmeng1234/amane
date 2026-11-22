@@ -213,6 +213,42 @@ class TestMediaFileRepo:
         assert updated.mosaic is Mosaic.CRACKED
 
     @pytest.mark.asyncio(loop_scope="function")
+    async def test_custom_mosaic_rules_reproject_existing_and_future_files(self, repo: Repository):
+        existing = await repo.create_media_file(library_id=1, path="/v/MIDV-001-custom.mp4")
+        assert existing.id is not None
+        assert existing.mosaic is None
+        await repo.update_media_file(existing.id, has_external_subtitle=True)
+
+        repo.set_mosaic_rules({"cracked": "custom", "leaked": ""})
+        assert await repo.reproject_media_phases() == 1
+        updated = await repo.get_media_file(existing.id)
+        assert updated is not None
+        assert updated.mosaic is Mosaic.CRACKED
+        assert updated.has_external_subtitle is True
+
+        future = await repo.create_media_file(library_id=1, path="/v/MIDV-002-custom.mp4")
+        assert future.mosaic is Mosaic.CRACKED
+
+        repo.set_mosaic_rules({"cracked": "", "leaked": ""})
+        await repo.reproject_media_phases()
+        updated = await repo.get_media_file(existing.id)
+        future = await repo.get_media_file(future.id)
+        assert updated is not None and updated.mosaic is None
+        assert future is not None and future.mosaic is None
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_media_file_hentai_and_western_filters(self, repo: Repository):
+        hentai = await repo.create_media_file(library_id=1, path="/v/里番/MIDV-001.mp4")
+        western = await repo.create_media_file(library_id=1, path="/v/欧美/Studio.26.10.16.mp4")
+        normal = await repo.create_media_file(library_id=1, path="/v/MIDV-002.mp4")
+
+        assert {item.path for item in await repo.list_media_files(hentai=True, limit=None)} == {hentai.path}
+        assert {item.path for item in await repo.list_media_files(mosaic=Mosaic.WESTERN, limit=None)} == {
+            western.path
+        }
+        assert normal.path not in {item.path for item in await repo.list_media_files(hentai=True, limit=None)}
+
+    @pytest.mark.asyncio(loop_scope="function")
     async def test_list_media_files_phase_filters(self, repo: Repository):
         await repo.create_media_file(library_id=1, path="/v/MIDV-001-C.mp4")
         await repo.create_media_file(library_id=1, path="/v/MIDV-002-无码.mp4")

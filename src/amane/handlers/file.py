@@ -198,6 +198,7 @@ async def execute_file_operations(
             tag_mapping_path=tag_mapping_path,
             nfo_output=config.nfo_output if config is not None else None,
             actor_genders=actor_genders,
+            file_info=file_info,
         )
 
     # 字幕按模板落到 video_dest 侧.

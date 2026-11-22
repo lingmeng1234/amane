@@ -9,7 +9,7 @@ import aiofiles
 import structlog
 
 from ..enums import ActorGender
-from ..parsing import ContentType
+from ..parsing import ContentType, FileInfo, Mosaic, shows_uncensored
 from ..utils.text import strip_illegal_xml_chars
 
 if TYPE_CHECKING:
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from ..config.manager import NfoOutputConfig
     from ..db.models import Metadata
+    from ..parsing import FileInfo
 
 logger = structlog.get_logger()
 
@@ -57,6 +58,7 @@ async def write_nfo(
     tag_mapping_path: Path | None = None,
     nfo_output: NfoOutputConfig | None = None,
     actor_genders: dict[str, ActorGender] | None = None,
+    file_info: FileInfo | None = None,
 ) -> bool:
     try:
         nfo_path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,31 +152,62 @@ async def write_nfo(
             code.write(f"  <publisher>{_escape_xml(metadata.publisher)}</publisher>\n")
             code.write(f"  <label>{_escape_xml(metadata.publisher)}</label>\n")
 
-        if metadata.tags:
-            write_genre = nfo_output is None or nfo_output.categories.genre
-            write_tag = nfo_output is None or nfo_output.categories.tag
+        tags = [tag for tag in metadata.tags if tag]
+        if tag_mapping_path is not None and tag_mapping_path.is_file():
+            try:
+                mapping_data = json.loads(tag_mapping_path.read_text(encoding="utf-8"))
+                entries = mapping_data.get("entries", {})
+                if mapping_data.get("enabled", True):
+                    tags = list(dict.fromkeys(entries.get(tag, {}).get("translation") or tag for tag in tags))
+            except OSError, ValueError, TypeError:
+                logger.warning(
+                    "tag mapping dictionary could not be read; writing original tags",
+                    path=str(tag_mapping_path),
+                )
 
-            if write_genre or write_tag:
-                tags = [tag for tag in metadata.tags if tag]
-                if tag_mapping_path is not None and tag_mapping_path.is_file():
-                    try:
-                        mapping_data = json.loads(tag_mapping_path.read_text(encoding="utf-8"))
-                        entries = mapping_data.get("entries", {})
-                        if mapping_data.get("enabled", True):
-                            tags = list(dict.fromkeys(entries.get(tag, {}).get("translation") or tag for tag in tags))
-                    except OSError, ValueError, TypeError:
-                        logger.warning(
-                            "tag mapping dictionary could not be read; writing original tags",
-                            path=str(tag_mapping_path),
-                        )
+        def cover_attributes() -> list[str]:
+            if file_info is None:
+                return []
+            values = ["无码" if shows_uncensored(file_info.mosaic, file_info.number_content_type) else "有码"]
+            if file_info.mosaic is Mosaic.CRACKED:
+                values.append("破解")
+            elif file_info.mosaic is Mosaic.LEAKED:
+                values.append("流出")
+            elif file_info.mosaic is Mosaic.LTX:
+                values.append("LTX")
+            elif file_info.number_content_type is ContentType.WESTERN:
+                values.append("欧美")
+            if file_info.hentai:
+                values.append("里番")
+            if file_info.definition:
+                values.append(file_info.definition)
+            if file_info.has_subtitle:
+                values.append("中文字幕")
+            return values
 
-                if write_genre:
-                    for tag in tags:
-                        code.write(f"  <genre>{_escape_xml(tag)}</genre>\n")
+        def write_category(target: str, sources: object) -> None:
+            values: list[str] = []
+            if nfo_output is None:
+                values.extend(tags)
+            else:
+                if sources.cover_attributes:  # type: ignore[attr-defined]
+                    values.extend(cover_attributes())
+                if sources.tags:  # type: ignore[attr-defined]
+                    values.extend(tags)
+                if sources.studio and metadata.studio:  # type: ignore[attr-defined]
+                    values.append(f"制作商:{metadata.studio}")
+                if sources.publisher and metadata.publisher:  # type: ignore[attr-defined]
+                    values.append(f"发行商:{metadata.publisher}")
+            for value in dict.fromkeys(item.strip() for item in values if item and item.strip()):
+                element = "genre" if target == "genre" else "tag"
+                code.write(f"  <{element}>{_escape_xml(value)}</{element}>\n")
 
-                if write_tag:
-                    for tag in tags:
-                        code.write(f"  <tag>{_escape_xml(tag)}</tag>\n")
+        if nfo_output is None:
+            write_category("genre", None)
+            write_category("tag", None)
+        else:
+            write_category("genre", nfo_output.categories.genre)
+            write_category("tag", nfo_output.categories.tag)
 
         if (nfo_output is None or nfo_output.images.poster) and metadata.original_poster_urls:
             code.write(f"  <poster>{_escape_xml(metadata.original_poster_urls[0])}</poster>\n")

@@ -106,10 +106,7 @@ async def test_typed_mapping_api_uses_one_export_with_distinct_ownership(
     exported = await client.get("tag-mappings/export")
     assert exported.status_code == 200
     entries = exported.json()["entries"]
-    assert {
-        (item["original"], item["type"], item["translation"])
-        for item in entries
-    } == {
+    assert {(item["original"], item["type"], item["translation"]) for item in entries} == {
         ("Same", "tag", "中文标签"),
         ("Same", "maker", "中文制作商"),
         ("Same", "publisher", "中文发行商"),

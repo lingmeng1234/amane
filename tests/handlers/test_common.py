@@ -344,7 +344,6 @@ class TestExternalSubtitle:
         assert stored is not None
         assert stored.has_external_subtitle is True
 
-
     @pytest.mark.asyncio
     async def test_register_media_file_requires_matching_metadata(self, repo: Repository, tmp_path: Path):
         video = tmp_path / "MIDV-005.mp4"

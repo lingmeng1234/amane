@@ -323,8 +323,6 @@ def parse_file_info(
         if cd is None and dirs:
             cd = _detect_cd_from_parent(dirs[-1])
         mosaic = _detect_mosaic(basename, mosaic_rules)
-        if number_content_type is ContentType.WESTERN:
-            mosaic = Mosaic.WESTERN
     else:
         # 文本: 只执行番号规则; 未命中则 number 为 None, 相位只依据该字符串.
         assert text is not None
@@ -335,8 +333,6 @@ def parse_file_info(
         basename = Path(text).stem.upper()
         cd = _detect_cd(basename)
         mosaic = _detect_mosaic(basename, mosaic_rules)
-        if number_content_type is ContentType.WESTERN:
-            mosaic = Mosaic.WESTERN
     return FileInfo(
         number=number,
         content_type=content_type,
@@ -453,6 +449,8 @@ def summarize_file_phases(phases: Iterable[FilePhase], content_type: ContentType
     """有码/无码和里番按文件属性聚合; 没有文件时回退条目类型."""
     items = list(phases)
     mosaic_present = {phase["mosaic"] for phase in items if phase["mosaic"] is not None}
+    if any(phase.get("number_content_type") is ContentType.WESTERN for phase in items):
+        mosaic_present.add(Mosaic.WESTERN)
     if items:
         censored = any(
             phase.get("number_content_type", content_type) is ContentType.CENSORED and phase["mosaic"] is None

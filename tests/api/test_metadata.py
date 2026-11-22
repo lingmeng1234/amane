@@ -9,7 +9,6 @@ from PIL import Image
 
 from amane.db.models import MediaFileStatus, Metadata
 from amane.enums import ActorGender
-from amane.parsing import ContentType
 
 if TYPE_CHECKING:
     from pathlib import Path

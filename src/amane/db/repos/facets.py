@@ -631,9 +631,7 @@ class FacetsRepoMixin(RepositoryMixinBase):
                 entity = UserTag
                 ids = (
                     await session.exec(
-                        select(UserTag.id).where(
-                            ~exists().where(col(MetadataUserTag.user_tag_id) == col(UserTag.id))
-                        )
+                        select(UserTag.id).where(~exists().where(col(MetadataUserTag.user_tag_id) == col(UserTag.id)))
                     )
                 ).all()
 

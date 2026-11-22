@@ -466,7 +466,7 @@ export function AppShellLayout(): ReactNode {
         <NavLink
           component={Link}
           to="/tag-mappings"
-          label="标签中文映射"
+          label="中文映射"
           leftSection={<IconTags size={18} />}
           onClick={closeMobile}
         />

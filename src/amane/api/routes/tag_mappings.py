@@ -31,7 +31,7 @@ async def list_mappings(
     language: Literal["all", "ja", "en", "zh", "other"] = "all",
     frequency: Literal["all", "high"] = "all",
     search: str = "",
-    mapping_type: MappingKind = Query(default="tag", alias="type"),
+    mapping_type: Annotated[MappingKind, Query(alias="type")] = "tag",
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ):
@@ -109,7 +109,7 @@ class MappingSelection(BaseModel):
 async def archive_mapping(
     original: str,
     runtime: RuntimeDep,
-    mapping_type: MappingKind = Query(default="tag", alias="type"),
+    mapping_type: Annotated[MappingKind, Query(alias="type")] = "tag",
 ):
     if not runtime.tag_mappings.archive(original, mapping_type):
         raise HTTPException(409, "词条不存在或已有中文译名，不能归档")
@@ -120,7 +120,7 @@ async def archive_mapping(
 async def restore_mapping(
     original: str,
     runtime: RuntimeDep,
-    mapping_type: MappingKind = Query(default="tag", alias="type"),
+    mapping_type: Annotated[MappingKind, Query(alias="type")] = "tag",
 ):
     if not runtime.tag_mappings.restore(original, mapping_type):
         raise HTTPException(404, "归档词条不存在")

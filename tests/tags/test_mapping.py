@@ -154,10 +154,7 @@ def test_mapping_types_are_independent_and_exported_together(tmp_path) -> None:
     assert store.map_values("series", ["Same"]) == ["中文系列"]
 
     exported = store.export()
-    assert {
-        (entry["original"], entry["type"], entry["translation"])
-        for entry in exported["entries"]
-    } == {
+    assert {(entry["original"], entry["type"], entry["translation"]) for entry in exported["entries"]} == {
         ("Same", "tag", "中文标签"),
         ("Same", "maker", "中文制作商"),
         ("Same", "publisher", "中文发行商"),

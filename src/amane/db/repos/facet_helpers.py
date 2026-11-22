@@ -730,7 +730,7 @@ async def _load_linked_facet_values(
         relevant = col(Metadata.id).in_(select(spec.link.metadata_id).where(col(spec.link_fk).in_(chunk)))
         # SQLModel.select 的静态重载未覆盖此处的八列投影; 使用 SQLAlchemy select
         # 保留单次窄列查询, 避免退化为加载整条 Metadata ORM 记录.
-        metadata_table = cast(Table, getattr(Metadata, "__table__"))
+        metadata_table = cast(Table, Metadata.__table__)  # pyright: ignore[reportAttributeAccessIssue]  # ty: ignore[unresolved-attribute]
         stmt = sa_select(
             metadata_table.c.id,
             metadata_table.c.actors,

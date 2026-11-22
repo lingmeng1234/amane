@@ -154,6 +154,7 @@ def parse_minnano_detail(html_text: str, *, page_url: str, base_url: str) -> Act
     fields = _profile_fields(profile)
     birthday = _parse_birthday(fields.get("生年月日", ""))
     birthplace = _plain(fields.get("出身地", "")) or None
+    blood_type = _plain(fields.get("血液型", "")) or None
     height, bust, waist, hip, cup = _parse_figure(fields.get("サイズ", ""))
 
     image = extract_text(html, '//meta[@property="og:image"]/@content') or extract_text(
@@ -174,6 +175,7 @@ def parse_minnano_detail(html_text: str, *, page_url: str, base_url: str) -> Act
         aliases=aliases,
         birthday=birthday,
         birthplace=birthplace,
+        blood_type=blood_type,
         height=height,
         bust=bust,
         waist=waist,

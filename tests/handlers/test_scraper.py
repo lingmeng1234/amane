@@ -1839,17 +1839,13 @@ class TestRefreshHandler:
         assert scrapes[0].key == f"scrape:{scrapes[0].payload['media_file_id']}"
 
     @pytest.mark.asyncio(loop_scope="function")
-    async def test_hentai_directory_keeps_number_content_type_for_scrape_task(
-        self, repo: Repository, tmp_path: Path
-    ):
+    async def test_hentai_directory_keeps_number_content_type_for_scrape_task(self, repo: Repository, tmp_path: Path):
         """里番目录只增加文件属性, 不得把有码番号改成 HENTAI Metadata 类型."""
         hentai_dir = tmp_path / "里番"
         hentai_dir.mkdir()
         (hentai_dir / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
 
-        result = await RefreshHandler(repo=repo).handle(
-            RefreshPayload(library_id=1, path=str(tmp_path))
-        )
+        result = await RefreshHandler(repo=repo).handle(RefreshPayload(library_id=1, path=str(tmp_path)))
 
         scrapes = [task for task in (result.followups or []) if task.task_type == TaskType.SCRAPE]
         assert len(scrapes) == 1

@@ -207,6 +207,12 @@ function TagMappingsPage() {
   const entries = query.data?.items ?? [];
   const pages = Math.max(1, Math.ceil((query.data?.total ?? 0) / PAGE_SIZE));
   const mappingEnabled = mappingState.data?.enabled ?? true;
+  const mappingTypeLabel = {
+    tag: "标签",
+    maker: "制作商",
+    publisher: "发行商",
+    series: "系列",
+  }[mappingType];
   return (
     <Stack gap="md" pb={120}>
       <Group justify="space-between" align="center">
@@ -478,6 +484,9 @@ function TagMappingsPage() {
                 <Table.Td>
                   <Group gap="xs" wrap="nowrap">
                     <Text fw={500}>{entry.original}</Text>
+                    <Badge size="xs" color="gray">
+                      {mappingTypeLabel}
+                    </Badge>
                     {entry.archived ? (
                       <Badge size="xs" color="gray">
                         已归档

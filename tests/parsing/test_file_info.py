@@ -302,10 +302,11 @@ CASES: list[object] = [
     ),
     _Case(
         "/media/欧美/MIDV-123-4K-無碼.mp4",
-        mosaic=None,
+        mosaic="uncensored",
         definition="4K",
         number="MIDV-123",
-        content_type=ContentType.WESTERN,
+        content_type=ContentType.CENSORED,
+        number_content_type=ContentType.CENSORED,
     ),
     _Case("/media/里番/foo-123-CD2.mp4", cd=2, content_type=ContentType.HENTAI, hentai=True),
     _Case(
@@ -739,6 +740,13 @@ def test_ltx_marker_has_its_own_branch(filename: str) -> None:
 )
 def test_ltx_marker_requires_token_boundary(filename: str) -> None:
     assert parse_file_info(filename).mosaic is None
+
+
+
+def test_western_directory_is_fallback_for_unrecognized_number() -> None:
+    info = parse_file_info("/media/欧美/unrecognized-title.mp4")
+    assert info.content_type is ContentType.WESTERN
+    assert info.number_content_type is ContentType.WESTERN
 
 
 def test_hentai_directory_does_not_override_known_western_number_type() -> None:

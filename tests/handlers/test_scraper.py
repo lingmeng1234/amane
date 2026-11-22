@@ -1845,7 +1845,7 @@ class TestRefreshHandler:
         """里番目录只增加文件属性, 不得把有码番号改成 HENTAI Metadata 类型."""
         hentai_dir = tmp_path / "里番"
         hentai_dir.mkdir()
-        (hentai_dir / "MIDV-123.mp4").write_bytes(b"\\x00" * 100)
+        (hentai_dir / "MIDV-123.mp4").write_bytes(b"\x00" * 100)
 
         result = await RefreshHandler(repo=repo).handle(
             RefreshPayload(library_id=1, path=str(tmp_path))

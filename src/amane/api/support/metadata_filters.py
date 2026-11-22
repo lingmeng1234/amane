@@ -23,6 +23,7 @@ class MetadataFilters:
     library_id: list[int] | None = None
     has_files: bool | None = None
     has_subtitle: bool | None = None
+    hentai: bool | None = None
     vr: bool | None = None
     mosaic: Mosaic | None = None
     uncensored: bool | None = None
@@ -45,6 +46,7 @@ class MetadataFilters:
                 self.library_id,
                 self.has_files is not None,
                 self.has_subtitle is not None,
+                self.hentai is not None,
                 self.vr is not None,
                 self.mosaic is not None,
                 self.uncensored is not None,
@@ -77,7 +79,8 @@ async def parse_metadata_filters(
         list[int] | None, Query(max_length=100, description="Filter by current media library id(s)")
     ] = None,
     has_files: Annotated[bool | None, Query(description="Filter by presence of linked MediaFile(s)")] = None,
-    has_subtitle: Annotated[bool | None, Query(description="Filter by linked file subtitle marker")] = None,
+    has_subtitle: Annotated[bool | None, Query(description="Filter by linked file Chinese-subtitle marker")] = None,
+    hentai: Annotated[bool | None, Query(description="Filter by hentai directory attribute")] = None,
     vr: Annotated[bool | None, Query(description="Filter by VR marker (entry tag vocabulary)")] = None,
     mosaic: Annotated[Mosaic | None, Query(description="Filter by linked file mosaic marker")] = None,
     uncensored: Annotated[
@@ -106,6 +109,7 @@ async def parse_metadata_filters(
         library_id=library_id,
         has_files=has_files,
         has_subtitle=has_subtitle,
+        hentai=hentai,
         vr=vr,
         mosaic=mosaic,
         uncensored=uncensored,

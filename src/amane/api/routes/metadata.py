@@ -191,6 +191,7 @@ async def list_metadata(
         library_ids=filters.library_id,
         has_files=filters.has_files,
         has_subtitle=filters.has_subtitle,
+        hentai=filters.hentai,
         vr=filters.vr,
         mosaic=filters.mosaic,
         uncensored=filters.uncensored,

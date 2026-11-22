@@ -130,6 +130,7 @@ def _apply_media_phase_filters(
     stmt: SelectOfScalar[MediaFile],
     *,
     has_subtitle: bool | None = None,
+    hentai: bool | None = None,
     mosaic: Mosaic | None = None,
     uncensored: bool | None = None,
     definition: str | None = None,
@@ -139,6 +140,9 @@ def _apply_media_phase_filters(
     if has_subtitle is not None:
         flag = has_subtitle_predicate()
         stmt = stmt.where(flag if has_subtitle else ~flag)
+    if hentai is not None:
+        flag = col(MediaFile.hentai).is_(True)
+        stmt = stmt.where(flag if hentai else ~flag)
     if mosaic is Mosaic.WESTERN:
         stmt = stmt.where(col(MediaFile.number_content_type).is_(ContentType.WESTERN))
     elif mosaic is not None:

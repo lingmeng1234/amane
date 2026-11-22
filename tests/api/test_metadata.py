@@ -61,7 +61,11 @@ class TestMetadataHttp:
         assert detail.json()["files"] == []
 
         uncensored_filtered = await client.get("metadata?uncensored=true")
-        assert {item["number"] for item in uncensored_filtered.json()["items"]} == {"HEYZO-1234", "MIDV-002", "WESTERN-1"}
+        assert {item["number"] for item in uncensored_filtered.json()["items"]} == {
+            "HEYZO-1234",
+            "MIDV-002",
+            "WESTERN-1",
+        }
         by_type = await client.get("metadata?content_type=uncensored")
         assert [item["number"] for item in by_type.json()["items"]] == ["HEYZO-1234"]
         by_mosaic = await client.get("metadata?mosaic=uncensored")

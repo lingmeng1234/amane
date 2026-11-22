@@ -756,7 +756,7 @@ def _classify_from_path(dir_names: tuple[str, ...]) -> ContentType | None:
 
 
 def _is_hentai_dir(dir_names: tuple[str, ...]) -> bool:
-    return any(name.startswith(("动漫", "里番")) for name in dir_names)
+    return any(name.startswith(("动漫", "里番", "裏番")) for name in dir_names)
 
 
 def _detect_cd(basename: str) -> int | None:

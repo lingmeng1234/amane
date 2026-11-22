@@ -77,7 +77,6 @@ class TestMediaHttp:
         assert mixed_response.json()["mosaic"] == "western"
         assert mixed_response.json()["hentai"] is True
 
-
     @pytest.mark.asyncio(loop_scope="function")
     async def test_hentai_media_filter(self, client: AsyncClient, repo: Repository):
         hentai = await repo.create_media_file(library_id=1, path="/v/动漫/MIDV-010.mp4")

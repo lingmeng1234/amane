@@ -212,12 +212,12 @@ class TagMappingStore:
             entry = self._entries.get(self._key(kind, original))
             return (entry.translation if entry else None) or original
 
-    def map_id_map(self, values: dict[str, int]) -> dict[str, int]:
-        """将详情页标签名映射到展示名称; 每个展示名称保留一个代表 ID."""
+    def map_id_map(self, values: dict[str, int], kind: MappingKind = "tag") -> dict[str, int]:
+        """将分类名称映射到展示名称; 每个展示名称保留一个代表 ID."""
         mapped: dict[str, int] = {}
         with self._lock:
             for original, facet_id in values.items():
-                entry = self._entries.get(self._key("tag", original)) if self._enabled else None
+                entry = self._entries.get(self._key(kind, original)) if self._enabled else None
                 display = (entry.translation if entry else None) or original
                 mapped.setdefault(display, facet_id)
         return mapped

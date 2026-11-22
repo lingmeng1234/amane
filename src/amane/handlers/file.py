@@ -35,7 +35,7 @@ from ..organize import (
     video_dest,
 )
 from ..organize.link import create_video_link
-from ..parsing import ContentType, FileInfo, file_phase_from_path, parse_file_info
+from ..parsing import ContentType, FileInfo, FilePhaseSummary, file_phase_from_path, parse_file_info
 from ..utils.path import existing_disk_path as existing_disk_path_sync
 from ..utils.path import is_descendant, nfc_path, path_is_under
 from ..utils.threads import existing_disk_path, in_thread, path_is_dir
@@ -107,6 +107,7 @@ async def execute_file_operations(
     watermark_dir: Path | None = None,
     actor_genders: dict[str, ActorGender] | None = None,
     tag_mapping_path: Path | None = None,
+    file_phase: FilePhaseSummary | None = None,
 ) -> FileOperationsResult:
     """``file_info`` 由渲染路径的那一次 ``parse_file_info`` 产出, 必须带上 ``has_external_subtitle``.
 
@@ -199,6 +200,7 @@ async def execute_file_operations(
             nfo_output=config.nfo_output if config is not None else None,
             actor_genders=actor_genders,
             file_info=file_info,
+            file_phase=file_phase,
         )
 
     # 字幕按模板落到 video_dest 侧.
@@ -260,6 +262,12 @@ async def apply_file_operations(
         has_external_subtitle=media_file.has_external_subtitle,
         mosaic_rules=config.scraping.mosaic_rules.model_dump(),
     )
+    file_phase = None
+    if metadata.id is not None:
+        summaries = await repo.summarize_media_by_metadata([metadata])
+        summary = summaries.get(metadata.id)
+        if summary is not None:
+            file_phase = summary.phase
     actor_genders = {a.name: a.gender for a in await repo.get_actors_by_names(metadata.actors)}
     paths = resolve_paths(
         library,
@@ -287,6 +295,7 @@ async def apply_file_operations(
         watermark_dir=watermark_dir,
         actor_genders=actor_genders,
         tag_mapping_path=tag_mapping_path,
+        file_phase=file_phase,
     )
 
 

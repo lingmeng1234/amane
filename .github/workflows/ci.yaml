@@ -17,9 +17,6 @@ on:
       - "LICENSE"
       - ".gitignore"
 
-permissions:
-  contents: write
-
 # 同一分支 (含 main) 与同一 PR 只保留最新一次运行: 连续推送或连续合并多个 PR 时, 旧运行直接取消.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -58,38 +55,6 @@ jobs:
 
       - name: just ci-static
         run: just ci-static
-
-      - name: Upload regenerated OpenAPI and client files
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: generated-openapi-client
-          path: |
-            web/openapi.json
-            web/src/client/
-
-      - name: Commit regenerated OpenAPI and client files
-        if: failure() && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          mkdir -p "$RUNNER_TEMP/generated-api"
-          cp web/openapi.json "$RUNNER_TEMP/generated-api/openapi.json"
-          cp -R web/src/client "$RUNNER_TEMP/generated-api/client"
-          git fetch origin "$GITHUB_HEAD_REF"
-          git checkout -B generated-api-sync "origin/$GITHUB_HEAD_REF"
-          cp "$RUNNER_TEMP/generated-api/openapi.json" web/openapi.json
-          rm -rf web/src/client
-          cp -R "$RUNNER_TEMP/generated-api/client" web/src/client
-          git add web/openapi.json web/src/client
-          if git diff --cached --quiet; then
-            echo "Generated API files are already up to date."
-            exit 0
-          fi
-          git commit -m "chore: regenerate OpenAPI client"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
 
   test:
     name: just ci-test

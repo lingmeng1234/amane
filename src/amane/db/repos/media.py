@@ -53,7 +53,7 @@ class MediaRepoMixin(RepositoryMixinBase):
             updates["path"] = nfc_path(path)
         async with self._session() as session:
             media = MediaFile(library_id=library_id, **updates)
-            _apply_path_phase(media)
+            _apply_path_phase(media, self._mosaic_rules)
             session.add(media)
             await session.commit()
             await session.refresh(media)
@@ -74,11 +74,23 @@ class MediaRepoMixin(RepositoryMixinBase):
             if existing is not None:
                 return existing, False
             media = MediaFile(library_id=library_id, **{**updates, "path": normalized})
-            _apply_path_phase(media)
+            _apply_path_phase(media, self._mosaic_rules)
             session.add(media)
             await session.commit()
             await session.refresh(media)
             return media, True
+
+    async def reproject_media_phases(self) -> int:
+        """按当前自定义规则重算所有已登记文件的路径属性; 保留精确匹配的外挂字幕状态."""
+        async with self._session() as session:
+            result = await session.exec(select(MediaFile))
+            media_files = list(result.all())
+            for media in media_files:
+                _apply_path_phase(media, self._mosaic_rules)
+                media.updated_at = _utcnow()
+                session.add(media)
+            await session.commit()
+            return len(media_files)
 
     async def get_media_file(self, media_id: int) -> MediaFile | None:
         async with self._session() as session:
@@ -221,7 +233,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         # 显式赋值, 禁止 setattr; 字段集由 MediaFileUpdates 与 MediaFile 静态对齐.
         if "path" in updates:
             media.path = nfc_path(updates["path"])
-            _apply_path_phase(media)
+            _apply_path_phase(media, self._mosaic_rules)
         if "number" in updates:
             media.number = updates["number"]
         if "oshash" in updates:

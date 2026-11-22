@@ -44,7 +44,7 @@ async def get_config(config: ConfigDep) -> HotSettings:
 
 
 @router.patch("")
-async def update_config(req: dict[str, Any], config: ConfigDep, runtime: RuntimeDep) -> HotSettings:
+async def update_config(req: dict[str, Any], config: ConfigDep, repo: RepoDep, runtime: RuntimeDep) -> HotSettings:
     """先用当前会话的插件目录校验新路由和插件配置, 再持久化."""
     changed_sections = list(req.keys())
     logger.info("config update requested", sections=changed_sections)

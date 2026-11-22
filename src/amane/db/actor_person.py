@@ -12,6 +12,7 @@ def actor_to_aggregated(actor: Actor) -> AggregatedActor:
         gender=actor.gender,
         birthday=actor.birthday,
         birthplace=actor.birthplace,
+        blood_type=actor.blood_type,
         height=actor.height,
         bust=actor.bust,
         waist=actor.waist,
@@ -32,6 +33,7 @@ def apply_aggregated_to_actor(actor: Actor, data: AggregatedActor) -> None:
     actor.gender = data.gender
     actor.birthday = data.birthday
     actor.birthplace = data.birthplace
+    actor.blood_type = data.blood_type
     actor.height = data.height
     actor.bust = data.bust
     actor.waist = data.waist

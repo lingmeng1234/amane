@@ -146,6 +146,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         ids: Sequence[int] | None = None,
         *,
         has_subtitle: bool | None = None,
+        hentai: bool | None = None,
         mosaic: Mosaic | None = None,
         uncensored: bool | None = None,
         definition: str | None = None,
@@ -172,6 +173,7 @@ class MediaRepoMixin(RepositoryMixinBase):
                 return _apply_media_phase_filters(
                     stmt,
                     has_subtitle=has_subtitle,
+                    hentai=hentai,
                     mosaic=mosaic,
                     content_type=content_type,
                     uncensored=uncensored,
@@ -202,6 +204,7 @@ class MediaRepoMixin(RepositoryMixinBase):
         library_id: int | None = None,
         *,
         has_subtitle: bool | None = None,
+        hentai: bool | None = None,
         mosaic: Mosaic | None = None,
         uncensored: bool | None = None,
         definition: str | None = None,
@@ -219,6 +222,7 @@ class MediaRepoMixin(RepositoryMixinBase):
             base = _apply_media_phase_filters(
                 base,
                 has_subtitle=has_subtitle,
+                hentai=hentai,
                 mosaic=mosaic,
                 uncensored=uncensored,
                 definition=definition,

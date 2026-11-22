@@ -219,6 +219,12 @@ function TagMappingsPage() {
     publisher: "发行商",
     series: "系列",
   }[mappingType];
+  const mappingTypeColor = {
+    tag: "teal",
+    maker: "blue",
+    publisher: "cyan",
+    series: "orange",
+  }[mappingType];
   return (
     <Stack gap="md" pb={120}>
       <Group justify="space-between" align="center">
@@ -490,7 +496,7 @@ function TagMappingsPage() {
                 <Table.Td>
                   <Group gap="xs" wrap="nowrap">
                     <Text fw={500}>{entry.original}</Text>
-                    <Badge size="xs" color="gray">
+                    <Badge size="xs" color={mappingTypeColor} variant="light">
                       {mappingTypeLabel}
                     </Badge>
                     {entry.archived ? (

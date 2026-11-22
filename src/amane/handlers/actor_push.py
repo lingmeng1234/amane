@@ -341,6 +341,7 @@ def _profile_updates(
         ("生日", actor.birthday or ""),
         ("出生地", actor.birthplace or ""),
         ("身高", f"{actor.height} cm" if actor.height else ""),
+        ("血型", actor.blood_type or ""),
         ("罩杯", actor.cup or ""),
         (
             "三围",

@@ -48,7 +48,13 @@ CASES = (
         ("MIDV-123.zh.ass",),
     ),
     _Case("empty-extensions", ("MIDV-123.mp4", "MIDV-123.srt"), "MIDV-123.mp4", (), ()),
-    _Case("extension-filter", ("MIDV-123.mp4", "MIDV-123.srt", "MIDV-123.ass"), "MIDV-123.mp4", (".srt",), ("MIDV-123.srt",)),
+    _Case(
+        "extension-filter",
+        ("MIDV-123.mp4", "MIDV-123.srt", "MIDV-123.ass"),
+        "MIDV-123.mp4",
+        (".srt",),
+        ("MIDV-123.srt",),
+    ),
     _Case("extension-case-insensitive", ("MIDV-123.mp4", "MIDV-123.SRT"), "MIDV-123.mp4", (".srt",), ("MIDV-123.SRT",)),
     _Case("does-not-recurse", ("MIDV-123.mp4", "subs/MIDV-123.srt"), "MIDV-123.mp4", DEFAULT_SUBTITLE_EXTENSIONS, ()),
     _Case(

@@ -589,6 +589,7 @@ class TestTaskRecord:
         assert submitted.status_code == 202
         assert submitted.json()["payload"]["path"] == str(real / "sub")
 
+
 @pytest.mark.asyncio(loop_scope="function")
 async def test_library_automation_restricts_organize_and_scan_scrape(
     client: AsyncClient, repo: Repository, safe_path, stop_worker: None

@@ -1398,6 +1398,8 @@ class TestRefreshHandler:
         expected: bool,
     ):
         """存量行的外挂字幕标记只在库扫描时补齐: 迁移不回填, 登记与改 path 都不覆盖既有行."""
+        metadata = await repo.upsert_metadata(number="MIDV-771")
+        assert metadata.id is not None
         video = tmp_path / "MIDV-771.mp4"
         video.write_bytes(b"\x00" * 100)
         if subtitle_name is not None:
@@ -1406,7 +1408,9 @@ class TestRefreshHandler:
             name="t", path=str(tmp_path), write_nfo=False, subtitle_extensions=subtitle_extensions
         )
         assert lib.id is not None
-        media = await repo.create_media_file(library_id=lib.id, path=str(video), has_external_subtitle=stored)
+        media = await repo.create_media_file(
+            library_id=lib.id, path=str(video), has_external_subtitle=stored, metadata_id=metadata.id
+        )
         assert media.id is not None
 
         result = await RefreshHandler(repo=repo).handle(
@@ -1437,8 +1441,13 @@ class TestRefreshHandler:
         stale = await repo.create_media_file(
             library_id=lib.id, path=str(lib_root / "hit" / "MIDV-772.mp4"), has_external_subtitle=True
         )
+        kept_metadata = await repo.upsert_metadata(number="MIDV-773")
+        assert kept_metadata.id is not None
         kept = await repo.create_media_file(
-            library_id=lib.id, path=str(lib_root / "kept" / "MIDV-773.mp4"), has_external_subtitle=True
+            library_id=lib.id,
+            path=str(lib_root / "kept" / "MIDV-773.mp4"),
+            has_external_subtitle=True,
+            metadata_id=kept_metadata.id,
         )
         outside = await repo.create_media_file(
             library_id=lib.id, path=str(lib_root / "outside" / "MIDV-774.mp4"), has_external_subtitle=False

@@ -154,3 +154,37 @@ class TestConfigRebuild:
     async def test_media_server_connection_test_requires_configuration(self, client: AsyncClient):
         response = await client.post("config/media-server/test", json={"kind": "jellyfin", "verify_tls": True})
         assert response.status_code == 400
+
+
+class TestMosaicRuleReprojection:
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_custom_rules_reproject_existing_and_future_media(self, client: AsyncClient, seed_library):
+        repo = seed_library
+        media = await repo.create_media_file(library_id=1, path="/media/MIDV-123-custom.mp4")
+        assert media.id is not None
+        assert media.mosaic is None
+        await repo.update_media_file(media.id, has_external_subtitle=True)
+
+        response = await client.patch(
+            "config",
+            json={"scraping": {"mosaic_rules": {"cracked": "custom", "leaked": ""}}},
+        )
+        assert response.status_code == 200
+
+        updated = await repo.get_media_file(media.id)
+        assert updated is not None
+        assert updated.mosaic.value == "cracked"
+        assert updated.has_external_subtitle is True
+
+        future = await repo.create_media_file(library_id=1, path="/media/MIDV-124-custom.mp4")
+        assert future.mosaic.value == "cracked"
+
+        response = await client.patch(
+            "config",
+            json={"scraping": {"mosaic_rules": {"cracked": "", "leaked": ""}}},
+        )
+        assert response.status_code == 200
+        updated = await repo.get_media_file(media.id)
+        future = await repo.get_media_file(future.id)
+        assert updated is not None and updated.mosaic is None
+        assert future is not None and future.mosaic is None

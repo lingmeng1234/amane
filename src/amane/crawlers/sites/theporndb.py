@@ -138,7 +138,7 @@ class ThePornDBCrawler(Crawler):
             )
             scene = _gql_field(data, "findScene")
             if isinstance(scene, dict) and str(scene.get("id") or "").casefold() == query.theporndb_uuid.casefold():
-                details = await self._scene_rest_details(query.theporndb_uuid, headers)
+                details = await self._scene_rest_details(str(scene.get("id") or query.theporndb_uuid), headers)
                 scene["_tpdb_oshashes"] = _extract_oshashes(details)
                 return scene
             return None

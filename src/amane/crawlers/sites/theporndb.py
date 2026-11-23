@@ -317,6 +317,13 @@ class ThePornDBCrawler(Crawler):
         images = scene.get("images") or []
         cover_url = images[0]["url"] if images else None
 
+        raw_oshashes = scene.get("_tpdb_oshashes")
+        oshashes = (
+            list(dict.fromkeys(value.strip() for value in raw_oshashes if isinstance(value, str) and value.strip()))
+            if isinstance(raw_oshashes, list)
+            else []
+        )
+
         return MediaMetadata(
             number=number,
             title=scene.get("title") or None,
@@ -331,7 +338,7 @@ class ThePornDBCrawler(Crawler):
             external_id=scene.get("id") or None,
             theporndb_uuid=scene.get("id") or None,
             source_url=f"https://theporndb.net/scenes/{scene['id']}" if scene.get("id") else None,
-            oshashes=list(dict.fromkeys(_extract_oshashes({"hashes": scene.get("_tpdb_oshashes", [])}))),
+            oshashes=oshashes,
         )
 
 

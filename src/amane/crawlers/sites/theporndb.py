@@ -138,6 +138,8 @@ class ThePornDBCrawler(Crawler):
             )
             scene = _gql_field(data, "findScene")
             if isinstance(scene, dict) and str(scene.get("id") or "").casefold() == query.theporndb_uuid.casefold():
+                details = await self._scene_rest_details(str(scene.get("id") or query.theporndb_uuid), headers)
+                scene["_tpdb_oshashes"] = _extract_oshashes(details)
                 return scene
             return None
 
@@ -205,30 +207,30 @@ class ThePornDBCrawler(Crawler):
                 )
 
             if len(scenes) == 1:
-                return scenes[0]
+                selected = scenes[0]
+                scene_id = str(selected.get("id") or "")
+                details = await self._scene_rest_details(scene_id, headers) if scene_id else None
+                selected["_tpdb_oshashes"] = _extract_oshashes(details)
+                return selected
 
             if len(scenes) > 1 and query.file_hash:
-                fingerprint_data = await self.client.post_json(
-                    gql_url,
-                    json={
-                        "query": _FINGERPRINT_QUERY,
-                        "variables": {"fingerprints": [[{"hash": query.file_hash, "algorithm": "OSHASH"}]]},
-                    },
-                    headers=headers,
-                )
-                fingerprint_results = _gql_field(fingerprint_data, "findScenesBySceneFingerprints")
-                groups = _as_list(fingerprint_results)
-                fingerprint_scenes = list(_as_list(groups[0])) if groups else []
-                candidate_ids = {str(scene.get("id") or "").casefold() for scene in scenes}
-                matched_by_id: dict[str, dict[str, Any]] = {}
-                for candidate in fingerprint_scenes:
-                    if not isinstance(candidate, dict):
-                        continue
-                    candidate_id = str(candidate.get("id") or "").casefold()
-                    if candidate_id and candidate_id in candidate_ids:
-                        matched_by_id.setdefault(candidate_id, candidate)
-                if len(matched_by_id) == 1:
-                    return next(iter(matched_by_id.values()))
+                # 必须逐一读取每个精确候选的完整 REST 详情并检查其全部 OSHASH。
+                # 任一候选详情不可读取时无法证明匹配唯一，保守失败；即使已命中也继续遍历。
+                matched: list[tuple[dict[str, Any], list[str]]] = []
+                for candidate in scenes:
+                    scene_id = str(candidate.get("id") or "")
+                    if not scene_id:
+                        return None
+                    details = await self._scene_rest_details(scene_id, headers)
+                    if details is None:
+                        return None
+                    hashes = _extract_oshashes(details)
+                    if query.file_hash.strip().casefold() in {value.casefold() for value in hashes}:
+                        matched.append((candidate, hashes))
+                if len(matched) == 1:
+                    selected, hashes = matched[0]
+                    selected["_tpdb_oshashes"] = hashes
+                    return selected
             return None
 
         if query.file_hash:
@@ -253,6 +255,16 @@ class ThePornDBCrawler(Crawler):
             headers=headers,
         )
         return pick_scene(_gql_field(data, "searchScene"), query.number)
+
+    async def _scene_rest_details(self, scene_id: str, headers: dict[str, str]) -> dict[str, Any] | None:
+        """按官方 REST 完整详情读取 Scene 的 hashes 数组 (GraphQL 搜索不保证包含完整指纹)."""
+        try:
+            payload = await self.client.get_json(f"https://api.theporndb.net/scenes/{scene_id}", headers=headers)
+        except RequestError as exc:
+            self.logger.warning("theporndb scene REST details unavailable", scene_id=scene_id, error=str(exc))
+            return None
+        data = payload.get("data") if isinstance(payload, dict) else None
+        return data if isinstance(data, dict) else None
 
     async def _scrape(self, url: str, options: FetchOptions | None = None) -> MediaMetadata | None:
         token = self.config.api_token if self.config else None
@@ -305,6 +317,13 @@ class ThePornDBCrawler(Crawler):
         images = scene.get("images") or []
         cover_url = images[0]["url"] if images else None
 
+        raw_oshashes = scene.get("_tpdb_oshashes")
+        oshashes = (
+            list(dict.fromkeys(value.strip() for value in raw_oshashes if isinstance(value, str) and value.strip()))
+            if isinstance(raw_oshashes, list)
+            else []
+        )
+
         return MediaMetadata(
             number=number,
             title=scene.get("title") or None,
@@ -319,6 +338,7 @@ class ThePornDBCrawler(Crawler):
             external_id=scene.get("id") or None,
             theporndb_uuid=scene.get("id") or None,
             source_url=f"https://theporndb.net/scenes/{scene['id']}" if scene.get("id") else None,
+            oshashes=oshashes,
         )
 
 
@@ -422,3 +442,19 @@ def _gql_field(payload: object, key: str) -> object:
         return None
     data = payload.get("data")
     return data.get(key) if isinstance(data, dict) else None
+
+
+def _extract_oshashes(details: object) -> list[str]:
+    """只提取官方完整详情中 type=OSHASH 的全部 hash，并去重。"""
+    data = details.get("data") if isinstance(details, dict) and "data" in details else details
+    hashes = data.get("hashes") if isinstance(data, dict) else None
+    if not isinstance(hashes, list):
+        return []
+    values: list[str] = []
+    for item in hashes:
+        if not isinstance(item, dict) or str(item.get("type") or "").upper() != "OSHASH":
+            continue
+        value = item.get("hash")
+        if isinstance(value, str) and value.strip():
+            values.append(value.strip())
+    return list(dict.fromkeys(values))

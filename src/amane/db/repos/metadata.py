@@ -661,7 +661,8 @@ class MetadataRepoMixin(RepositoryMixinBase):
                     await session.delete(row)
 
         else:
-            # OSHASH 可以有多个，不因新增身份删除目标作品的其他 OSHASH。
+            # OSHASH 在同番号的 WESTERN Metadata 范围内唯一；不同番号互不影响。
+            # 若同番号内已有其他 UUID 持有该 OSHASH，则将旧归属转移到本次确定的作品。
             if matching_rows:
                 target = next(
                     (row for row in matching_rows if row.metadata_id == metadata_id),
@@ -878,6 +879,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
         media_file_id: int | None,
         oshash: str | None,
         file_115_id: str | None,
+        oshashes: Sequence[str] | None = None,
         metadata_id: int | None = None,
         actor_genders: Mapping[str, ActorGender] | None = None,
         merge_raw: bool = False,
@@ -922,9 +924,19 @@ class MetadataRepoMixin(RepositoryMixinBase):
                         link.library_id = media.library_id
                         link.updated_at = now
                         session.add(link)
-                if oshash:
+                # 本地文件 OSHASH 与官方详情中的全部 OSHASH 一并关联 UUID。
+                # 同番号范围内同一 OSHASH 只保留一个归属；写入新作品时转移旧归属。
+                all_oshashes: list[str] = []
+                seen_oshashes: set[str] = set()
+                for candidate in [*(oshashes or []), *([oshash] if oshash else [])]:
+                    value = candidate.strip()
+                    normalized = value.casefold()
+                    if value and normalized not in seen_oshashes:
+                        all_oshashes.append(value)
+                        seen_oshashes.add(normalized)
+                for value in all_oshashes:
                     await self.replace_media_identity_in_session(
-                        session, metadata.id, MediaIdentityType.LOCAL_OSHASH, oshash
+                        session, metadata.id, MediaIdentityType.LOCAL_OSHASH, value
                     )
                 if file_115_id:
                     await self.replace_media_identity_in_session(

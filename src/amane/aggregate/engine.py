@@ -520,6 +520,10 @@ def _assemble_aggregate_fields(graph: FetchGraph, state: ExecutionState) -> None
             scores.append(SourcedScore(site=ck, score=data.score))
     state.result.scores = scores
 
+    for data in state.fetched.values():
+        if data is not None and data.oshashes:
+            state.result.oshashes = list(dict.fromkeys([*state.result.oshashes, *data.oshashes]))
+
     for ck, data in state.fetched.items():
         if data is None:
             continue

@@ -669,6 +669,38 @@ class TestMetadataRepo:
         assert found_115.id == updated.id
 
     @pytest.mark.asyncio(loop_scope="function")
+    async def test_western_finalize_allows_same_oshash_for_different_numbers(self, repo: Repository):
+        number_a = "Lancelotstylesevolution.26.10.16"
+        number_b = "Lancelotstylesevolution.26.10.17"
+        first = await repo.upsert_western_metadata("uuid-same-hash-a", number_a)
+        second = await repo.upsert_western_metadata("uuid-same-hash-b", number_b)
+        assert first.id is not None
+        assert second.id is not None
+        await repo.register_media_identity(first.id, MediaIdentityType.LOCAL_OSHASH, "shared-cross-number-hash")
+
+        media = await repo.create_media_file(
+            library_id=1,
+            path="/video/shared-cross-number-hash.mp4",
+            number=number_b,
+            oshash="shared-cross-number-hash",
+        )
+        assert media.id is not None
+
+        updated = await repo.finalize_western_scrape(
+            theporndb_uuid="uuid-same-hash-b",
+            number=number_b,
+            metadata_id=second.id,
+            media_file_id=media.id,
+            oshash="shared-cross-number-hash",
+            file_115_id=None,
+            title="Second number",
+        )
+
+        assert updated.id == second.id
+        matches = await repo.get_metadata_by_oshash_matches("shared-cross-number-hash")
+        assert {item.id for item in matches} == {first.id, second.id}
+
+    @pytest.mark.asyncio(loop_scope="function")
     async def test_western_finalize_rejects_115_and_oshash_owned_by_different_metadata(self, repo: Repository):
         number = "Lancelotstylesevolution.26.10.16"
         owner_115 = await repo.upsert_western_metadata("uuid-owner-115", number)

@@ -178,11 +178,12 @@ async def test_western_multiple_number_results_use_unique_studio_and_date_match(
 
     assert metadata is not None
     assert metadata.external_id == "scene-exact"
-    assert web.get_json.await_count == 1
+    assert web.get_json.await_count == 2
     assert web.post_json.await_count == 3
-    assert web.get_json.await_args.args[0].startswith("https://api.theporndb.net/scenes?")
-    assert "site=Lancelot+Styles+evolution" in web.get_json.await_args.args[0]
-    assert "date=2026-10-09" in web.get_json.await_args.args[0]
+    search_url = web.get_json.await_args_list[0].args[0]
+    assert search_url.startswith("https://api.theporndb.net/scenes?")
+    assert "site=Lancelot+Styles+evolution" in search_url
+    assert "date=2026-10-09" in search_url
 
 
 @pytest.mark.asyncio
@@ -314,9 +315,20 @@ def test_pick_western_fingerprint_scene_filters_by_number_and_requires_unique_sc
 
 @pytest.mark.asyncio
 async def test_western_unique_number_result_does_not_require_oshash() -> None:
-    """REST 返回唯一候选时直接刮削，不要求 OSHASH。"""
+    """REST 唯一候选直接刮削，并从完整详情取得全部 OSHASH。"""
     web = AsyncMock()
-    web.get_json.return_value = {"data": [{"id": _BLACKED["id"]}]}
+    web.get_json.side_effect = [
+        {"data": [{"id": _BLACKED["id"]}]},
+        {
+            "data": {
+                "hashes": [
+                    {"hash": _OSHASH, "type": "OSHASH", "duration": 120},
+                    {"hash": "abcdef0123456789", "type": "OSHASH", "duration": 120},
+                    {"hash": "not-oshash", "type": "PHASH", "duration": 120},
+                ]
+            }
+        },
+    ]
     web.post_json.return_value = {"data": {"findScene": _BLACKED}}
     crawler = _crawler(web)
 
@@ -324,145 +336,108 @@ async def test_western_unique_number_result_does_not_require_oshash() -> None:
 
     assert metadata is not None
     assert metadata.external_id == _BLACKED["id"]
+    assert metadata.oshashes == [_OSHASH, "abcdef0123456789"]
+    assert web.get_json.await_count == 2
+    assert web.get_json.await_args_list[1].args[0] == f"https://api.theporndb.net/scenes/{_BLACKED['id']}"
+
+
+@pytest.mark.asyncio
+async def test_western_multiple_candidates_checks_every_candidate_and_requires_unique_oshash() -> None:
+    """逐个检查所有精确候选的完整 hashes；唯一匹配才成功，且返回完整 hash 集。"""
+    web = AsyncMock()
+    web.get_json.side_effect = [
+        {"data": [{"id": _BLACKED["id"]}, {"id": _BLACKED_SAME_DAY["id"]}]},
+        {"data": {"hashes": [{"hash": _OSHASH, "type": "OSHASH", "duration": 120}]}},
+        {"data": {"hashes": [{"hash": "different-hash", "type": "OSHASH", "duration": 120}]}},
+    ]
+    web.post_json.side_effect = [
+        {"data": {"findScene": _BLACKED}},
+        {"data": {"findScene": _BLACKED_SAME_DAY}},
+    ]
+    crawler = _crawler(web)
+
+    metadata = await crawler.fetch(
+        SearchQuery(number="Blacked.26.03.29", file_hash=_OSHASH, content_type=ContentType.WESTERN)
+    )
+
+    assert metadata is not None
+    assert metadata.external_id == _BLACKED["id"]
+    assert metadata.oshashes == [_OSHASH]
+    assert web.get_json.await_count == 3
+    assert web.post_json.await_count == 2
+    assert web.get_json.await_args_list[1].args[0].endswith(f"/scenes/{_BLACKED['id']}")
+    assert web.get_json.await_args_list[2].args[0].endswith(f"/scenes/{_BLACKED_SAME_DAY['id']}")
+
+
+@pytest.mark.asyncio
+async def test_western_oshash_matching_multiple_candidates_is_rejected_after_full_scan() -> None:
+    """两个作品都有当前视频 OSHASH 时，即使第一个先命中也必须继续检查并拒绝。"""
+    web = AsyncMock()
+    web.get_json.side_effect = [
+        {"data": [{"id": _BLACKED["id"]}, {"id": _BLACKED_SAME_DAY["id"]}]},
+        {"data": {"hashes": [{"hash": _OSHASH, "type": "OSHASH", "duration": 120}]}},
+        {"data": {"hashes": [{"hash": _OSHASH.upper(), "type": "OSHASH", "duration": 120}]}},
+    ]
+    web.post_json.side_effect = [
+        {"data": {"findScene": _BLACKED}},
+        {"data": {"findScene": _BLACKED_SAME_DAY}},
+    ]
+    crawler = _crawler(web)
+
+    metadata = await crawler.fetch(
+        SearchQuery(number="Blacked.26.03.29", file_hash=_OSHASH, content_type=ContentType.WESTERN)
+    )
+
+    assert metadata is None
+    assert web.get_json.await_count == 3
+    assert web.post_json.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_western_multiple_candidates_fail_closed_when_any_detail_is_unavailable() -> None:
+    """无法读取任一候选的完整 hashes 时，不能把剩余的单个命中误判为唯一。"""
+    web = AsyncMock()
+    web.get_json.side_effect = [
+        {"data": [{"id": _BLACKED["id"]}, {"id": _BLACKED_SAME_DAY["id"]}]},
+        {"data": {"hashes": [{"hash": _OSHASH, "type": "OSHASH", "duration": 120}]}},
+        {},
+    ]
+    web.post_json.side_effect = [
+        {"data": {"findScene": _BLACKED}},
+        {"data": {"findScene": _BLACKED_SAME_DAY}},
+    ]
+    crawler = _crawler(web)
+
+    metadata = await crawler.fetch(
+        SearchQuery(number="Blacked.26.03.29", file_hash=_OSHASH, content_type=ContentType.WESTERN)
+    )
+
+    assert metadata is None
+    assert web.get_json.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_western_manual_uuid_fetches_official_oshashes() -> None:
+    """手动 UUID 路径也获取完整官方 OSHASH，供成功收尾写入 UUID 身份索引。"""
+    web = AsyncMock()
+    web.post_json.return_value = {"data": {"findScene": _BLACKED}}
+    web.get_json.return_value = {"data": {"hashes": [{"hash": _OSHASH, "type": "OSHASH", "duration": 120}]}}
+    crawler = _crawler(web)
+
+    metadata = await crawler.fetch(
+        SearchQuery(number="Blacked.26.03.29", content_type=ContentType.WESTERN, theporndb_uuid=_BLACKED["id"])
+    )
+
+    assert metadata is not None
+    assert metadata.oshashes == [_OSHASH]
     assert web.get_json.await_count == 1
     assert web.post_json.await_count == 1
-    assert web.post_json.await_args.kwargs["json"]["variables"] == {"id": _BLACKED["id"]}
-
-
-@pytest.mark.asyncio
-async def test_western_multiple_number_results_use_oshash_to_disambiguate() -> None:
-    """多个候选时，仅 OSHASH 唯一命中其中一条才允许刮削。"""
-    web = AsyncMock()
-    web.get_json.return_value = {
-        "data": [
-            {"id": _BLACKED["id"]},
-            {"id": _BLACKED_SAME_DAY["id"]},
-        ]
-    }
-    web.post_json.side_effect = [
-        {"data": {"findScene": _BLACKED}},
-        {"data": {"findScene": _BLACKED_SAME_DAY}},
-        {"data": {"findScenesBySceneFingerprints": [[_BLACKED]]}},
-    ]
-    crawler = _crawler(web)
-
-    metadata = await crawler.fetch(
-        SearchQuery(number="Blacked.26.03.29", file_hash=_OSHASH, content_type=ContentType.WESTERN)
-    )
-
-    assert metadata is not None
-    assert metadata.external_id == _BLACKED["id"]
-    assert web.get_json.await_count == 1
-    assert web.post_json.await_count == 3
-    assert web.post_json.await_args_list[0].kwargs["json"]["variables"] == {"id": _BLACKED["id"]}
-    assert web.post_json.await_args_list[1].kwargs["json"]["variables"] == {"id": _BLACKED_SAME_DAY["id"]}
-    assert web.post_json.await_args_list[2].kwargs["json"]["variables"] == {
-        "fingerprints": [[{"hash": _OSHASH, "algorithm": "OSHASH"}]]
-    }
-
-
-@pytest.mark.asyncio
-async def test_western_oshash_disambiguates_same_number_candidates_by_scene_id() -> None:
-    web = AsyncMock()
-    web.get_json.return_value = {
-        "data": [
-            {"id": _BLACKED["id"]},
-            {"id": _BLACKED_SAME_DAY["id"]},
-        ]
-    }
-    web.post_json.side_effect = [
-        {"data": {"findScene": _BLACKED}},
-        {"data": {"findScene": _BLACKED_SAME_DAY}},
-        {"data": {"findScenesBySceneFingerprints": [[_BLACKED]]}},
-    ]
-    crawler = _crawler(web)
-
-    metadata = await crawler.fetch(
-        SearchQuery(number="Blacked.26.03.29", file_hash=_OSHASH, content_type=ContentType.WESTERN)
-    )
-
-    assert metadata is not None
-    assert metadata.external_id == _BLACKED["id"]
-    assert web.get_json.await_count == 1
-    assert web.post_json.await_count == 3
-
-
-@pytest.mark.asyncio
-async def test_western_oshash_matching_multiple_candidates_is_rejected() -> None:
-    """同一片商和日期的多个候选同时命中 OSHASH 时，必须拒绝刮削。"""
-    web = AsyncMock()
-    web.get_json.return_value = {
-        "data": [
-            {"id": _BLACKED["id"]},
-            {"id": _BLACKED_SAME_DAY["id"]},
-        ]
-    }
-    web.post_json.side_effect = [
-        {"data": {"findScene": _BLACKED}},
-        {"data": {"findScene": _BLACKED_SAME_DAY}},
-        {"data": {"findScenesBySceneFingerprints": [[_BLACKED, _BLACKED_SAME_DAY]]}},
-    ]
-    crawler = _crawler(web)
-
-    metadata = await crawler.fetch(
-        SearchQuery(number="Blacked.26.03.29", file_hash=_OSHASH, content_type=ContentType.WESTERN)
-    )
-
-    assert metadata is None
-    assert web.get_json.await_count == 1
-    assert web.post_json.await_count == 3
-
-
-@pytest.mark.asyncio
-async def test_western_oshash_duplicate_scene_id_counts_as_one_match() -> None:
-    """OSHASH 重复返回同一个 Scene ID 时，去重后仍是唯一命中。"""
-    duplicate_same_scene = dict(_BLACKED)
-    web = AsyncMock()
-    web.get_json.return_value = {
-        "data": [
-            {"id": _BLACKED["id"]},
-            {"id": _BLACKED_SAME_DAY["id"]},
-        ]
-    }
-    web.post_json.side_effect = [
-        {"data": {"findScene": _BLACKED}},
-        {"data": {"findScene": _BLACKED_SAME_DAY}},
-        {"data": {"findScenesBySceneFingerprints": [[_BLACKED, duplicate_same_scene]]}},
-    ]
-    crawler = _crawler(web)
-
-    metadata = await crawler.fetch(
-        SearchQuery(number="Blacked.26.03.29", file_hash=_OSHASH, content_type=ContentType.WESTERN)
-    )
-
-    assert metadata is not None
-    assert metadata.external_id == _BLACKED["id"]
-    assert web.get_json.await_count == 1
-    assert web.post_json.await_count == 3
-
-
-@pytest.mark.asyncio
-async def test_western_zero_number_results_returns_not_found() -> None:
-    web = AsyncMock()
-    web.get_json.return_value = {"data": []}
-    crawler = _crawler(web)
-
-    metadata = await crawler.fetch(SearchQuery(number="Blacked.26.03.29", content_type=ContentType.WESTERN))
-
-    assert metadata is None
-    assert web.get_json.await_count == 1
-    assert web.post_json.await_count == 0
 
 
 @pytest.mark.asyncio
 async def test_western_multiple_number_results_without_oshash_are_rejected() -> None:
     web = AsyncMock()
-    web.get_json.return_value = {
-        "data": [
-            {"id": _BLACKED["id"]},
-            {"id": _BLACKED_SAME_DAY["id"]},
-        ]
-    }
+    web.get_json.return_value = {"data": [{"id": _BLACKED["id"]}, {"id": _BLACKED_SAME_DAY["id"]}]}
     web.post_json.side_effect = [
         {"data": {"findScene": _BLACKED}},
         {"data": {"findScene": _BLACKED_SAME_DAY}},

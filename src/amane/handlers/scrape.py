@@ -556,6 +556,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
                 metadata_id=payload.metadata_id,
                 media_file_id=payload.media_file_id,
                 oshash=file_hash,
+                oshashes=result.metadata.oshashes,
                 file_115_id=file_115_id,
                 merge_raw=use_metadata_cache,
                 **metadata_fields,

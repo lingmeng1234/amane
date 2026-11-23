@@ -926,12 +926,18 @@ class MetadataRepoMixin(RepositoryMixinBase):
                         session.add(link)
                 # 本地文件 OSHASH 与官方详情中的全部 OSHASH 一并关联 UUID。
                 # 同番号范围内同一 OSHASH 只保留一个归属；写入新作品时转移旧归属。
-                all_oshashes = list(dict.fromkeys([*(oshashes or []), *([oshash] if oshash else [])]))
+                all_oshashes: list[str] = []
+                seen_oshashes: set[str] = set()
+                for candidate in [*(oshashes or []), *([oshash] if oshash else [])]:
+                    value = candidate.strip()
+                    normalized = value.casefold()
+                    if value and normalized not in seen_oshashes:
+                        all_oshashes.append(value)
+                        seen_oshashes.add(normalized)
                 for value in all_oshashes:
-                    if value and value.strip():
-                        await self.replace_media_identity_in_session(
-                            session, metadata.id, MediaIdentityType.LOCAL_OSHASH, value
-                        )
+                    await self.replace_media_identity_in_session(
+                        session, metadata.id, MediaIdentityType.LOCAL_OSHASH, value
+                    )
                 if file_115_id:
                     await self.replace_media_identity_in_session(
                         session, metadata.id, MediaIdentityType.FILE_115_ID, file_115_id

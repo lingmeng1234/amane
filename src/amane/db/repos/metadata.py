@@ -661,20 +661,16 @@ class MetadataRepoMixin(RepositoryMixinBase):
                     await session.delete(row)
 
         else:
-            # OSHASH 可以有多个，不因新增身份删除目标作品的其他 OSHASH。
-            if matching_rows:
-                target = next(
-                    (row for row in matching_rows if row.metadata_id == metadata_id),
-                    matching_rows[0],
-                )
-                target.metadata_id = metadata_id
+            # OSHASH 允许多值，也允许同一 OSHASH 属于同番号的不同作品。
+            # 只更新当前作品自己的重复项，绝不能把其他 UUID 的同值 OSHASH 转移或删除。
+            own_matches = [row for row in matching_rows if row.metadata_id == metadata_id]
+            if own_matches:
+                target = own_matches[0]
                 target.identity_value = value
                 target.updated_at = _utcnow()
                 session.add(target)
-
-                for row in matching_rows:
-                    if row.id != target.id:
-                        await session.delete(row)
+                for duplicate in own_matches[1:]:
+                    await session.delete(duplicate)
             else:
                 target = MediaIdentity(
                     metadata_id=metadata_id,
@@ -877,6 +873,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
         number: str,
         media_file_id: int | None,
         oshash: str | None,
+        oshashes: Sequence[str] | None = None,
         file_115_id: str | None,
         metadata_id: int | None = None,
         actor_genders: Mapping[str, ActorGender] | None = None,
@@ -922,10 +919,14 @@ class MetadataRepoMixin(RepositoryMixinBase):
                         link.library_id = media.library_id
                         link.updated_at = now
                         session.add(link)
-                if oshash:
-                    await self.replace_media_identity_in_session(
-                        session, metadata.id, MediaIdentityType.LOCAL_OSHASH, oshash
-                    )
+                # 本地文件 OSHASH 与官方详情中的全部 OSHASH 一并关联 UUID。
+                # 去重后逐个写入；同一 OSHASH 可以合法关联同番号下的多个作品。
+                all_oshashes = list(dict.fromkeys([*(oshashes or []), *([oshash] if oshash else [])]))
+                for value in all_oshashes:
+                    if value and value.strip():
+                        await self.replace_media_identity_in_session(
+                            session, metadata.id, MediaIdentityType.LOCAL_OSHASH, value
+                        )
                 if file_115_id:
                     await self.replace_media_identity_in_session(
                         session, metadata.id, MediaIdentityType.FILE_115_ID, file_115_id

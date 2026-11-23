@@ -700,7 +700,6 @@ class TestMetadataRepo:
         matches = await repo.get_metadata_by_oshash_matches("shared-cross-number-hash")
         assert {item.id for item in matches} == {first.id, second.id}
 
-
     @pytest.mark.asyncio(loop_scope="function")
     async def test_western_finalize_rejects_115_and_oshash_owned_by_different_metadata(self, repo: Repository):
         number = "Lancelotstylesevolution.26.10.16"

@@ -661,16 +661,21 @@ class MetadataRepoMixin(RepositoryMixinBase):
                     await session.delete(row)
 
         else:
-            # OSHASH 允许多值，也允许同一 OSHASH 属于同番号的不同作品。
-            # 只更新当前作品自己的重复项，绝不能把其他 UUID 的同值 OSHASH 转移或删除。
-            own_matches = [row for row in matching_rows if row.metadata_id == metadata_id]
-            if own_matches:
-                target = own_matches[0]
+            # OSHASH 在同番号的 WESTERN Metadata 范围内唯一；不同番号互不影响。
+            # 若同番号内已有其他 UUID 持有该 OSHASH，则将旧归属转移到本次确定的作品。
+            if matching_rows:
+                target = next(
+                    (row for row in matching_rows if row.metadata_id == metadata_id),
+                    matching_rows[0],
+                )
+                target.metadata_id = metadata_id
                 target.identity_value = value
                 target.updated_at = _utcnow()
                 session.add(target)
-                for duplicate in own_matches[1:]:
-                    await session.delete(duplicate)
+
+                for row in matching_rows:
+                    if row.id != target.id:
+                        await session.delete(row)
             else:
                 target = MediaIdentity(
                     metadata_id=metadata_id,
@@ -920,7 +925,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
                         link.updated_at = now
                         session.add(link)
                 # 本地文件 OSHASH 与官方详情中的全部 OSHASH 一并关联 UUID。
-                # 去重后逐个写入；同一 OSHASH 可以合法关联同番号下的多个作品。
+                # 同番号范围内同一 OSHASH 只保留一个归属；写入新作品时转移旧归属。
                 all_oshashes = list(dict.fromkeys([*(oshashes or []), *([oshash] if oshash else [])]))
                 for value in all_oshashes:
                     if value and value.strip():

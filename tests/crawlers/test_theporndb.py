@@ -319,11 +319,15 @@ async def test_western_unique_number_result_does_not_require_oshash() -> None:
     web = AsyncMock()
     web.get_json.side_effect = [
         {"data": [{"id": _BLACKED["id"]}]},
-        {"data": {"hashes": [
-            {"hash": _OSHASH, "type": "OSHASH", "duration": 120},
-            {"hash": "abcdef0123456789", "type": "OSHASH", "duration": 120},
-            {"hash": "not-oshash", "type": "PHASH", "duration": 120},
-        ]}},
+        {
+            "data": {
+                "hashes": [
+                    {"hash": _OSHASH, "type": "OSHASH", "duration": 120},
+                    {"hash": "abcdef0123456789", "type": "OSHASH", "duration": 120},
+                    {"hash": "not-oshash", "type": "PHASH", "duration": 120},
+                ]
+            }
+        },
     ]
     web.post_json.return_value = {"data": {"findScene": _BLACKED}}
     crawler = _crawler(web)
@@ -417,9 +421,7 @@ async def test_western_manual_uuid_fetches_official_oshashes() -> None:
     """手动 UUID 路径也获取完整官方 OSHASH，供成功收尾写入 UUID 身份索引。"""
     web = AsyncMock()
     web.post_json.return_value = {"data": {"findScene": _BLACKED}}
-    web.get_json.return_value = {
-        "data": {"hashes": [{"hash": _OSHASH, "type": "OSHASH", "duration": 120}]}
-    }
+    web.get_json.return_value = {"data": {"hashes": [{"hash": _OSHASH, "type": "OSHASH", "duration": 120}]}}
     crawler = _crawler(web)
 
     metadata = await crawler.fetch(
@@ -435,9 +437,7 @@ async def test_western_manual_uuid_fetches_official_oshashes() -> None:
 @pytest.mark.asyncio
 async def test_western_multiple_number_results_without_oshash_are_rejected() -> None:
     web = AsyncMock()
-    web.get_json.return_value = {
-        "data": [{"id": _BLACKED["id"]}, {"id": _BLACKED_SAME_DAY["id"]}]
-    }
+    web.get_json.return_value = {"data": [{"id": _BLACKED["id"]}, {"id": _BLACKED_SAME_DAY["id"]}]}
     web.post_json.side_effect = [
         {"data": {"findScene": _BLACKED}},
         {"data": {"findScene": _BLACKED_SAME_DAY}},

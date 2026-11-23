@@ -91,6 +91,8 @@ class MediaMetadata(BaseModel):
     external_id: str | None = None
     theporndb_uuid: str | None = None
     source_url: str | None = None
+    # ThePornDB 完整详情返回的全部 OSHASH; 仅 WESTERN 用于身份索引.
+    oshashes: list[str] = Field(default_factory=list)
     directors: list[str] = Field(default_factory=list)
     extrafanart: list[str] = Field(default_factory=list)
 

@@ -46,6 +46,7 @@ class AggregatedMetadata:
 
     external_ids: dict[str, str] = field(default_factory=dict)
     source_urls: dict[str, str] = field(default_factory=dict)
+    oshashes: list[str] = field(default_factory=list)
     field_sources: dict[str, str] = field(default_factory=dict)
     # URL -> first contributing source, preserving the aggregate priority order.
     image_sources: dict[str, str] = field(default_factory=dict)

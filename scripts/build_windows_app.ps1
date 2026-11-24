@@ -104,6 +104,15 @@ if (-not (Test-Path $Onedir)) {
     exit 1
 }
 
+foreach ($Model in @("face_detect_scrfd.onnx", "face_detect_genderage.onnx")) {
+    $BundledModel = Get-ChildItem $Onedir -Recurse -File -Filter $Model | Select-Object -First 1
+    if (-not $BundledModel -or $BundledModel.Length -eq 0) {
+        Write-Error "PyInstaller output is missing bundled face model: $Model"
+        exit 1
+    }
+    Write-Output "Verified bundled model: $($BundledModel.FullName)"
+}
+
 $Version = (& (Join-Path $Root ".venv\Scripts\python.exe") -c "from amane.version import get_version; print(get_version())").Trim()
 if ($LASTEXITCODE -ne 0 -or -not $Version) {
     Write-Error "failed to read amane.version"

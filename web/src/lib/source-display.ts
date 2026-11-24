@@ -4,6 +4,7 @@ const SOURCE_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   pacopacomama: "Pacopacomama",
   caribbeancom: "Caribbeancom",
   caribbeancompr: "Caribbeancompr",
+  heyzo: "Heyzo",
   tokyo_hot: "Tokyo-Hot",
 };
 

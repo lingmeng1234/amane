@@ -928,6 +928,4 @@ class TestPosterFaceCropConfig:
 
     def test_rejects_sources_outside_supported_face_crop_list(self):
         with pytest.raises(ValidationError):
-            ScrapingConfig.model_validate(
-                {"poster_face_crop": {"enabled": True, "sources": ["tokyo_hot"]}}
-            )
+            ScrapingConfig.model_validate({"poster_face_crop": {"enabled": True, "sources": ["tokyo_hot"]}})

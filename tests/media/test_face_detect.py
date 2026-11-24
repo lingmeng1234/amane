@@ -71,7 +71,6 @@ def test_main_subject_returns_none_when_gender_age_inference_fails(monkeypatch):
     assert face_detect.main_subject_face(Image.new("RGB", (800, 600))) is None
 
 
-
 def test_missing_onnxruntime_does_not_download_model(monkeypatch):
     called = False
 

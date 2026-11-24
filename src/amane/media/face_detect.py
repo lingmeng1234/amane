@@ -29,11 +29,7 @@ _MODEL_SPECS = {
     "face_detect_genderage.onnx": ("c1a68b8db319d8d5c78f27136822ef1313c51a77", 1322532),
 }
 _MODEL_DOWNLOAD_LOCK = threading.Lock()
-_MODEL_BASE_URL = (
-    "https://raw.githubusercontent.com/BiancaVeritas/amane-promax/"
-    + _MODEL_REVISION
-    + "/src/amane/media"
-)
+_MODEL_BASE_URL = "https://raw.githubusercontent.com/BiancaVeritas/amane-promax/" + _MODEL_REVISION + "/src/amane/media"
 
 
 @lru_cache(maxsize=1)

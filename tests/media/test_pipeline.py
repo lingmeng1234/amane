@@ -734,7 +734,9 @@ async def test_face_crop_for_selected_source_forces_crop_and_uses_uncensored_rat
 
 
 @pytest.mark.asyncio
-async def test_face_crop_streaming_western_route_forces_crop(resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+async def test_face_crop_streaming_western_route_forces_crop(
+    resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     """选中的无码流媒体来源即使按 WESTERN 处理, 也强制使用无码比例裁剪."""
     cover_url = "https://s/streaming-face-cover.jpg"
     poster_url = "https://s/streaming-tall-poster.jpg"

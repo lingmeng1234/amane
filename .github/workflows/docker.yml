@@ -51,7 +51,7 @@ jobs:
         with:
           images: |
               ${{ env.IMAGE }}
-              docker.io/${{ secrets.DOCKERHUB_USERNAME }}/amane
+              ${{ startsWith(github.ref, 'refs/tags/v') && format('docker.io/{0}/amane', secrets.DOCKERHUB_USERNAME) || '' }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

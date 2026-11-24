@@ -4,19 +4,14 @@
 **距离**, 要先按格子坐标生成 anchor 才能解出 x1y1x2y2. 把预测值直接当坐标会把所有框挤到
 左上角.
 
-模型为 insightface buffalo_l 的 ``det_10g.onnx`` (16.9 MB), 首次需要时按需下载并缓存. 会话惰性创建 ——
-不裁海报时不加载模型, 也不占内存.
+模型文件随 Amane 源码放在当前目录. 会话惰性创建 —— 不裁海报时不加载模型, 也不占内存.
 """
 
 from __future__ import annotations
 
-import hashlib
-import os
-import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import cast
-from urllib.request import Request, urlopen
 
 import numpy as np
 import structlog
@@ -24,76 +19,17 @@ from PIL import Image
 
 logger = structlog.get_logger()
 
-_MODEL_REVISION = "657b70dc36047a875eb1431dca342abc7a07a346"
-_MODEL_SPECS = {
-    "face_detect_scrfd.onnx": ("bbfebbab00217df73af23fca160236208bb69616", 16923827),
-    "face_detect_genderage.onnx": ("c1a68b8db319d8d5c78f27136822ef1313c51a77", 1322532),
-}
-_MODEL_DOWNLOAD_LOCK = threading.Lock()
-_MODEL_BASE_URL = "https://raw.githubusercontent.com/BiancaVeritas/amane-promax/" + _MODEL_REVISION + "/src/amane/media"
+_MODEL_FILES = ("face_detect_scrfd.onnx", "face_detect_genderage.onnx")
 
 
-@lru_cache(maxsize=1)
-def _onnxruntime_available() -> bool:
-    """先确认运行时存在, 避免在不支持 ONNX Runtime 的平台无意义下载模型."""
-    try:
-        import onnxruntime  # noqa: F401
-    except Exception as exc:
-        logger.warning("onnxruntime unavailable; face crop will use center fallback", error=str(exc))
-        return False
-    return True
+def _model_path(filename: str) -> Path | None:
+    """只从源码/发行包内读取模型；不执行任何网络下载或缓存回退。"""
+    path = Path(__file__).with_name(filename)
+    if path.is_file() and path.stat().st_size > 0:
+        return path
+    logger.warning("bundled face model missing", model=filename, expected_path=str(path))
+    return None
 
-
-def _matches_model(path: Path, expected_sha: str, expected_size: int) -> bool:
-    if not path.is_file() or path.stat().st_size != expected_size:
-        return False
-    digest = hashlib.sha1(f"blob {expected_size}\0".encode())
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest() == expected_sha
-
-
-def _ensure_model(filename: str) -> Path | None:
-    """按固定 revision 懒下载模型, 用 Git blob SHA-1 与大小校验后原子缓存."""
-    expected_sha, expected_size = _MODEL_SPECS[filename]
-    packaged = Path(__file__).with_name(filename)
-    if _matches_model(packaged, expected_sha, expected_size):
-        return packaged
-
-    cache_root = Path(os.environ.get("AMANE_MODEL_DIR") or (Path.home() / ".cache" / "amane" / "models"))
-    target = cache_root / filename
-    if _matches_model(target, expected_sha, expected_size):
-        return target
-
-    # 多个刮削任务可能同时首次触发检测; 串行下载并在拿到锁后再次检查缓存.
-    with _MODEL_DOWNLOAD_LOCK:
-        if _matches_model(target, expected_sha, expected_size):
-            return target
-        temporary = target.with_suffix(target.suffix + ".part")
-        try:
-            cache_root.mkdir(parents=True, exist_ok=True)
-            request = Request(
-                f"{_MODEL_BASE_URL}/{filename}",
-                headers={"User-Agent": "Amane face-crop model loader"},
-            )
-            digest = hashlib.sha1(f"blob {expected_size}\0".encode())
-            received = 0
-            with urlopen(request, timeout=90) as response, temporary.open("wb") as output:
-                while chunk := response.read(1024 * 1024):
-                    received += len(chunk)
-                    if received > expected_size:
-                        raise ValueError(f"model is larger than expected: {filename}")
-                    digest.update(chunk)
-                    output.write(chunk)
-            if received != expected_size or digest.hexdigest() != expected_sha:
-                raise ValueError(f"model integrity check failed: {filename}")
-            temporary.replace(target)
-            return target
-        except Exception as exc:
-            temporary.unlink(missing_ok=True)
-            logger.warning("face model unavailable", model=filename, error=str(exc))
-            return None
 
 
 #: 输出按 stride 分组, 每组依次是 score / bbox / kps.
@@ -107,7 +43,7 @@ _NMS_IOU = 0.4
 
 
 def model_available() -> bool:
-    return _ensure_model("face_detect_scrfd.onnx") is not None
+    return _model_path("face_detect_scrfd.onnx") is not None
 
 
 def _anchor_centers(height: int, width: int, stride: int, num_anchors: int) -> np.ndarray:
@@ -239,7 +175,7 @@ def _detector() -> _Detector | None:
     """会话只建一次; 模型缺失或 onnxruntime 不可用时返回 None, 调用方退回固定裁剪."""
     if not _onnxruntime_available():
         return None
-    model_path = _ensure_model("face_detect_scrfd.onnx")
+    model_path = _model_path("face_detect_scrfd.onnx")
     if model_path is None:
         return None
     try:
@@ -322,7 +258,7 @@ def _warp_affine_center(rgb: np.ndarray, center: tuple[float, float], scale: flo
 def _gender_model() -> _GenderModel | None:
     if not _onnxruntime_available():
         return None
-    model_path = _ensure_model("face_detect_genderage.onnx")
+    model_path = _model_path("face_detect_genderage.onnx")
     if model_path is None:
         return None
     try:

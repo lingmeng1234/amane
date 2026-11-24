@@ -28,23 +28,23 @@ def main() -> int:
     for name, (expected_size, expected_sha) in MODELS.items():
         path = MODEL_DIR / name
         if not path.is_file():
-            print(f"MISSING: {path}", file=sys.stderr)
+            print(  # noqa: T201f"MISSING: {path}", file=sys.stderr)
             failed = True
             continue
         size = path.stat().st_size
         sha = git_blob_sha1(path)
         if size != expected_size or sha != expected_sha:
-            print(
+            print(  # noqa: T201
                 f"INVALID: {name}: size={size} (expected {expected_size}), "
                 f"git_blob_sha1={sha} (expected {expected_sha})",
                 file=sys.stderr,
             )
             failed = True
             continue
-        print(f"OK: {name} ({size} bytes, {sha})")
+        print(  # noqa: T201f"OK: {name} ({size} bytes, {sha})")
     if failed:
         return 1
-    print("Both bundled face models passed integrity verification.")
+    print(  # noqa: T201"Both bundled face models passed integrity verification.")
     return 0
 
 

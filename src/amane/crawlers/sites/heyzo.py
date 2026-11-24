@@ -8,11 +8,11 @@ from urllib.parse import urljoin
 from parsel import Selector
 
 from ...enums import SiteName
+from ...utils.dates import normalize_calendar_date
+from ...utils.text import normalize_long_text
 from ..base import Crawler, CrawlerProfile
 from ..http import RequestError
 from ..models import FetchOptions, MediaMetadata, SearchQuery, film_actors
-from ...utils.dates import normalize_calendar_date
-from ...utils.text import normalize_long_text
 
 _BASE_URL = "https://www.heyzo.com"
 _NUMBER_RE = re.compile(r"^HEYZO-(?P<digits>\d{4})$", re.IGNORECASE)
@@ -137,15 +137,17 @@ class HeyzoCrawler(Crawler):
         tags = data.get("tags")
         plot = data.get("plot")
         release = data.get("release")
+        actor_names = [name for name in actors if isinstance(name, str)] if isinstance(actors, list) else []
+        tag_values = [tag for tag in tags if isinstance(tag, str)] if isinstance(tags, list) else []
         return MediaMetadata(
             number=number,
             title=title,
             plot=plot if isinstance(plot, str) else None,
-            actors=film_actors(actors if isinstance(actors, list) else []),
+            actors=film_actors(actor_names),
             release=release if isinstance(release, str) else None,
             studio="HEYZO",
             publisher="HEYZO",
-            tags=tags if isinstance(tags, list) else [],
+            tags=tag_values,
             # 无码流媒体通用图片流程会把 cover_urls 同步为海报及原始海报;
             # Tokyo-Hot 的专属封面模式不在本来源内实现.
             cover_urls=[poster] if poster else [],

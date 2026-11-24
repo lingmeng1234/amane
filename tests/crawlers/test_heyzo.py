@@ -1,3 +1,5 @@
+import pytest
+
 from amane.crawlers import registry
 from amane.crawlers.models import SearchQuery
 from amane.crawlers.sites.heyzo import HeyzoCrawler, _detail, _number
@@ -46,6 +48,7 @@ def test_heyzo_registered_and_number_is_strict() -> None:
     assert _number("1206") is None
 
 
+@pytest.mark.asyncio(loop_scope="function")
 async def test_search_builds_direct_movie_url_and_normalizes_leading_zeroes() -> None:
     crawler = HeyzoCrawler(object())  # type: ignore[arg-type]
     assert await crawler._search(SearchQuery("HEYZO-1206")) == "https://www.heyzo.com/movie/1206"
@@ -76,6 +79,7 @@ class _FakeClient:
         return _HTML
 
 
+@pytest.mark.asyncio(loop_scope="function")
 async def test_scrape_returns_single_cover_and_heyzo_company_fields() -> None:
     crawler = HeyzoCrawler(_FakeClient())  # type: ignore[arg-type]
     result = await crawler._scrape("https://www.heyzo.com/movie/1206")

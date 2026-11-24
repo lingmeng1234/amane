@@ -4,7 +4,7 @@
 **距离**, 要先按格子坐标生成 anchor 才能解出 x1y1x2y2. 把预测值直接当坐标会把所有框挤到
 左上角.
 
-模型为 insightface buffalo_l 的 ``det_10g.onnx`` (16.9 MB), 随包分发. 会话惰性创建 ——
+模型为 insightface buffalo_l 的 ``det_10g.onnx`` (16.9 MB), 首次需要时按需下载并缓存. 会话惰性创建 ——
 不裁海报时不加载模型, 也不占内存.
 """
 

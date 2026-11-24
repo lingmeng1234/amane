@@ -432,7 +432,11 @@ class ScrapingConfig(BaseModel):
 
     poster_crop_face_sources: list[str] = Field(
         default_factory=lambda: list(_POSTER_CROP_FACE_SOURCE_IDS),
-        json_schema_extra={"x-hidden": True},
+        json_schema_extra={
+            "x-hidden": True,
+            "x-ordered": True,
+            "items": {"type": "string", "enum": list(_POSTER_CROP_FACE_SOURCE_IDS)},
+        },
     )
     """允许使用人脸检测的无码来源; 其他来源和 Tokyo-Hot 始终沿用原有裁切方式."""
 

@@ -4868,6 +4868,14 @@ export type ScrapingConfig = {
      */
     poster_crop_skip_ratio?: number;
     /**
+     * Poster Crop Detect Face
+     */
+    poster_crop_detect_face?: boolean;
+    /**
+     * Poster Crop Face Sources
+     */
+    poster_crop_face_sources?: Array<'10musume' | '1pondo' | 'caribbeancom' | 'pacopacomama' | 'caribbeancompr' | 'caribbeancom_index' | 'd2pass' | 'heyzo'>;
+    /**
      * Jpeg Quality
      */
     jpeg_quality?: number;

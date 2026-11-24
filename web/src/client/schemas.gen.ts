@@ -3329,6 +3329,8 @@ export const HotSettingsSchema = {
                 poster_ratio: 0.7,
                 uncensored_poster_ratio: 0.87,
                 poster_crop_skip_ratio: 0.9,
+                poster_crop_detect_face: true,
+                poster_crop_face_sources: ['10musume', '1pondo', 'caribbeancom', 'pacopacomama', 'caribbeancompr', 'caribbeancom_index', 'd2pass', 'heyzo'],
                 jpeg_quality: 95,
                 content_routes: {
                     amateur: [
@@ -9175,6 +9177,24 @@ export const ScrapingConfigSchema = {
             minimum: 0.5,
             title: 'Poster Crop Skip Ratio',
             default: 0.9
+        },
+        poster_crop_detect_face: {
+            type: 'boolean',
+            title: 'Poster Crop Detect Face',
+            default: true,
+            description: '人脸检测总开关. 仅在裁切海报总开关开启且来源属于独立启用列表时生效.'
+        },
+        poster_crop_face_sources: {
+            items: {
+                type: 'string',
+                enum: ['10musume', '1pondo', 'caribbeancom', 'pacopacomama', 'caribbeancompr', 'caribbeancom_index', 'd2pass', 'heyzo']
+            },
+            type: 'array',
+            title: 'Poster Crop Face Sources',
+            description: '允许使用人脸检测的无码来源; 其他来源和 Tokyo-Hot 始终沿用原有裁切方式.',
+            default: ['10musume', '1pondo', 'caribbeancom', 'pacopacomama', 'caribbeancompr', 'caribbeancom_index', 'd2pass', 'heyzo'],
+            'x-hidden': true,
+            'x-ordered': true
         },
         jpeg_quality: {
             type: 'integer',

@@ -555,9 +555,28 @@ function SettingsPage() {
                       ) : null}
 
                       <SchemaForm
-                        schema={sectionSchema}
+                        schema={
+                          key === "scraping"
+                            ? {
+                                ...sectionSchema,
+                                properties: Object.fromEntries(
+                                  Object.entries(sectionSchema.properties ?? {}).filter(
+                                    ([field]) => field !== "poster_crop_face_sources",
+                                  ),
+                                ),
+                              }
+                            : sectionSchema
+                        }
                         prefix={key}
-                        values={sectionValues}
+                        values={
+                          key === "scraping"
+                            ? Object.fromEntries(
+                                Object.entries(sectionValues).filter(
+                                  ([field]) => field !== "poster_crop_face_sources",
+                                ),
+                              )
+                            : sectionValues
+                        }
                         i18nPrefix="settings:fields"
                         actionsPlacement="affix"
                         fieldActions={key === "scraping" ? scrapingFieldActions : undefined}

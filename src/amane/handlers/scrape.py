@@ -484,17 +484,17 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
         poster_out = list(identity_metadata.poster_urls) if poster_locked and identity_metadata else list(poster_input)
         cover_out = list(identity_metadata.cover_urls) if cover_locked and identity_metadata else list(cover_input)
         trailer_out = result.metadata.trailer_urls
+        image_sources = {
+            **result.metadata.image_sources,
+            **(identity_metadata.image_sources if identity_metadata else {}),
+        }
+        # 旧刮削源未显式记录 image_sources 时, 以本次选中的流媒体源补齐封面来源.
+        if face_crop_streaming and not cover_locked and selected_streaming_site is not None:
+            for url in cover_input:
+                image_sources.setdefault(url, selected_streaming_site)
+
         if self._web_client is not None:
             try:
-                image_sources = {
-                    **result.metadata.image_sources,
-                    **(identity_metadata.image_sources if identity_metadata else {}),
-                }
-                # 旧刮削源未显式记录 image_sources 时, 以本次选中的流媒体源补齐封面来源.
-                if face_crop_streaming and not cover_locked and selected_streaming_site is not None:
-                    for url in cover_input:
-                        image_sources.setdefault(url, selected_streaming_site)
-
                 materialized = await materialize_images(
                     poster_input,
                     cover_input,
@@ -552,7 +552,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
             "external_ids": result.metadata.external_ids,
             "source_urls": result.metadata.source_urls,
             "field_sources": result.field_sources,
-            "image_sources": result.metadata.image_sources,
+            "image_sources": image_sources,
             "raw": result.raw,
         }
         if payload.content_type == ContentType.WESTERN:

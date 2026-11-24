@@ -179,7 +179,7 @@ function FaceDetectionSourceSettings({
             </Group>
           </Group>
         </UnstyledButton>
-        <Collapse in={expanded}>
+        <Collapse expanded={expanded}>
           <Stack gap="sm" mt="md">
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
               {POSTER_FACE_SOURCES.map((source) => (

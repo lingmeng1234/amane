@@ -30,10 +30,7 @@ def _download(name: str, expected_size: int, expected_sha: str) -> None:
             LOGGER.info("Verified existing model: %s", destination)
             return
 
-    url = (
-        f"https://raw.githubusercontent.com/BiancaVeritas/amane-promax/"
-        f"{REFERENCE_COMMIT}/src/amane/media/{name}"
-    )
+    url = f"https://raw.githubusercontent.com/BiancaVeritas/amane-promax/{REFERENCE_COMMIT}/src/amane/media/{name}"
     request = Request(url, headers={"User-Agent": "Amane-face-model-fetcher"})
     LOGGER.info("Downloading %s ...", name)
     with urlopen(request, timeout=120) as response:

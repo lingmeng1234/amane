@@ -190,8 +190,9 @@ function FaceDetectionSourceSettings({
                   label={source.label}
                   checked={draft.includes(source.id)}
                   onChange={(event) => {
+                    const checked = event.currentTarget.checked;
                     setDraft((current) =>
-                      event.currentTarget.checked
+                      checked
                         ? [...current, source.id]
                         : current.filter((value) => value !== source.id),
                     );

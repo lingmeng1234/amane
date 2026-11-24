@@ -57,6 +57,8 @@ $StdlibArgs = @()
     --add-data "$(Join-Path $Root 'web\dist');web/dist" `
     --add-data "$(Join-Path $Root 'src\amane\db\migrations');amane/db/migrations" `
     --add-data "$(Join-Path $Root 'src\amane\media\watermarks');amane/media/watermarks" `
+    --add-data "$(Join-Path $Root 'src\amane\media\face_detect_scrfd.onnx');amane/media" `
+    --add-data "$(Join-Path $Root 'src\amane\media\face_detect_genderage.onnx');amane/media" `
     --add-data "$(Join-Path $Root 'src\amane\utils\zhcdict.json');amane/utils" `
     --add-data "$(Join-Path $Root 'src\amane\utils\zhconv_overrides.json');amane/utils" `
     --add-data "$(Join-Path $Root 'resources\mapping_table\minnano_actress_map.json');amane/resources" `

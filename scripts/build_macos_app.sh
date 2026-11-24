@@ -54,6 +54,8 @@ done < <(.venv/bin/python scripts/stdlib_modules.py)
   --add-data "$ROOT/web/dist:web/dist" \
   --add-data "$ROOT/src/amane/db/migrations:amane/db/migrations" \
   --add-data "$ROOT/src/amane/media/watermarks:amane/media/watermarks" \
+  --add-data "$ROOT/src/amane/media/face_detect_scrfd.onnx:amane/media" \
+  --add-data "$ROOT/src/amane/media/face_detect_genderage.onnx:amane/media" \
   --add-data "$ROOT/src/amane/utils/zhcdict.json:amane/utils" \
   --add-data "$ROOT/src/amane/utils/zhconv_overrides.json:amane/utils" \
   --add-data "$ROOT/src/amane/crawlers/sites/caribbeancompr_heyzo_index.json:amane/crawlers/sites" \

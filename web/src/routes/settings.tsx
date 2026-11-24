@@ -51,6 +51,7 @@ const DEFAULT_CONTENT_ROUTES = {
     "1pondo",
     "caribbeancom",
     "pacopacomama",
+    "heyzo",
     "tokyo_hot",
     "caribbeancompr",
     "d2pass",

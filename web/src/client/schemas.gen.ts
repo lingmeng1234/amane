@@ -3326,6 +3326,10 @@ export const HotSettingsSchema = {
                     'extrafanart'
                 ],
                 crop_poster: true,
+                poster_face_crop: {
+                    enabled: false,
+                    sources: []
+                },
                 poster_ratio: 0.7,
                 uncensored_poster_ratio: 0.87,
                 poster_crop_skip_ratio: 0.9,
@@ -7831,6 +7835,35 @@ export const PluginResponseSchema = {
     title: 'PluginResponse'
 } as const;
 
+export const PosterFaceCropConfigSchema = {
+    properties: {
+        enabled: {
+            type: 'boolean',
+            title: 'Enabled',
+            default: false
+        },
+        sources: {
+            items: {
+                type: 'string',
+                enum: [
+                    '10mususume',
+                    '1pondo',
+                    'caribbeancom',
+                    'pacopacomama',
+                    'caribbeancompr',
+                    'd2pass',
+                    'heyzo'
+                ]
+            },
+            type: 'array',
+            title: 'Sources'
+        }
+    },
+    type: 'object',
+    title: 'PosterFaceCropConfig',
+    description: '按实际封面来源启用人脸定位裁剪; 未勾选来源沿用旧裁剪规则.'
+} as const;
+
 export const R18ConfigSchema = {
     properties: {
         dsn: {
@@ -9154,6 +9187,10 @@ export const ScrapingConfigSchema = {
             type: 'boolean',
             title: 'Crop Poster',
             default: true
+        },
+        poster_face_crop: {
+            $ref: '#/components/schemas/PosterFaceCropConfig',
+            title: '人脸定位裁剪'
         },
         poster_ratio: {
             type: 'number',

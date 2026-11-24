@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+  pull_request:
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
@@ -60,7 +62,11 @@ jobs:
         id: zip
         shell: pwsh
         run: |
-          $tag = $env:GITHUB_REF_NAME
+          if ($env:GITHUB_EVENT_NAME -eq "pull_request") {
+            $tag = "pr-${{ github.event.pull_request.number }}"
+          } else {
+            $tag = $env:GITHUB_REF_NAME
+          }
           $zip = "dist/Amane-$tag-windows-x64.zip"
           if (-not (Test-Path dist/Amane/Amane.exe)) { throw "dist/Amane/Amane.exe missing" }
           if (-not (Test-Path dist/Amane/onedir/Amane.Server.exe)) { throw "onedir/Amane.Server.exe missing" }
@@ -73,7 +79,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Amane-windows-${{ github.ref_name }}
+          name: Amane-windows-${{ github.event.pull_request.number || github.ref_name }}
           path: ${{ steps.zip.outputs.zip }}
           if-no-files-found: error
 

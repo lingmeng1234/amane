@@ -1,0 +1,8 @@
+Required bundled model files for Amane v0.28.4.
+
+Upload the two binary files directly into this directory (src/amane/media/), preserving these exact names:
+
+1. face_detect_scrfd.onnx — expected size: 16,923,827 bytes; Git blob SHA-1: bbfebbab00217df73af23fca160236208bb69616
+2. face_detect_genderage.onnx — expected size: 1,322,532 bytes; Git blob SHA-1: c1a68b8db319d8d5c78f27136822ef1313c51a77
+
+Do not create empty placeholder files. The release must not be tagged until both real model binaries are uploaded and verified with: uv run python scripts/verify_face_models.py

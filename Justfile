@@ -35,6 +35,10 @@ _web-install:
 fixtures:
     uv run python scripts/fetch_fixtures.py
 
+# Verify the required source-bundled face model binaries.
+verify-face-models:
+    uv run python scripts/verify_face_models.py
+
 # CI static job: frozen Python(dev+extras) + frozen web
 ci-sync: _ci-sync-python _web-install-ci
 
@@ -94,7 +98,7 @@ _check-openapi: generate
 ci: ci-static ci-test
 
 # 前端只打包: check-web 已做完整 tsc 检查, 而 noEmit 下 `tsc -b` 没有可复用的增量结果, 再跑一次是同样的全量检查
-ci-static: ci-sync _check-openapi lint typecheck check-web _web-bundle
+ci-static: ci-sync _check-openapi lint verify-face-models typecheck check-web _web-bundle
 
 # 测试不依赖 Node 与前端产物, CI 的 test job 因此不安装 Node / pnpm
 ci-test: _ci-sync-python test-cov

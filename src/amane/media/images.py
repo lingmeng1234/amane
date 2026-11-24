@@ -138,30 +138,63 @@ def needs_upscale(
     return max(size) < max_dim_threshold
 
 
+def face_crop_left(thumb_path: Path, poster_ratio: float) -> tuple[int, str]:
+    """计算人脸模式的横向裁剪位置; 无脸或模型异常时返回居中位置.
+
+    返回的来源标记会进入派生资源键, 避免人脸定位结果与居中回退互相命中缓存.
+    """
+    try:
+        with Image.open(thumb_path) as img:
+            width, height = img.size
+            target_w = int(height * poster_ratio)
+            if target_w >= width:
+                return 0, "full"
+
+            try:
+                from .face_detect import main_subject_face
+
+                face = main_subject_face(img)
+            except Exception as exc:
+                logger.warning("face positioning failed, use center crop", path=str(thumb_path), error=str(exc))
+                face = None
+
+            if face is None:
+                return round((width - target_w) / 2), "center"
+
+            x1, _, x2, _ = face
+            center_x = (x1 + x2) / 2
+            left = round(min(max(0.0, center_x - target_w / 2), float(width - target_w)))
+            return left, "face"
+    except Exception as exc:
+        logger.warning("face positioning failed, use center crop", path=str(thumb_path), error=str(exc))
+        return 0, "center"
+
+
 def crop_poster(
     thumb_path: Path,
     poster_path: Path,
     *,
     poster_ratio: float = _DEFAULT_POSTER_RATIO,
     jpeg_quality: int = _DEFAULT_JPEG_QUALITY,
+    left: int | None = None,
 ) -> bool:
-    """海报取封面右侧, 宽度 = height × poster_ratio."""
+    """从封面裁出海报, 宽度 = height × poster_ratio.
+
+    未传 left 时保持旧版右侧裁剪; 人脸模式传入已计算的横向位置.
+    """
     try:
-        img = Image.open(thumb_path)
-        w, h = img.size
+        with Image.open(thumb_path) as img:
+            w, h = img.size
+            target_w = int(h * poster_ratio)
+            poster_path.parent.mkdir(parents=True, exist_ok=True)
+            if target_w >= w:
+                _save_jpeg(img, poster_path, jpeg_quality)
+                return True
 
-        target_w = int(h * poster_ratio)
-        if target_w >= w:
-            # 已足够窄, 整图作为海报.
-            _save_jpeg(img, poster_path, jpeg_quality)
+            crop_left = w - target_w if left is None else max(0, min(w - target_w, left))
+            cropped = img.crop((crop_left, 0, crop_left + target_w, h))
+            _save_jpeg(cropped, poster_path, jpeg_quality)
             return True
-
-        # 从右侧裁剪.
-        left = w - target_w
-        cropped = img.crop((left, 0, w, h))
-        poster_path.parent.mkdir(parents=True, exist_ok=True)
-        _save_jpeg(cropped, poster_path, jpeg_quality)
-        return True
     except Exception as e:
         logger.warning("poster crop failed", path=str(thumb_path), error=str(e))
         return False

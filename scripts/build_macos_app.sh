@@ -30,6 +30,13 @@ if [[ ! -f web/dist/index.html ]]; then
   exit 1
 fi
 
+for model in face_detect_scrfd.onnx face_detect_genderage.onnx; do
+  if [[ ! -s "$ROOT/src/amane/media/$model" ]]; then
+    echo "Required bundled face model missing or empty: src/amane/media/$model" >&2
+    exit 1
+  fi
+done
+
 if [[ ! -f "$ROOT/assets/app.icns" ]]; then
   echo "assets/app.icns missing; run: just icons" >&2
   exit 1
@@ -54,6 +61,8 @@ done < <(.venv/bin/python scripts/stdlib_modules.py)
   --add-data "$ROOT/web/dist:web/dist" \
   --add-data "$ROOT/src/amane/db/migrations:amane/db/migrations" \
   --add-data "$ROOT/src/amane/media/watermarks:amane/media/watermarks" \
+  --add-data "$ROOT/src/amane/media/face_detect_scrfd.onnx:amane/media" \
+  --add-data "$ROOT/src/amane/media/face_detect_genderage.onnx:amane/media" \
   --add-data "$ROOT/src/amane/utils/zhcdict.json:amane/utils" \
   --add-data "$ROOT/src/amane/utils/zhconv_overrides.json:amane/utils" \
   --add-data "$ROOT/src/amane/crawlers/sites/caribbeancompr_heyzo_index.json:amane/crawlers/sites" \

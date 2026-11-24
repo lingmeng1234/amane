@@ -31,6 +31,14 @@ if (-not (Test-Path (Join-Path $Root "web\dist\index.html"))) {
     exit 1
 }
 
+foreach ($Model in @("face_detect_scrfd.onnx", "face_detect_genderage.onnx")) {
+    $ModelPath = Join-Path $Root ("src\amane\media\{0}" -f $Model)
+    if (-not (Test-Path $ModelPath) -or (Get-Item $ModelPath).Length -eq 0) {
+        Write-Error "Required bundled face model missing or empty: $ModelPath"
+        exit 1
+    }
+}
+
 if (-not (Test-Path (Join-Path $Root "assets\app.ico"))) {
     Write-Error "assets/app.ico missing; run: just icons"
     exit 1
@@ -57,6 +65,8 @@ $StdlibArgs = @()
     --add-data "$(Join-Path $Root 'web\dist');web/dist" `
     --add-data "$(Join-Path $Root 'src\amane\db\migrations');amane/db/migrations" `
     --add-data "$(Join-Path $Root 'src\amane\media\watermarks');amane/media/watermarks" `
+    --add-data "$(Join-Path $Root 'src\amane\media\face_detect_scrfd.onnx');amane/media" `
+    --add-data "$(Join-Path $Root 'src\amane\media\face_detect_genderage.onnx');amane/media" `
     --add-data "$(Join-Path $Root 'src\amane\utils\zhcdict.json');amane/utils" `
     --add-data "$(Join-Path $Root 'src\amane\utils\zhconv_overrides.json');amane/utils" `
     --add-data "$(Join-Path $Root 'resources\mapping_table\minnano_actress_map.json');amane/resources" `
@@ -73,6 +83,7 @@ $StdlibArgs = @()
     --collect-all pydantic_ai `
     --collect-all pydantic_graph `
     --collect-all genai_prices `
+    --collect-all onnxruntime `
     --hidden-import socksio `
     @StdlibArgs `
     --copy-metadata genai_prices `
@@ -91,6 +102,15 @@ $Onedir = Join-Path $Work "dist\Amane.Server"
 if (-not (Test-Path $Onedir)) {
     Write-Error "PyInstaller onedir missing: $Onedir"
     exit 1
+}
+
+foreach ($Model in @("face_detect_scrfd.onnx", "face_detect_genderage.onnx")) {
+    $BundledModel = Get-ChildItem $Onedir -Recurse -File -Filter $Model | Select-Object -First 1
+    if (-not $BundledModel -or $BundledModel.Length -eq 0) {
+        Write-Error "PyInstaller output is missing bundled face model: $Model"
+        exit 1
+    }
+    Write-Output "Verified bundled model: $($BundledModel.FullName)"
 }
 
 $Version = (& (Join-Path $Root ".venv\Scripts\python.exe") -c "from amane.version import get_version; print(get_version())").Trim()

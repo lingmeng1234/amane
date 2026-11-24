@@ -466,8 +466,21 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
         # 图像处理模式由刮削路由决定, double_page_* 不参与裁剪路线判断.
         image_content_type = ContentType.WESTERN if western else payload.content_type
 
+        # 仅对用户启用的七个无码流媒体来源进入人脸模式; 手动锁定的图片字段不覆盖.
+        face_crop_streaming = (
+            route_key == "uncensored_streaming"
+            and selected_streaming_site is not None
+            and selected_streaming_site != str(SiteName.TOKYO_HOT)
+            and self._config.scraping.crop_poster
+            and self._config.scraping.poster_face_crop.enabled
+            and selected_streaming_site in self._config.scraping.poster_face_crop.sources
+            and not poster_locked
+            and not cover_locked
+        )
+
         # 锁定类型在物化前直接沿用现有资源, 不触发重新下载 / 超分 / 派生覆盖.
         original_poster_urls = list(result.metadata.poster_urls or [])
+        # 海报候选仍保留原始 URL; 人脸模式会强制裁切, 来源未命中时也能安全保留原海报.
         poster_input = [] if poster_locked else list(result.metadata.poster_urls)
         cover_input = [] if cover_locked else list(result.metadata.cover_urls)
         if cover_locked and identity_metadata is not None:
@@ -475,6 +488,15 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
         poster_out = list(identity_metadata.poster_urls) if poster_locked and identity_metadata else list(poster_input)
         cover_out = list(identity_metadata.cover_urls) if cover_locked and identity_metadata else list(cover_input)
         trailer_out = result.metadata.trailer_urls
+        image_sources = {
+            **result.metadata.image_sources,
+            **(identity_metadata.image_sources if identity_metadata else {}),
+        }
+        # 旧刮削源未显式记录 image_sources 时, 以本次成功返回的流媒体来源补齐.
+        # setdefault 保留刮削器明确给出的来源归属, 避免误把其他源图片算作当前源.
+        if face_crop_streaming and selected_streaming_site is not None:
+            for url in cover_input:
+                image_sources.setdefault(url, selected_streaming_site)
         if self._web_client is not None:
             try:
                 materialized = await materialize_images(
@@ -487,11 +509,9 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
                     self._resource_store.data_dir,
                     content_type=image_content_type,
                     extrafanart_urls=result.metadata.extrafanart_urls,
-                    image_sources={
-                        **result.metadata.image_sources,
-                        **(identity_metadata.image_sources if identity_metadata else {}),
-                    },
+                    image_sources=image_sources,
                     preserve_cover_resource=cover_locked,
+                    scrape_route=route_key,
                 )
                 if not poster_locked:
                     poster_out = materialized.poster_urls

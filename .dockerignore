@@ -49,6 +49,7 @@ compose.yaml
 docs
 tests
 scripts
+!scripts/
 resources
 !resources/
 !resources/mapping_table/

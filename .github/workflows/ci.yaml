@@ -75,6 +75,40 @@ jobs:
           FIXTURES_DEPLOY_KEY: ${{ secrets.FIXTURES_DEPLOY_KEY }}
         run: just ci-test
 
+      - name: Load bundled ONNX models with ONNX Runtime
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+          import onnxruntime as ort
+
+          model_dir = Path("src/amane/media")
+          for filename in ("face_detect_scrfd.onnx", "face_detect_genderage.onnx"):
+              model_path = model_dir / filename
+              session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+              print(filename, "loaded", "inputs=", [item.name for item in session.get_inputs()], "outputs=", [item.name for item in session.get_outputs()])
+          PY
+
+      - name: Build and verify wheel and sdist model contents
+        run: |
+          uv build
+          uv run python - <<'PY'
+          from pathlib import Path
+          from tarfile import open as open_tar
+          from zipfile import ZipFile
+
+          required = {"face_detect_scrfd.onnx", "face_detect_genderage.onnx"}
+          wheel = next(Path("dist").glob("*.whl"))
+          with ZipFile(wheel) as archive:
+              wheel_models = {Path(name).name for name in archive.namelist() if name.endswith(".onnx")}
+          assert required <= wheel_models, f"wheel missing models: {required - wheel_models}"
+
+          sdist = next(Path("dist").glob("*.tar.gz"))
+          with open_tar(sdist, "r:gz") as archive:
+              sdist_models = {Path(member.name).name for member in archive.getmembers() if member.name.endswith(".onnx")}
+          assert required <= sdist_models, f"sdist missing models: {required - sdist_models}"
+          print("wheel and sdist both contain both ONNX models")
+          PY
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7

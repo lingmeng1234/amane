@@ -4064,6 +4064,22 @@ export type PluginResponse = {
 };
 
 /**
+ * PosterFaceCropConfig
+ *
+ * 按实际封面来源启用人脸定位裁剪; 未勾选来源沿用旧裁剪规则.
+ */
+export type PosterFaceCropConfig = {
+    /**
+     * Enabled
+     */
+    enabled?: boolean;
+    /**
+     * Sources
+     */
+    sources?: Array<'10mususume' | '1pondo' | 'caribbeancom' | 'pacopacomama' | 'caribbeancompr' | 'd2pass' | 'heyzo'>;
+};
+
+/**
  * R18Config
  *
  * 放 Hot: 修改 dsn 经 AppRuntime.apply_rebuild() 重建只读引擎. 未配置 dsn 时整个数据源禁用.
@@ -4855,6 +4871,10 @@ export type ScrapingConfig = {
      * Crop Poster
      */
     crop_poster?: boolean;
+    /**
+     * 人脸定位裁剪
+     */
+    poster_face_crop?: PosterFaceCropConfig;
     /**
      * Poster Ratio
      */

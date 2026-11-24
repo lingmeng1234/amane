@@ -3,6 +3,7 @@
 与整理到媒体库路径无关. 任一步失败不抛, 仅降级.
 """
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -16,6 +17,7 @@ from .images import (
     CropRotation,
     crop_box,
     crop_poster,
+    face_crop_left,
     format_crop_box_args,
     needs_upscale,
     probe_oriented_size,
@@ -98,6 +100,7 @@ async def materialize_images(
     image_sources: dict[str, str] | None = None,
     force_crop_poster: bool = False,
     preserve_cover_resource: bool = False,
+    scrape_route: str | None = None,
 ) -> MaterializedImages:
     """仅下载集合内的类型; 未选中的图片类型保留聚合 URL.
 
@@ -107,8 +110,18 @@ async def materialize_images(
     """
     kinds = set(config.scraping.download_resources)
     image_sources = image_sources or {}
-    # 欧美不使用封面裁剪生成海报，其他分类保持原有裁剪规则.
-    can_crop_poster = content_type != ContentType.WESTERN and (config.scraping.crop_poster or force_crop_poster)
+    face_crop_config = config.scraping.poster_face_crop
+    # 无码流媒体路由在元数据层按 WESTERN 处理, 但明确启用的人脸来源仍允许从封面强制生成海报.
+    face_streaming_candidate = (
+        scrape_route == "uncensored_streaming"
+        and config.scraping.crop_poster
+        and face_crop_config.enabled
+        and any(image_sources.get(url) in face_crop_config.sources for url in cover_urls)
+    )
+    # 其他情况严格沿用旧版裁剪开关和 WESTERN 排除规则.
+    can_crop_poster = (
+        content_type != ContentType.WESTERN and (config.scraping.crop_poster or force_crop_poster)
+    ) or face_streaming_candidate
 
     # 下载封面资源.
     cover_ok: set[str] = set()
@@ -154,21 +167,44 @@ async def materialize_images(
     cover_size = probe_size(cover_local) if cover_local else None
     cand_size = probe_size(poster_candidate_local) if poster_candidate_local else None
 
-    if (
-        can_crop_poster
-        and should_crop_poster(cover_size, cand_size, skip_ratio=config.scraping.poster_crop_skip_ratio)
-        and cover_local
-    ):
+    face_crop_enabled = (
+        config.scraping.crop_poster
+        and face_crop_config.enabled
+        and scrape_route == "uncensored_streaming"
+        and cover_src is not None
+        and image_sources.get(cover_src) in face_crop_config.sources
+        and (content_type != ContentType.WESTERN or scrape_route == "uncensored_streaming")
+    )
+    # 流媒体的 WESTERN 图片流程仅允许实际封面来源命中开关时覆盖原本不裁切规则.
+    if content_type == ContentType.WESTERN and scrape_route == "uncensored_streaming":
+        can_crop_poster = face_crop_enabled
+    should_crop = face_crop_enabled or should_crop_poster(
+        cover_size, cand_size, skip_ratio=config.scraping.poster_crop_skip_ratio
+    )
+
+    if can_crop_poster and should_crop and cover_local:
+        # 人脸模式统一使用无码比例; 普通模式保留有码/无码各自的原有比例.
         ratio = (
             config.scraping.uncensored_poster_ratio
-            if content_type == ContentType.UNCENSORED
+            if face_crop_enabled or content_type == ContentType.UNCENSORED
             else config.scraping.poster_ratio
         )
+        crop_left: int | None = None
         args = f"{ratio:.4f}"
+        if face_crop_enabled:
+            crop_left, position = await asyncio.to_thread(face_crop_left, cover_local, ratio)
+            # 定位结果纳入派生键, 人脸检测失败的居中回退不会复用到人脸裁剪结果.
+            args = f"{ratio:.4f}:face:{position}:{crop_left}"
         local_cover = cover_local
 
         async def crop_producer(dest: Path) -> bool:
-            return crop_poster(local_cover, dest, poster_ratio=ratio, jpeg_quality=config.scraping.jpeg_quality)
+            return crop_poster(
+                local_cover,
+                dest,
+                poster_ratio=ratio,
+                jpeg_quality=config.scraping.jpeg_quality,
+                left=crop_left,
+            )
 
         crop_res = await store.acquire_derived(cover_src or "", "crop", args, crop_producer)
         if crop_res:

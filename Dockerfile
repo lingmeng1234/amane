@@ -18,6 +18,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+RUN test -s src/amane/media/face_detect_scrfd.onnx \
+    && test -s src/amane/media/face_detect_genderage.onnx
 COPY resources/mapping_table/minnano_actress_map.json ./resources/mapping_table/minnano_actress_map.json
 RUN uv sync --no-dev --frozen --no-editable
 

@@ -3,6 +3,8 @@
 与整理到媒体库路径无关. 任一步失败不抛, 仅降级.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING

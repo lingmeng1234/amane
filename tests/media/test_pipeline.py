@@ -768,6 +768,38 @@ async def test_face_crop_streaming_western_route_forces_crop(resource_store: Res
 
 
 @pytest.mark.asyncio
+async def test_unselected_streaming_source_keeps_western_no_crop_rule(
+    resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """无码流媒体封面实际来源未勾选时, 不得误进入人脸裁剪."""
+    cover_url = "https://s/unselected-stream-cover.jpg"
+    poster_url = "https://s/unselected-stream-poster.jpg"
+    client = FakeClient({cover_url: (800, 538), poster_url: (379, 538)})
+    cfg = HotSettings()
+    cfg.scraping.poster_face_crop.enabled = True
+    cfg.scraping.poster_face_crop.sources = ["1pondo"]
+
+    def unexpected_face_crop(_path: Path, _ratio: float) -> tuple[int, str]:
+        raise AssertionError("unselected source must not invoke face positioning")
+
+    monkeypatch.setattr(pipeline_mod, "face_crop_left", unexpected_face_crop)
+    out = await materialize_images(
+        [poster_url],
+        [cover_url],
+        [],
+        resource_store,
+        cast("WebClient", client),
+        cfg,
+        tmp_path,
+        content_type=ContentType.WESTERN,
+        image_sources={cover_url: "heyzo"},
+        scrape_route="uncensored_streaming",
+    )
+
+    assert out.poster_urls == [poster_url]
+
+
+@pytest.mark.asyncio
 async def test_face_crop_without_face_uses_center_and_keeps_face_mode_ratio(
     resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

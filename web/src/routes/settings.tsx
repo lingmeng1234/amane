@@ -584,7 +584,9 @@ function SettingsPage() {
                         actionsPlacement="affix"
                         fieldActions={key === "scraping" ? scrapingFieldActions : undefined}
                         afterFieldKey={
-                          key === "scraping" ? "poster_crop_detect_face" : undefined
+                          key === "scraping"
+                            ? "poster_crop_detect_face"
+                            : undefined
                         }
                         afterField={
                           key === "scraping" ? (

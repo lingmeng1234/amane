@@ -19,7 +19,13 @@ import {
   Title,
   UnstyledButton,
 } from "@mantine/core";
-import { IconAlertCircle, IconChevronDown, IconInfoCircle, IconPlugConnected, IconRefresh } from "@tabler/icons-react";
+import {
+  IconAlertCircle,
+  IconChevronDown,
+  IconInfoCircle,
+  IconPlugConnected,
+  IconRefresh,
+} from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -145,8 +151,7 @@ function FaceDetectionSourceSettings({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const changed =
-    draft.length !== savedSources.length ||
-    draft.some((source) => !savedSources.includes(source));
+    draft.length !== savedSources.length || draft.some((source) => !savedSources.includes(source));
 
   return (
     <>
@@ -228,9 +233,7 @@ function FaceDetectionSourceSettings({
         centered
       >
         <Stack gap="md">
-          <Text size="sm">
-            {t("faceDetection.confirmBody", { count: draft.length })}
-          </Text>
+          <Text size="sm">{t("faceDetection.confirmBody", { count: draft.length })}</Text>
           <Group justify="flex-end">
             <Button type="button" variant="default" onClick={() => setConfirmOpen(false)}>
               {t("faceDetection.cancel")}
@@ -583,11 +586,7 @@ function SettingsPage() {
                         i18nPrefix="settings:fields"
                         actionsPlacement="affix"
                         fieldActions={key === "scraping" ? scrapingFieldActions : undefined}
-                        afterFieldKey={
-                          key === "scraping"
-                            ? "poster_crop_detect_face"
-                            : undefined
-                        }
+                        afterFieldKey={key === "scraping" ? "poster_crop_detect_face" : undefined}
                         afterField={
                           key === "scraping" ? (
                             <FaceDetectionSourceSettings

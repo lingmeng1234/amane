@@ -50,7 +50,6 @@ docs
 tests
 scripts
 !scripts/
-!scripts/fetch_face_models.py
 resources
 !resources/
 !resources/mapping_table/

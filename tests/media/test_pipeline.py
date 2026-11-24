@@ -720,6 +720,7 @@ async def test_face_crop_for_selected_source_forces_crop_and_uses_uncensored_rat
         tmp_path,
         content_type=ContentType.CENSORED,
         image_sources={cover_url: "10mususume"},
+        scrape_route="uncensored_streaming",
     )
 
     assert out.poster_urls[0].startswith(pipeline_mod.RESOURCE_URL_PREFIX)
@@ -823,6 +824,7 @@ async def test_face_crop_without_face_uses_center_and_keeps_face_mode_ratio(
         tmp_path,
         content_type=ContentType.UNCENSORED,
         image_sources={cover_url: "heyzo"},
+        scrape_route="uncensored_streaming",
     )
 
     url_hash = out.poster_urls[0].rsplit("/", 1)[-1]

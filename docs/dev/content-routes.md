@@ -63,6 +63,8 @@
 
 **theporndb.net** — 未登录跳转 `/login`; 无 token 时影片 / 演员爬虫都直接 `None`. 欧美路由第一, 与影片共用 `site_config.api_token`. 欧美条目 `code` 是 `studio:title-slug`, 与文件名番号不同构, 日期号 (`Studio.YY.MM.DD`) 按片商 + 发布日期确认. GraphQL 面是自研的 stash-box 兼容层, 可空标注与上游不一致: 请求按上游最严的形态构造, 应答按最宽松的形态解析.
 
+**heyzo.com** — `HEYZO-XXXX` 由番号直接构造 `/movie/{id}` 详情页; 读取标题、简介、出演、配信日、TAG、播放器展示图与图库. 图库数量以详情页图库节点为准, 原图地址按序号构造, 不请求超出页面数量的图片. 默认位于无码流媒体路由的 Tokyo-Hot 之前, 使用通用单图封面同步流程.
+
 **official** — Will / Outvision 官网集群; 前缀对不上不发 HTTP.
 
 **r18dev** — 未配 PG 直接 skip; dump 图片补全后是 DMM CDN, 见 [crawlers.md](crawlers.md).

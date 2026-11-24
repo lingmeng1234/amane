@@ -33,6 +33,7 @@ from .sites import (
     GetchuCrawler,
     GigaCrawler,
     Hanime1Crawler,
+    HeyzoCrawler,
     IqqtvCrawler,
     Jav321Crawler,
     JavBusCrawler,
@@ -82,6 +83,7 @@ registry.register(CaribbeancomIndexCrawler)
 registry.register(D2PassCrawler)
 registry.register(R18DevCrawler)
 registry.register(TenmusumeCrawler)
+registry.register(HeyzoCrawler)
 registry.register(ThePornDBCrawler)
 registry.register(OfficialCrawler)
 registry.register(TokyoHotCrawler)
@@ -114,6 +116,7 @@ __all__ = [
     "GetchuCrawler",
     "GigaCrawler",
     "Hanime1Crawler",
+    "HeyzoCrawler",
     "HttpClient",
     "IqqtvCrawler",
     "Jav321Crawler",

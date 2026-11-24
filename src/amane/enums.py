@@ -19,6 +19,7 @@ class SiteName(StrEnum):
     GFRIENDS = "gfriends"
     GIGA = "giga"
     HANIME1 = "hanime1"
+    HEYZO = "heyzo"
     IQQTV = "iqqtv"
     JAV321 = "jav321"
     JAVBUS = "javbus"

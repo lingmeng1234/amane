@@ -16,7 +16,7 @@ MODELS = {
 
 def git_blob_sha1(path: Path) -> str:
     size = path.stat().st_size
-    digest = hashlib.sha1(f"blob {size}\\0".encode())
+    digest = hashlib.sha1(f"blob {size}\0".encode())
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)

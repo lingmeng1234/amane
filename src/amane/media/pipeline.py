@@ -133,7 +133,9 @@ async def materialize_images(
         scrape_route == "uncensored_streaming"
         and config.scraping.crop_poster
         and config.scraping.poster_crop_detect_face
-        and any(image_sources.get(url) in config.scraping.poster_crop_face_sources for url in cover_urls)
+        and any(
+            image_sources.get(url) in config.scraping.poster_crop_face_sources for url in cover_urls
+        )
     )
     can_crop_poster = (
         content_type != ContentType.WESTERN and (config.scraping.crop_poster or force_crop_poster)

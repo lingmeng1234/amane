@@ -692,3 +692,111 @@ async def test_force_crop_uses_cached_locked_cover_without_reacquiring(resource_
     assert len(out.poster_urls) == 1
     assert out.poster_urls[0].startswith(pipeline_mod.RESOURCE_URL_PREFIX)
     assert client.downloaded == [url]
+
+
+
+@pytest.mark.asyncio
+async def test_face_crop_for_selected_source_forces_crop_and_uses_uncensored_ratio(
+    resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """人脸模式命中实际封面来源时, 即使已有海报够高也强制裁剪并使用无码比例."""
+    cover_url = "https://s/face-cover.jpg"
+    poster_url = "https://s/tall-poster.jpg"
+    client = FakeClient({cover_url: (800, 538), poster_url: (379, 538)})
+    cfg = HotSettings()
+    cfg.scraping.poster_ratio = 0.55
+    cfg.scraping.uncensored_poster_ratio = 0.87
+    cfg.scraping.poster_face_crop.enabled = True
+    cfg.scraping.poster_face_crop.sources = ["10mususume"]
+    monkeypatch.setattr(pipeline_mod, "face_crop_left", lambda _path, _ratio: (111, "face"))
+
+    out = await materialize_images(
+        [poster_url],
+        [cover_url],
+        [],
+        resource_store,
+        cast("WebClient", client),
+        cfg,
+        tmp_path,
+        content_type=ContentType.CENSORED,
+        image_sources={cover_url: "10mususume"},
+    )
+
+    assert out.poster_urls[0].startswith(pipeline_mod.RESOURCE_URL_PREFIX)
+    url_hash = out.poster_urls[0].rsplit("/", 1)[-1]
+    got = await resource_store.get_by_url_hash(url_hash)
+    assert got is not None
+    crop_res, crop_path = got
+    assert crop_res.meta is not None
+    assert crop_res.meta["args"] == "0.8700:face:face:111"
+    assert Image.open(crop_path).size == (468, 538)
+
+
+@pytest.mark.asyncio
+async def test_face_crop_without_face_uses_center_and_keeps_face_mode_ratio(
+    resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """人脸模式无脸时仍强制裁剪, 位置由检测层回退到居中."""
+    cover_url = "https://s/center-cover.jpg"
+    poster_url = "https://s/tall-poster.jpg"
+    client = FakeClient({cover_url: (800, 538), poster_url: (379, 538)})
+    cfg = HotSettings()
+    cfg.scraping.uncensored_poster_ratio = 0.8
+    cfg.scraping.poster_face_crop.enabled = True
+    cfg.scraping.poster_face_crop.sources = ["heyzo"]
+    monkeypatch.setattr(pipeline_mod, "face_crop_left", lambda _path, _ratio: (185, "center"))
+
+    out = await materialize_images(
+        [poster_url],
+        [cover_url],
+        [],
+        resource_store,
+        cast("WebClient", client),
+        cfg,
+        tmp_path,
+        content_type=ContentType.UNCENSORED,
+        image_sources={cover_url: "heyzo"},
+    )
+
+    url_hash = out.poster_urls[0].rsplit("/", 1)[-1]
+    got = await resource_store.get_by_url_hash(url_hash)
+    assert got is not None
+    crop_res, crop_path = got
+    assert crop_res.meta is not None
+    assert crop_res.meta["args"] == "0.8000:face:center:185"
+    assert Image.open(crop_path).size == (430, 538)
+
+
+@pytest.mark.asyncio
+async def test_unselected_face_source_uses_legacy_crop_gate(
+    resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """来源未勾选时不进入人脸模式, 继续使用旧跳过条件."""
+    cover_url = "https://s/legacy-cover.jpg"
+    poster_url = "https://s/tall-poster.jpg"
+    client = FakeClient({cover_url: (800, 538), poster_url: (379, 538)})
+    cfg = HotSettings()
+    cfg.scraping.poster_face_crop.enabled = True
+    cfg.scraping.poster_face_crop.sources = ["10mususume"]
+    called = False
+
+    def unexpected_face_crop(_path: Path, _ratio: float) -> tuple[int, str]:
+        nonlocal called
+        called = True
+        return 100, "face"
+
+    monkeypatch.setattr(pipeline_mod, "face_crop_left", unexpected_face_crop)
+    out = await materialize_images(
+        [poster_url],
+        [cover_url],
+        [],
+        resource_store,
+        cast("WebClient", client),
+        cfg,
+        tmp_path,
+        content_type=ContentType.UNCENSORED,
+        image_sources={cover_url: "1pondo"},
+    )
+
+    assert out.poster_urls == [poster_url]
+    assert called is False

@@ -16,6 +16,7 @@ from .images import (
     CropRotation,
     crop_box,
     crop_poster,
+    face_crop_left,
     format_crop_box_args,
     needs_upscale,
     probe_oriented_size,
@@ -154,21 +155,41 @@ async def materialize_images(
     cover_size = probe_size(cover_local) if cover_local else None
     cand_size = probe_size(poster_candidate_local) if poster_candidate_local else None
 
-    if (
-        can_crop_poster
-        and should_crop_poster(cover_size, cand_size, skip_ratio=config.scraping.poster_crop_skip_ratio)
-        and cover_local
-    ):
+    face_crop_config = config.scraping.poster_face_crop
+    face_crop_enabled = (
+        config.scraping.crop_poster
+        and content_type != ContentType.WESTERN
+        and face_crop_config.enabled
+        and cover_src is not None
+        and image_sources.get(cover_src) in face_crop_config.sources
+    )
+    should_crop = face_crop_enabled or should_crop_poster(
+        cover_size, cand_size, skip_ratio=config.scraping.poster_crop_skip_ratio
+    )
+
+    if can_crop_poster and should_crop and cover_local:
+        # 人脸模式统一使用无码比例; 普通模式保留有码/无码各自的原有比例.
         ratio = (
             config.scraping.uncensored_poster_ratio
-            if content_type == ContentType.UNCENSORED
+            if face_crop_enabled or content_type == ContentType.UNCENSORED
             else config.scraping.poster_ratio
         )
+        crop_left: int | None = None
         args = f"{ratio:.4f}"
+        if face_crop_enabled:
+            crop_left, position = face_crop_left(cover_local, ratio)
+            # 定位结果纳入派生键, 人脸检测失败的居中回退不会复用到人脸裁剪结果.
+            args = f"{ratio:.4f}:face:{position}:{crop_left}"
         local_cover = cover_local
 
         async def crop_producer(dest: Path) -> bool:
-            return crop_poster(local_cover, dest, poster_ratio=ratio, jpeg_quality=config.scraping.jpeg_quality)
+            return crop_poster(
+                local_cover,
+                dest,
+                poster_ratio=ratio,
+                jpeg_quality=config.scraping.jpeg_quality,
+                left=crop_left,
+            )
 
         crop_res = await store.acquire_derived(cover_src or "", "crop", args, crop_producer)
         if crop_res:

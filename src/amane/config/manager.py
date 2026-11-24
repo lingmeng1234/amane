@@ -397,12 +397,39 @@ class MosaicRulesConfig(BaseModel):
         return self
 
 
+PosterFaceCropSource = Literal[
+    "10mususume",
+    "1pondo",
+    "caribbeancom",
+    "pacopacomama",
+    "caribbeancompr",
+    "d2pass",
+    "heyzo",
+]
+
+
+class PosterFaceCropConfig(BaseModel):
+    """按实际封面来源启用人脸定位裁剪; 未勾选来源沿用旧裁剪规则."""
+
+    enabled: bool = False
+    sources: list[PosterFaceCropSource] = Field(default_factory=list)
+
+    @field_validator("sources")
+    @classmethod
+    def _unique_sources(cls, value: list[PosterFaceCropSource]) -> list[PosterFaceCropSource]:
+        return list(dict.fromkeys(value))
+
+
 class ScrapingConfig(BaseModel):
     download_resources: list[DownloadableResource] = Field(
         default_factory=lambda: [r for r in DownloadableResource if r != DownloadableResource.trailer],
         description="刮削时自动下载到 Resource 目录的资源类型",
     )
     crop_poster: bool = True
+    poster_face_crop: PosterFaceCropConfig = Field(
+        default_factory=PosterFaceCropConfig,
+        title="人脸定位裁剪",
+    )
 
     poster_ratio: float = Field(default=0.7, ge=0.3, le=1.0)
     """日本有码等常规影片的海报裁剪宽高比 (w/h). 默认 0.7."""

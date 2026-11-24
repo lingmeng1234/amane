@@ -138,14 +138,37 @@ def needs_upscale(
     return max(size) < max_dim_threshold
 
 
+def _face_crop_left(img: Image.Image, target_w: int) -> int:
+    """检测到人脸时让裁切窗口对准人脸中心；未检测到时水平居中."""
+    w, _ = img.size
+    fallback = round((w - target_w) / 2)
+    try:
+        from .face_detect import main_subject_face
+
+        face = main_subject_face(img)
+    except Exception as e:
+        logger.warning("poster face detection failed", error=str(e))
+        return fallback
+
+    if face is None:
+        return fallback
+    x1, _, x2, _ = face
+    face_cx = (x1 + x2) / 2
+    return round(min(max(0.0, face_cx - target_w / 2), float(w - target_w)))
+
+
 def crop_poster(
     thumb_path: Path,
     poster_path: Path,
     *,
     poster_ratio: float = _DEFAULT_POSTER_RATIO,
     jpeg_quality: int = _DEFAULT_JPEG_QUALITY,
+    detect_face: bool = False,
 ) -> bool:
-    """海报取封面右侧, 宽度 = height × poster_ratio."""
+    """从封面裁出海报, 宽度 = height × poster_ratio.
+
+    detect_face 关闭时保持原有右侧裁切；开启时按主体人脸居中，未检测到人脸则水平居中.
+    """
     try:
         img = Image.open(thumb_path)
         w, h = img.size
@@ -156,9 +179,9 @@ def crop_poster(
             _save_jpeg(img, poster_path, jpeg_quality)
             return True
 
-        # 从右侧裁剪.
-        left = w - target_w
-        cropped = img.crop((left, 0, w, h))
+        # 只有明确启用的人脸检测来源才改变裁切窗口；未启用时保持原有右侧裁切.
+        left = _face_crop_left(img, target_w) if detect_face else w - target_w
+        cropped = img.crop((left, 0, left + target_w, h))
         poster_path.parent.mkdir(parents=True, exist_ok=True)
         _save_jpeg(cropped, poster_path, jpeg_quality)
         return True

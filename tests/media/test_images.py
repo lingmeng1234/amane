@@ -51,6 +51,48 @@ def _near(color: tuple[int, ...] | float | None, expected: tuple[int, int, int],
 
 
 class TestCropPoster:
+    def test_face_detection_disabled_keeps_right_crop(self, tmp_path: Path):
+        img = Image.new("RGB", (100, 100), "blue")
+        img.paste(Image.new("RGB", (30, 100), _RED), (0, 0))
+        img.paste(Image.new("RGB", (30, 100), _GREEN), (70, 0))
+        source = tmp_path / "cover.png"
+        img.save(source)
+        output = tmp_path / "poster.jpg"
+
+        assert crop_poster(source, output, poster_ratio=0.3, detect_face=False)
+        poster = Image.open(output)
+        assert _near(poster.getpixel((5, 50)), _GREEN)
+
+    def test_face_detection_without_face_uses_horizontal_center(self, tmp_path: Path, monkeypatch):
+        from amane.media import face_detect
+
+        img = Image.new("RGB", (100, 100), "blue")
+        img.paste(Image.new("RGB", (30, 100), _RED), (0, 0))
+        img.paste(Image.new("RGB", (30, 100), _GREEN), (70, 0))
+        source = tmp_path / "cover.png"
+        img.save(source)
+        output = tmp_path / "poster.jpg"
+        monkeypatch.setattr(face_detect, "main_subject_face", lambda image: None)
+
+        assert crop_poster(source, output, poster_ratio=0.3, detect_face=True)
+        poster = Image.open(output)
+        assert _near(poster.getpixel((15, 50)), (0, 0, 255))
+
+    def test_face_detection_centers_on_detected_face(self, tmp_path: Path, monkeypatch):
+        from amane.media import face_detect
+
+        img = Image.new("RGB", (100, 100), "blue")
+        img.paste(Image.new("RGB", (30, 100), _RED), (0, 0))
+        img.paste(Image.new("RGB", (30, 100), _GREEN), (70, 0))
+        source = tmp_path / "cover.png"
+        img.save(source)
+        output = tmp_path / "poster.jpg"
+        monkeypatch.setattr(face_detect, "main_subject_face", lambda image: (5.0, 20.0, 25.0, 50.0))
+
+        assert crop_poster(source, output, poster_ratio=0.3, detect_face=True)
+        poster = Image.open(output)
+        assert _near(poster.getpixel((5, 50)), _RED)
+
     def test_crop_poster_from_thumb(self, tmp_path: Path):
         """裁剪缩略图右侧生成海报 (默认宽高比 0.7)"""
         img = Image.new("RGB", (800, 538), color="blue")

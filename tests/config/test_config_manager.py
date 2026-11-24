@@ -411,6 +411,24 @@ class TestScrapingPriorityMigration:
         assert cfg.uncensored_poster_ratio == 0.82
         assert ScrapingConfig().uncensored_poster_ratio == 0.87
 
+    def test_poster_face_detection_defaults_to_supported_uncensored_sources(self):
+        cfg = ScrapingConfig()
+        assert cfg.poster_crop_detect_face is True
+        assert cfg.poster_crop_face_sources == [
+            "10musume",
+            "1pondo",
+            "caribbeancom",
+            "pacopacomama",
+            "caribbeancompr",
+            "caribbeancom_index",
+            "d2pass",
+            "heyzo",
+        ]
+
+    def test_poster_face_detection_rejects_unlisted_sources(self):
+        with pytest.raises(ValidationError, match="poster_crop_face_sources"):
+            ScrapingConfig(poster_crop_face_sources=["tokyo_hot"])
+
     def test_legacy_uncensored_route_becomes_streaming_route(self):
         cfg = ScrapingConfig.model_validate(
             {"content_routes": {"uncensored": ["aventertainments", "javdb", "javbus", "avsox", "freejavbt"]}}

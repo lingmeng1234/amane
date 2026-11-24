@@ -397,6 +397,19 @@ class MosaicRulesConfig(BaseModel):
         return self
 
 
+# 仅这些无码来源允许使用人脸检测辅助海报裁切；Tokyo-Hot 与其他来源保持旧裁切方式。
+_POSTER_CROP_FACE_SOURCE_IDS: tuple[str, ...] = (
+    "10musume",
+    "1pondo",
+    "caribbeancom",
+    "pacopacomama",
+    "caribbeancompr",
+    "caribbeancom_index",
+    "d2pass",
+    "heyzo",
+)
+
+
 class ScrapingConfig(BaseModel):
     download_resources: list[DownloadableResource] = Field(
         default_factory=lambda: [r for r in DownloadableResource if r != DownloadableResource.trailer],
@@ -413,6 +426,15 @@ class ScrapingConfig(BaseModel):
     poster_crop_skip_ratio: float = Field(default=0.9, ge=0.5, le=1.0)
     """海报裁剪跳过阈值. 当 poster 候选高度已达 thumb 高度的此比例以上时, 视为候选够用, 不再从 thumb 裁剪
     (裁剪有错位风险, 非必要不做). 默认 0.9."""
+
+    poster_crop_detect_face: bool = True
+    """人脸检测总开关. 仅在裁切海报总开关开启且来源属于下方独立启用列表时生效."""
+
+    poster_crop_face_sources: list[str] = Field(
+        default_factory=lambda: list(_POSTER_CROP_FACE_SOURCE_IDS),
+        json_schema_extra={"x-hidden": True},
+    )
+    """允许使用人脸检测的无码来源; 其他来源和 Tokyo-Hot 始终沿用原有裁切方式."""
 
     jpeg_quality: int = Field(default=95, ge=50, le=100, json_schema_extra={"x-hidden": True})
 
@@ -476,6 +498,18 @@ class ScrapingConfig(BaseModel):
         json_schema_extra={"x-frozen-keys": True},
     )
     """含影片站与演员站."""
+
+    @field_validator("poster_crop_face_sources")
+    @classmethod
+    def _validate_poster_crop_face_sources(cls, values: list[str]) -> list[str]:
+        invalid = [value for value in values if value not in _POSTER_CROP_FACE_SOURCE_IDS]
+        if invalid:
+            raise ValueError(
+                "poster_crop_face_sources 仅允许指定的无码来源: "
+                + ", ".join(_POSTER_CROP_FACE_SOURCE_IDS)
+                + f"; invalid: {invalid}"
+            )
+        return list(dict.fromkeys(values))
 
     @field_validator("content_routes", mode="before")
     @classmethod

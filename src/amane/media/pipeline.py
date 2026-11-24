@@ -48,6 +48,21 @@ def _internal_url(store: ResourceStore, locator_url: str) -> str:
     return f"{RESOURCE_URL_PREFIX}/{store.url_hash(locator_url)}"
 
 
+
+def _should_detect_face(
+    config: "HotSettings",
+    content_type: ContentType | None,
+    source_id: str | None,
+) -> bool:
+    """仅对明确启用的人脸检测来源生效；其他来源保留原有右侧裁切."""
+    return (
+        content_type == ContentType.UNCENSORED
+        and config.scraping.poster_crop_detect_face
+        and source_id is not None
+        and source_id in config.scraping.poster_crop_face_sources
+    )
+
+
 def _success_first(urls: list[str], succeeded: set[str]) -> list[str]:
     # 成功者保序前置, 失败者保序置于尾部. succeeded 为空时幂等返回原序.
     return [u for u in urls if u in succeeded] + [u for u in urls if u not in succeeded]
@@ -164,11 +179,20 @@ async def materialize_images(
             if content_type == ContentType.UNCENSORED
             else config.scraping.poster_ratio
         )
-        args = f"{ratio:.4f}"
+        source_id = image_sources.get(cover_src or "")
+        detect_face = _should_detect_face(config, content_type, source_id)
+        # 关闭检测时沿用旧派生键，避免无意义地重建既有右侧裁切结果。
+        args = f"{ratio:.4f}" + (":face=1" if detect_face else "")
         local_cover = cover_local
 
         async def crop_producer(dest: Path) -> bool:
-            return crop_poster(local_cover, dest, poster_ratio=ratio, jpeg_quality=config.scraping.jpeg_quality)
+            return crop_poster(
+                local_cover,
+                dest,
+                poster_ratio=ratio,
+                jpeg_quality=config.scraping.jpeg_quality,
+                detect_face=detect_face,
+            )
 
         crop_res = await store.acquire_derived(cover_src or "", "crop", args, crop_producer)
         if crop_res:

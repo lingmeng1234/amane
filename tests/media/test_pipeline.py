@@ -21,6 +21,19 @@ if TYPE_CHECKING:
     from amane.net.http import WebClient
 
 
+def test_face_detection_is_limited_to_enabled_uncensored_sources():
+    config = HotSettings()
+    config.scraping.poster_crop_detect_face = True
+    config.scraping.poster_crop_face_sources = ["heyzo"]
+
+    assert pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo")
+    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "tokyo_hot")
+    assert not pipeline_mod._should_detect_face(config, ContentType.CENSORED, "heyzo")
+
+    config.scraping.poster_crop_detect_face = False
+    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo")
+
+
 class FakeClient:
     """伪 WebClient: download 按 url 写出预设尺寸的图片 (或视频占位); fail 集合内 URL 下载失败."""
 

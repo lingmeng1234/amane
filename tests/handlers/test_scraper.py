@@ -357,6 +357,7 @@ class TestScrapeHandler:
 
         async def fake_materialize_images(*args, **kwargs):
             captured["content_type"] = kwargs["content_type"]
+            captured["poster_input"] = args[0]
             return SimpleNamespace(
                 poster_urls=[],
                 cover_urls=[],
@@ -396,6 +397,13 @@ class TestScrapeHandler:
 
         assert result.success is True
         assert captured["content_type"] is ContentType.WESTERN
+        assert captured["poster_input"] == []  # 人脸裁切模式以封面为唯一候选
+
+        metadata = await repo.get_metadata_by_number("HEYZO-1234")
+        assert metadata is not None
+        assert metadata.poster_urls == ["https://example.com/streaming-cover.jpg"]
+        assert metadata.original_poster_urls == ["https://example.com/streaming-cover.jpg"]
+        assert metadata.cover_urls == ["https://example.com/streaming-cover.jpg"]
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_tokyo_hot_streaming_keeps_uncensored_image_flow(self, repo: Repository, resource_store, monkeypatch):

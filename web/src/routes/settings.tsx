@@ -583,7 +583,9 @@ function SettingsPage() {
                         i18nPrefix="settings:fields"
                         actionsPlacement="affix"
                         fieldActions={key === "scraping" ? scrapingFieldActions : undefined}
-                        afterFieldKey={key === "scraping" ? "poster_crop_detect_face" : undefined}
+                        afterFieldKey={
+                          key === "scraping" ? "poster_crop_detect_face" : undefined
+                        }
                         afterField={
                           key === "scraping" ? (
                             <FaceDetectionSourceSettings

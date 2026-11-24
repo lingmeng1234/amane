@@ -1,5 +1,3 @@
-import pytest
-
 from amane.crawlers import registry
 from amane.crawlers.models import SearchQuery
 from amane.crawlers.sites.heyzo import HeyzoCrawler, _detail, _number
@@ -48,7 +46,6 @@ def test_heyzo_registered_and_number_is_strict() -> None:
     assert _number("1206") is None
 
 
-@pytest.mark.asyncio(loop_scope="function")
 async def test_search_builds_direct_movie_url_and_normalizes_leading_zeroes() -> None:
     crawler = HeyzoCrawler(object())  # type: ignore[arg-type]
     assert await crawler._search(SearchQuery("HEYZO-1206")) == "https://www.heyzo.com/movie/1206"
@@ -60,7 +57,7 @@ def test_detail_keeps_plot_layout_and_separates_each_actor_and_tag() -> None:
     data, gallery, poster = _detail(_HTML, "https://www.heyzo.com/movie/1206")
 
     assert data["title"] == "作品标题"
-    assert data["plot"] == "第一段说明\n第二行\n\n第二段说明"
+    assert data["plot"] == "第一段说明\\n第二行\\n\\n第二段说明"
     assert "这段网站说明不属于简介" not in str(data["plot"])
     assert data["actors"] == ["演员甲", "演员乙"]
     assert data["tags"] == ["标签甲", "标签乙"]
@@ -79,7 +76,6 @@ class _FakeClient:
         return _HTML
 
 
-@pytest.mark.asyncio(loop_scope="function")
 async def test_scrape_returns_single_cover_and_heyzo_company_fields() -> None:
     crawler = HeyzoCrawler(_FakeClient())  # type: ignore[arg-type]
     result = await crawler._scrape("https://www.heyzo.com/movie/1206")

@@ -401,7 +401,7 @@ class TestScrapeHandler:
 
         assert result.success is True
         assert captured["content_type"] is ContentType.WESTERN
-        assert captured["poster_input"] == []  # 人脸模式以封面为唯一输入
+        assert captured["poster_input"] == ["https://example.com/streaming-cover.jpg"]  # 来源不匹配时仍可保留原海报
         assert captured["image_sources"]["https://example.com/streaming-cover.jpg"] == "1pondo"
         assert captured["scrape_route"] == "uncensored_streaming"
 

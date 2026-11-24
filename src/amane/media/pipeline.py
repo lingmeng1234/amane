@@ -173,6 +173,9 @@ async def materialize_images(
         and image_sources.get(cover_src) in face_crop_config.sources
         and (content_type != ContentType.WESTERN or scrape_route == "uncensored_streaming")
     )
+    # 流媒体的 WESTERN 图片流程仅允许实际封面来源命中开关时覆盖原本不裁切规则.
+    if content_type == ContentType.WESTERN and scrape_route == "uncensored_streaming":
+        can_crop_poster = face_crop_enabled
     should_crop = face_crop_enabled or should_crop_poster(
         cover_size, cand_size, skip_ratio=config.scraping.poster_crop_skip_ratio
     )

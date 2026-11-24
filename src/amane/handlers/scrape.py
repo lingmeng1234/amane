@@ -480,8 +480,8 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
 
         # 锁定类型在物化前直接沿用现有资源, 不触发重新下载 / 超分 / 派生覆盖.
         original_poster_urls = list(result.metadata.poster_urls or [])
-        # 人脸模式以封面为唯一输入, 不把同一张流媒体封面重复当作已有海报候选.
-        poster_input = [] if poster_locked or face_crop_streaming else list(result.metadata.poster_urls)
+        # 海报候选仍保留原始 URL; 人脸模式会强制裁切, 来源未命中时也能安全保留原海报.
+        poster_input = [] if poster_locked else list(result.metadata.poster_urls)
         cover_input = [] if cover_locked else list(result.metadata.cover_urls)
         if cover_locked and identity_metadata is not None:
             cover_input = [] if poster_locked else list(identity_metadata.cover_urls)

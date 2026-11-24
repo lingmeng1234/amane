@@ -31,6 +31,14 @@ if (-not (Test-Path (Join-Path $Root "web\dist\index.html"))) {
     exit 1
 }
 
+foreach ($Model in @("face_detect_scrfd.onnx", "face_detect_genderage.onnx")) {
+    $ModelPath = Join-Path $Root ("src\amane\media\{0}" -f $Model)
+    if (-not (Test-Path $ModelPath) -or (Get-Item $ModelPath).Length -eq 0) {
+        Write-Error "Required bundled face model missing or empty: $ModelPath"
+        exit 1
+    }
+}
+
 if (-not (Test-Path (Join-Path $Root "assets\app.ico"))) {
     Write-Error "assets/app.ico missing; run: just icons"
     exit 1

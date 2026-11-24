@@ -409,7 +409,9 @@ class TestScrapeHandler:
         assert metadata.image_sources["https://example.com/streaming-cover.jpg"] == "1pondo"
 
     @pytest.mark.asyncio(loop_scope="function")
-    async def test_non_face_enabled_streaming_keeps_western_image_flow(self, repo: Repository, resource_store, monkeypatch):
+    async def test_non_face_enabled_streaming_keeps_western_image_flow(
+        self, repo: Repository, resource_store, monkeypatch
+    ):
         """未启用人脸识别的无码流媒体来源继续沿用欧美原图海报流程。"""
         from types import SimpleNamespace
 

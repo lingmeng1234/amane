@@ -30,6 +30,13 @@ if [[ ! -f web/dist/index.html ]]; then
   exit 1
 fi
 
+for model in face_detect_scrfd.onnx face_detect_genderage.onnx; do
+  if [[ ! -s "$ROOT/src/amane/media/$model" ]]; then
+    echo "Required bundled face model missing or empty: src/amane/media/$model" >&2
+    exit 1
+  fi
+done
+
 if [[ ! -f "$ROOT/assets/app.icns" ]]; then
   echo "assets/app.icns missing; run: just icons" >&2
   exit 1

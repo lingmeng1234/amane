@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
 from functools import lru_cache
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -27,6 +28,7 @@ _MODEL_SPECS = {
     "face_detect_scrfd.onnx": ("bbfebbab00217df73af23fca160236208bb69616", 16923827),
     "face_detect_genderage.onnx": ("c1a68b8db319d8d5c78f27136822ef1313c51a77", 1322532),
 }
+_MODEL_DOWNLOAD_LOCK = threading.Lock()
 _MODEL_BASE_URL = (
     "https://raw.githubusercontent.com/BiancaVeritas/amane-promax/"
     + _MODEL_REVISION
@@ -56,30 +58,35 @@ def _ensure_model(filename: str) -> Path | None:
     if _matches_model(target, expected_sha, expected_size):
         return target
 
-    temporary = target.with_suffix(target.suffix + ".part")
-    try:
-        cache_root.mkdir(parents=True, exist_ok=True)
-        request = Request(
-            f"{_MODEL_BASE_URL}/{filename}",
-            headers={"User-Agent": "Amane face-crop model loader"},
-        )
-        digest = hashlib.sha1(f"blob {expected_size}\0".encode())
-        received = 0
-        with urlopen(request, timeout=90) as response, temporary.open("wb") as output:
-            while chunk := response.read(1024 * 1024):
-                received += len(chunk)
-                if received > expected_size:
-                    raise ValueError(f"model is larger than expected: {filename}")
-                digest.update(chunk)
-                output.write(chunk)
-        if received != expected_size or digest.hexdigest() != expected_sha:
-            raise ValueError(f"model integrity check failed: {filename}")
-        temporary.replace(target)
-        return target
-    except Exception as exc:
-        temporary.unlink(missing_ok=True)
-        logger.warning("face model unavailable", model=filename, error=str(exc))
-        return None
+    # 多个刮削任务可能同时首次触发检测; 串行下载并在拿到锁后再次检查缓存.
+    with _MODEL_DOWNLOAD_LOCK:
+        if _matches_model(target, expected_sha, expected_size):
+            return target
+        temporary = target.with_suffix(target.suffix + ".part")
+        try:
+            cache_root.mkdir(parents=True, exist_ok=True)
+            request = Request(
+                f"{_MODEL_BASE_URL}/{filename}",
+                headers={"User-Agent": "Amane face-crop model loader"},
+            )
+            digest = hashlib.sha1(f"blob {expected_size}\0".encode())
+            received = 0
+            with urlopen(request, timeout=90) as response, temporary.open("wb") as output:
+                while chunk := response.read(1024 * 1024):
+                    received += len(chunk)
+                    if received > expected_size:
+                        raise ValueError(f"model is larger than expected: {filename}")
+                    digest.update(chunk)
+                    output.write(chunk)
+            if received != expected_size or digest.hexdigest() != expected_sha:
+                raise ValueError(f"model integrity check failed: {filename}")
+            temporary.replace(target)
+            return target
+        except Exception as exc:
+            temporary.unlink(missing_ok=True)
+            logger.warning("face model unavailable", model=filename, error=str(exc))
+            return None
+
 #: 输出按 stride 分组, 每组依次是 score / bbox / kps.
 _STRIDES_3 = (8, 16, 32)
 _STRIDES_5 = (8, 16, 32, 64, 128)

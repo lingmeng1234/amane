@@ -3,6 +3,7 @@
 与整理到媒体库路径无关. 任一步失败不抛, 仅降级.
 """
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -177,7 +178,7 @@ async def materialize_images(
         crop_left: int | None = None
         args = f"{ratio:.4f}"
         if face_crop_enabled:
-            crop_left, position = face_crop_left(cover_local, ratio)
+            crop_left, position = await asyncio.to_thread(face_crop_left, cover_local, ratio)
             # 定位结果纳入派生键, 人脸检测失败的居中回退不会复用到人脸裁剪结果.
             args = f"{ratio:.4f}:face:{position}:{crop_left}"
         local_cover = cover_local

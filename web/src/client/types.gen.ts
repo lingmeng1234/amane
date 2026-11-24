@@ -4842,6 +4842,14 @@ export type ScrapeSubmission = {
 };
 
 /**
+ * PosterFaceCropConfig
+ */
+export type PosterFaceCropConfig = {
+    enabled?: boolean;
+    sources?: Array<'10mususume' | '1pondo' | 'caribbeancom' | 'pacopacomama' | 'caribbeancompr' | 'd2pass' | 'heyzo'>;
+};
+
+/**
  * ScrapingConfig
  */
 export type ScrapingConfig = {
@@ -4855,6 +4863,10 @@ export type ScrapingConfig = {
      * Crop Poster
      */
     crop_poster?: boolean;
+    /**
+     * Poster Face Crop
+     */
+    poster_face_crop?: PosterFaceCropConfig;
     /**
      * Poster Ratio
      */

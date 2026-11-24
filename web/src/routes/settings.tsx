@@ -2,10 +2,10 @@ import {
   Alert,
   Anchor,
   Box,
-  Checkbox,
-  Collapse,
   Button,
   Center,
+  Checkbox,
+  Collapse,
   Group,
   Loader,
   NavLink,
@@ -271,6 +271,16 @@ const POSTER_FACE_CROP_SOURCES: PosterFaceCropSource[] = [
   "heyzo",
 ];
 
+const POSTER_FACE_CROP_SOURCE_LABELS: Record<PosterFaceCropSource, string> = {
+  "10mususume": "10mususume",
+  "1pondo": "1pondo",
+  caribbeancom: "Caribbeancom",
+  pacopacomama: "Pacopacomama",
+  caribbeancompr: "Caribbeancompr",
+  d2pass: "D2Pass",
+  heyzo: "Heyzo",
+};
+
 function PosterFaceCropField({ name, form }: { name: string; form: SchemaFormInstance }) {
   const { t } = useTranslation("settings");
   const [expanded, setExpanded] = useState(false);
@@ -339,7 +349,7 @@ function PosterFaceCropField({ name, form }: { name: string; form: SchemaFormIns
                   {POSTER_FACE_CROP_SOURCES.map((source) => (
                     <Checkbox
                       key={source}
-                      label={t(("fields.scraping.poster_face_crop.sources." + source) as never)}
+                      label={POSTER_FACE_CROP_SOURCE_LABELS[source]}
                       checked={selectedSet.has(source)}
                       onChange={(event) => {
                         const next = new Set(selectedSet);

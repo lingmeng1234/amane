@@ -27,6 +27,9 @@ def test_face_detection_is_limited_to_enabled_uncensored_sources():
     config.scraping.poster_crop_face_sources = ["heyzo"]
 
     assert pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_streaming")
+    # 非 Tokyo-Hot 无码流媒体在 ScrapeHandler 中按 WESTERN 图像模式处理,
+    # 但启用人脸检测的来源必须允许执行裁切.
+    assert pipeline_mod._should_detect_face(config, ContentType.WESTERN, "heyzo", "uncensored_streaming")
     assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "tokyo_hot", "uncensored_streaming")
     assert not pipeline_mod._should_detect_face(config, ContentType.CENSORED, "heyzo", "uncensored_streaming")
     assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_dvd")

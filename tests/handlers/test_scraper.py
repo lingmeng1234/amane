@@ -406,6 +406,7 @@ class TestScrapeHandler:
         assert metadata.poster_urls == ["https://example.com/streaming-cover.jpg"]
         assert metadata.original_poster_urls == ["https://example.com/streaming-cover.jpg"]
         assert metadata.cover_urls == ["https://example.com/streaming-cover.jpg"]
+        assert metadata.image_sources["https://example.com/streaming-cover.jpg"] == "1pondo"
 
     @pytest.mark.asyncio(loop_scope="function")
     async def test_non_face_enabled_streaming_keeps_western_image_flow(self, repo: Repository, resource_store, monkeypatch):

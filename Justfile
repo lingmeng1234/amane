@@ -35,6 +35,10 @@ _web-install:
 fixtures:
     uv run python scripts/fetch_fixtures.py
 
+# Verify the required source-bundled face model binaries.
+verify-face-models:
+    uv run python scripts/verify_face_models.py
+
 # CI static job: frozen Python(dev+extras) + frozen web
 ci-sync: _ci-sync-python _web-install-ci
 

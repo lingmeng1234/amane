@@ -303,7 +303,7 @@ function PosterFaceCropField({ name, form }: { name: string; form: SchemaFormIns
             <Group align="center" justify="space-between" wrap="nowrap">
               <Stack gap={2} style={{ minWidth: 0 }}>
                 <Group gap="xs">
-                  <Text fw={500}>{t("fields.scraping.poster_face_crop.enabled")}</Text>
+                  <Text fw={500}>{t("fields.scraping.poster_face_crop.enabled.label")}</Text>
                   <Popover position="right" withArrow>
                     <Popover.Target>
                       <Anchor component="button" type="button" size="xs" c="blue">
@@ -343,7 +343,7 @@ function PosterFaceCropField({ name, form }: { name: string; form: SchemaFormIns
               </Group>
             </UnstyledButton>
 
-            <Collapse in={expanded}>
+            <Collapse expanded={expanded}>
               <Paper withBorder p="sm">
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                   {POSTER_FACE_CROP_SOURCES.map((source) => (

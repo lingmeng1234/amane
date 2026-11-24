@@ -1059,9 +1059,8 @@ class TestContentRoutesFiltering:
             str(SiteName.PONDO),
             str(SiteName.CARIBBEANCOM),
             str(SiteName.PACOPACOMAMA),
+            str(SiteName.HEYZO),
             str(SiteName.TOKYO_HOT),
-            str(SiteName.CARIBBEANCOMPR),
-            str(SiteName.D2PASS),
             str(SiteName.AVSOX),
         ]
         assert routes[ContentType.CHINESE.value] == []

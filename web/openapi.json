@@ -10077,53 +10077,53 @@
           },
           "max_tokens": {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 1.0,
             "title": "Max Tokens",
             "default": 128000
           },
           "rate_limit": {
             "type": "number",
-            "maximum": 100,
+            "maximum": 100.0,
             "minimum": 0.1,
             "title": "Rate Limit",
-            "default": 2
+            "default": 2.0
           },
           "sql_timeout_ms": {
             "type": "integer",
-            "maximum": 60000,
-            "minimum": 50,
+            "maximum": 60000.0,
+            "minimum": 50.0,
             "title": "Sql Timeout Ms",
             "default": 1000,
             "x-hidden": true
           },
           "result_cache_ttl_s": {
             "type": "integer",
-            "maximum": 86400,
-            "minimum": 60,
+            "maximum": 86400.0,
+            "minimum": 60.0,
             "title": "Result Cache Ttl S",
             "default": 3600,
             "x-hidden": true
           },
           "result_cache_max_entries": {
             "type": "integer",
-            "maximum": 1000,
-            "minimum": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0,
             "title": "Result Cache Max Entries",
             "default": 64,
             "x-hidden": true
           },
           "history_ttl_s": {
             "type": "integer",
-            "maximum": 86400,
-            "minimum": 60,
+            "maximum": 86400.0,
+            "minimum": 60.0,
             "title": "History Ttl S",
             "default": 3600,
             "x-hidden": true
           },
           "history_max_sessions": {
             "type": "integer",
-            "maximum": 500,
-            "minimum": 1,
+            "maximum": 500.0,
+            "minimum": 1.0,
             "title": "History Max Sessions",
             "default": 32,
             "x-hidden": true
@@ -10645,8 +10645,8 @@
           },
           "timeout": {
             "type": "integer",
-            "maximum": 120000,
-            "minimum": 5000,
+            "maximum": 120000.0,
+            "minimum": 5000.0,
             "title": "Timeout",
             "default": 30000
           },
@@ -11068,25 +11068,25 @@
         "properties": {
           "left": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Left",
             "description": "裁切框左边界 (含)"
           },
           "top": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Top",
             "description": "裁切框上边界 (含)"
           },
           "right": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Right",
             "description": "裁切框右边界 (不含)"
           },
           "bottom": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Bottom",
             "description": "裁切框下边界 (不含)"
           },
@@ -11117,25 +11117,25 @@
         "properties": {
           "left": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Left",
             "description": "裁切框左边界 (含)"
           },
           "top": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Top",
             "description": "裁切框上边界 (含)"
           },
           "right": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Right",
             "description": "裁切框右边界 (不含)"
           },
           "bottom": {
             "type": "integer",
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Bottom",
             "description": "裁切框下边界 (不含)"
           },
@@ -11683,8 +11683,8 @@
           },
           "interval_seconds": {
             "type": "integer",
-            "maximum": 86400,
-            "minimum": 60,
+            "maximum": 86400.0,
+            "minimum": 60.0,
             "title": "Interval Seconds",
             "default": 3600
           },
@@ -12497,7 +12497,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12509,7 +12509,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12521,7 +12521,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12533,7 +12533,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12545,7 +12545,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12557,7 +12557,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12569,7 +12569,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12581,7 +12581,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12593,7 +12593,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12605,7 +12605,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12617,7 +12617,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12629,7 +12629,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12641,7 +12641,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12653,7 +12653,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12665,7 +12665,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12677,7 +12677,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12689,7 +12689,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12701,7 +12701,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12713,7 +12713,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12725,7 +12725,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12737,7 +12737,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12749,7 +12749,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12761,7 +12761,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12773,7 +12773,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12785,7 +12785,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12797,7 +12797,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12809,7 +12809,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12821,7 +12821,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12833,7 +12833,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12845,7 +12845,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12857,7 +12857,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12869,7 +12869,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12881,7 +12881,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12893,7 +12893,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12905,7 +12905,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12917,7 +12917,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12929,7 +12929,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12941,7 +12941,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12953,7 +12953,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 },
@@ -12965,7 +12965,7 @@
                     "en"
                   ],
                   "official_routes": {},
-                  "rate_limit": 2,
+                  "rate_limit": 2.0,
                   "use_browser": "auto",
                   "use_proxy": true
                 }
@@ -13006,7 +13006,7 @@
               "base_url": "https://api.openai.com/v1",
               "model": "gpt-4o-mini",
               "max_tokens": 128000,
-              "rate_limit": 2,
+              "rate_limit": 2.0,
               "sql_timeout_ms": 1000,
               "result_cache_ttl_s": 3600,
               "result_cache_max_entries": 64,
@@ -13017,7 +13017,7 @@
           "network": {
             "$ref": "#/components/schemas/NetworkConfig",
             "default": {
-              "timeout": 10,
+              "timeout": 10.0,
               "max_retries": 2,
               "max_clients": 50,
               "browser": {
@@ -13030,7 +13030,7 @@
               "chunk_size": 1048576,
               "concurrency": 10,
               "rate_limits": {},
-              "default_rate_limit": 5
+              "default_rate_limit": 5.0
             }
           },
           "sr": {
@@ -13077,7 +13077,7 @@
               "api_type": "chat",
               "base_url": "https://api.openai.com/v1",
               "model": "",
-              "rate_limit": 2
+              "rate_limit": 2.0
             }
           },
           "r18": {
@@ -13094,7 +13094,7 @@
             "$ref": "#/components/schemas/WatcherConfig",
             "default": {
               "use_polling": false,
-              "debounce_seconds": 3,
+              "debounce_seconds": 3.0,
               "media_extensions": [
                 ".mp4",
                 ".mkv",
@@ -13112,8 +13112,8 @@
             "$ref": "#/components/schemas/WorkerConfig",
             "default": {
               "concurrency": 10,
-              "poll_interval": 2,
-              "shutdown_timeout": 0
+              "poll_interval": 2.0,
+              "shutdown_timeout": 0.0
             }
           },
           "logging": {
@@ -13569,10 +13569,10 @@
           },
           "rate_limit": {
             "type": "number",
-            "maximum": 100,
+            "maximum": 100.0,
             "minimum": 0.1,
             "title": "Rate Limit",
-            "default": 2
+            "default": 2.0
           }
         },
         "type": "object",
@@ -16031,22 +16031,22 @@
           },
           "timeout": {
             "type": "number",
-            "maximum": 300,
-            "minimum": 5,
+            "maximum": 300.0,
+            "minimum": 5.0,
             "title": "Timeout",
-            "default": 10
+            "default": 10.0
           },
           "max_retries": {
             "type": "integer",
-            "maximum": 10,
-            "minimum": 0,
+            "maximum": 10.0,
+            "minimum": 0.0,
             "title": "Max Retries",
             "default": 2
           },
           "max_clients": {
             "type": "integer",
-            "maximum": 500,
-            "minimum": 5,
+            "maximum": 500.0,
+            "minimum": 5.0,
             "title": "Max Clients",
             "default": 50,
             "x-hidden": true
@@ -16056,22 +16056,22 @@
           },
           "chunked_threshold": {
             "type": "integer",
-            "maximum": 104857600,
-            "minimum": 524288,
+            "maximum": 104857600.0,
+            "minimum": 524288.0,
             "title": "Chunked Threshold",
             "default": 2097152
           },
           "chunk_size": {
             "type": "integer",
-            "maximum": 52428800,
-            "minimum": 262144,
+            "maximum": 52428800.0,
+            "minimum": 262144.0,
             "title": "Chunk Size",
             "default": 1048576
           },
           "concurrency": {
             "type": "integer",
-            "maximum": 50,
-            "minimum": 1,
+            "maximum": 50.0,
+            "minimum": 1.0,
             "title": "Concurrency",
             "default": 10
           },
@@ -16084,7 +16084,7 @@
           },
           "default_rate_limit": {
             "type": "number",
-            "maximum": 100,
+            "maximum": 100.0,
             "minimum": 0.1,
             "title": "Default Rate Limit",
             "default": 5
@@ -16884,8 +16884,8 @@
           },
           "read_timeout": {
             "type": "integer",
-            "maximum": 600,
-            "minimum": 1,
+            "maximum": 600.0,
+            "minimum": 1.0,
             "title": "Read Timeout",
             "default": 30
           },
@@ -17286,8 +17286,8 @@
         "properties": {
           "limit": {
             "type": "integer",
-            "maximum": 1000,
-            "minimum": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0,
             "title": "Limit",
             "description": "每个已选目标单次最多补刮的条数 (避免长占 worker 队列)",
             "default": 100
@@ -17296,7 +17296,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -18147,21 +18147,21 @@
           },
           "poster_ratio": {
             "type": "number",
-            "maximum": 1,
+            "maximum": 1.0,
             "minimum": 0.3,
             "title": "Poster Ratio",
             "default": 0.7
           },
           "uncensored_poster_ratio": {
             "type": "number",
-            "maximum": 1,
+            "maximum": 1.0,
             "minimum": 0.3,
             "title": "Uncensored Poster Ratio",
             "default": 0.87
           },
           "poster_crop_skip_ratio": {
             "type": "number",
-            "maximum": 1,
+            "maximum": 1.0,
             "minimum": 0.5,
             "title": "Poster Crop Skip Ratio",
             "default": 0.9
@@ -18169,8 +18169,8 @@
           "poster_crop_detect_face": {
             "type": "boolean",
             "title": "Poster Crop Detect Face",
-            "default": true,
-            "description": "人脸检测总开关. 仅在裁切海报总开关开启且来源属于下方独立启用列表时生效."
+            "description": "人脸检测总开关. 仅在裁切海报总开关开启且来源属于下方独立启用列表时生效.",
+            "default": true
           },
           "poster_crop_face_sources": {
             "items": {
@@ -18194,8 +18194,8 @@
           },
           "jpeg_quality": {
             "type": "integer",
-            "maximum": 100,
-            "minimum": 50,
+            "maximum": 100.0,
+            "minimum": 50.0,
             "title": "Jpeg Quality",
             "default": 95,
             "x-hidden": true
@@ -18854,7 +18854,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -19020,7 +19020,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 100,
+                "maximum": 100.0,
                 "minimum": 0.1
               },
               {
@@ -19263,7 +19263,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 100,
+                "maximum": 100.0,
                 "minimum": 0.1
               },
               {
@@ -19301,15 +19301,15 @@
           },
           "max_dim_threshold": {
             "type": "integer",
-            "maximum": 8192,
-            "minimum": 64,
+            "maximum": 8192.0,
+            "minimum": 64.0,
             "title": "Max Dim Threshold",
             "default": 1200
           },
           "max_bytes_threshold": {
             "type": "integer",
-            "maximum": 67108864,
-            "minimum": 65536,
+            "maximum": 67108864.0,
+            "minimum": 65536.0,
             "title": "Max Bytes Threshold",
             "default": 2097152
           },
@@ -20802,10 +20802,10 @@
           },
           "debounce_seconds": {
             "type": "number",
-            "maximum": 30,
+            "maximum": 30.0,
             "minimum": 0.5,
             "title": "Debounce Seconds",
-            "default": 3
+            "default": 3.0
           },
           "media_extensions": {
             "items": {
@@ -20874,8 +20874,8 @@
         "properties": {
           "concurrency": {
             "type": "integer",
-            "maximum": 64,
-            "minimum": 1,
+            "maximum": 64.0,
+            "minimum": 1.0,
             "title": "Concurrency",
             "default": 10
           },

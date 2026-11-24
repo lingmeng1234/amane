@@ -37,7 +37,7 @@ fixtures:
 
 # Fetch the pinned InsightFace ONNX assets used by source-scoped poster face detection.
 face-models:
-    python scripts/fetch_face_models.py
+    uv run --no-sync python scripts/fetch_face_models.py
 
 # CI static job: frozen Python(dev+extras) + frozen web
 ci-sync: _ci-sync-python _web-install-ci

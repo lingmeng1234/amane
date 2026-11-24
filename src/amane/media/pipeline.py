@@ -100,6 +100,7 @@ async def materialize_images(
     image_sources: dict[str, str] | None = None,
     force_crop_poster: bool = False,
     preserve_cover_resource: bool = False,
+    scrape_route: str | None = None,
 ) -> MaterializedImages:
     """仅下载集合内的类型; 未选中的图片类型保留聚合 URL.
 

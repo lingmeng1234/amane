@@ -19,8 +19,8 @@ from amane.media import (
     should_crop_poster,
     validate_crop_box,
 )
-from amane.parsing import DEFINITION_VALUES, Mosaic
 from amane.media.images import face_crop_left
+from amane.parsing import DEFINITION_VALUES, Mosaic
 
 if TYPE_CHECKING:
     from pathlib import Path

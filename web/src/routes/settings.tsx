@@ -2,21 +2,26 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
+  Collapse,
   Center,
   Group,
   Loader,
   NavLink,
+  Modal,
   Paper,
+  Popover,
   Select,
   SimpleGrid,
   Stack,
   Tabs,
   Text,
   Title,
+  UnstyledButton,
 } from "@mantine/core";
-import { IconAlertCircle, IconPlugConnected, IconRefresh } from "@tabler/icons-react";
+import { IconAlertCircle, IconChevronDown, IconInfoCircle, IconPlugConnected, IconRefresh } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { isHidden, resolveSchema, type JSONSchemaObject } from "@/components/schema-form/schema";
@@ -91,7 +96,164 @@ function RestoreDefaultButton({
   );
 }
 
+const POSTER_FACE_SOURCES = [
+  { id: "10musume", label: "10musume" },
+  { id: "1pondo", label: "1pondo" },
+  { id: "caribbeancom", label: "Caribbeancom" },
+  { id: "pacopacomama", label: "Pacopacomama" },
+  { id: "caribbeancompr", label: "Caribbeancompr" },
+  { id: "caribbeancom_index", label: "Caribbeancom Index" },
+  { id: "d2pass", label: "D2Pass" },
+  { id: "heyzo", label: "Heyzo" },
+] as const;
+
+function FaceDetectionHelp() {
+  const { t } = useTranslation("settings");
+  return (
+    <Popover width={340} position="bottom" withArrow shadow="md">
+      <Popover.Target>
+        <Button
+          size="xs"
+          variant="subtle"
+          color="blue"
+          leftSection={<IconInfoCircle size={14} />}
+        >
+          {t("faceDetection.helpLink")}
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Text size="sm">{t("faceDetection.helpBody")}</Text>
+      </Popover.Dropdown>
+    </Popover>
+  );
+}
+
+function FaceDetectionSourceSettings({
+  savedSources,
+  saving,
+  onSave,
+}: {
+  savedSources: string[];
+  saving: boolean;
+  onSave: (sources: string[]) => void;
+}) {
+  const { t } = useTranslation("settings");
+  const [expanded, setExpanded] = useState(false);
+  const [draft, setDraft] = useState<string[]>(savedSources);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    setDraft(savedSources);
+  }, [savedSources]);
+
+  const changed =
+    draft.length !== savedSources.length ||
+    draft.some((source) => !savedSources.includes(source));
+
+  return (
+    <>
+      <Paper withBorder p="sm">
+        <UnstyledButton
+          onClick={() => setExpanded((current) => !current)}
+          style={{ width: "100%", textAlign: "left" }}
+        >
+          <Group justify="space-between" wrap="nowrap">
+            <Box style={{ minWidth: 0 }}>
+              <Text size="sm" fw={600}>
+                {t("faceDetection.sourceSelection")}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {t("faceDetection.sourceDescription")}
+              </Text>
+            </Box>
+            <Group gap="xs" wrap="nowrap">
+              <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                {t("faceDetection.selectedCount", { count: draft.length })}
+              </Text>
+              <IconChevronDown
+                size={16}
+                style={{
+                  flexShrink: 0,
+                  transform: expanded ? "rotate(180deg)" : undefined,
+                  transition: "transform 150ms ease",
+                }}
+              />
+            </Group>
+          </Group>
+        </UnstyledButton>
+        <Collapse in={expanded}>
+          <Stack gap="sm" mt="md">
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              {POSTER_FACE_SOURCES.map((source) => (
+                <Checkbox
+                  key={source.id}
+                  label={source.label}
+                  checked={draft.includes(source.id)}
+                  onChange={(event) => {
+                    setDraft((current) =>
+                      event.currentTarget.checked
+                        ? [...current, source.id]
+                        : current.filter((value) => value !== source.id),
+                    );
+                  }}
+                />
+              ))}
+            </SimpleGrid>
+            <Group justify="flex-end">
+              <Button
+                size="xs"
+                variant="default"
+                disabled={!changed || saving}
+                onClick={() => setDraft(savedSources)}
+              >
+                {t("faceDetection.discard")}
+              </Button>
+              <Button
+                size="xs"
+                disabled={!changed || saving}
+                loading={saving}
+                onClick={() => setConfirmOpen(true)}
+              >
+                {t("faceDetection.save")}
+              </Button>
+            </Group>
+          </Stack>
+        </Collapse>
+      </Paper>
+
+      <Modal
+        opened={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title={t("faceDetection.confirmTitle")}
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            {t("faceDetection.confirmBody", { count: draft.length })}
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setConfirmOpen(false)}>
+              {t("faceDetection.cancel")}
+            </Button>
+            <Button
+              loading={saving}
+              onClick={() => {
+                onSave(draft);
+                setConfirmOpen(false);
+              }}
+            >
+              {t("faceDetection.confirm")}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </>
+  );
+}
+
 function scrapingFieldActions(field: string, setValue: (value: unknown) => void) {
+  if (field === "poster_crop_detect_face") return <FaceDetectionHelp />;
+
   const defaults: Record<string, unknown> = {
     poster_ratio: 0.7,
     uncensored_poster_ratio: 0.87,
@@ -398,6 +560,26 @@ function SettingsPage() {
                         i18nPrefix="settings:fields"
                         actionsPlacement="affix"
                         fieldActions={key === "scraping" ? scrapingFieldActions : undefined}
+                        afterField={
+                          key === "scraping"
+                            ? (field) =>
+                                field === "poster_crop_detect_face" ? (
+                                  <FaceDetectionSourceSettings
+                                    savedSources={
+                                      Array.isArray(sectionValues.poster_crop_face_sources)
+                                        ? (sectionValues.poster_crop_face_sources as string[])
+                                        : POSTER_FACE_SOURCES.map((source) => source.id)
+                                    }
+                                    saving={saveMutation.isPending}
+                                    onSave={(sources) =>
+                                      saveMutation.mutate({
+                                        body: { scraping: { poster_crop_face_sources: sources } },
+                                      })
+                                    }
+                                  />
+                                ) : null
+                            : undefined
+                        }
                         onSave={(patch) => saveMutation.mutate({ body: { [key]: patch } })}
                         saving={saveMutation.isPending}
                       />

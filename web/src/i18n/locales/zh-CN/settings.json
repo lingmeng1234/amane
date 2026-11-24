@@ -96,17 +96,33 @@
         "label": "分类与系列",
         "genre": {
           "label": "分类",
-          "cover_attributes": { "label": "封面属性" },
-          "tags": { "label": "原有标签" },
-          "studio": { "label": "制作商" },
-          "publisher": { "label": "发行商" }
+          "cover_attributes": {
+            "label": "封面属性"
+          },
+          "tags": {
+            "label": "原有标签"
+          },
+          "studio": {
+            "label": "制作商"
+          },
+          "publisher": {
+            "label": "发行商"
+          }
         },
         "tag": {
           "label": "类型",
-          "cover_attributes": { "label": "封面属性" },
-          "tags": { "label": "原有标签" },
-          "studio": { "label": "制作商" },
-          "publisher": { "label": "发行商" }
+          "cover_attributes": {
+            "label": "封面属性"
+          },
+          "tags": {
+            "label": "原有标签"
+          },
+          "studio": {
+            "label": "制作商"
+          },
+          "publisher": {
+            "label": "发行商"
+          }
         },
         "series": {
           "label": "系列"
@@ -663,7 +679,14 @@
           "label": "破解关键词",
           "description": "英文逗号分隔；保存后完全替代默认关键词"
         },
-        "leaked": { "label": "流出关键词", "description": "英文逗号分隔；保存后完全替代默认关键词" }
+        "leaked": {
+          "label": "流出关键词",
+          "description": "英文逗号分隔；保存后完全替代默认关键词"
+        }
+      },
+      "poster_crop_detect_face": {
+        "label": "人脸识别",
+        "description": "启用后，仅对下方已选择的无码来源进行人脸定位；关闭时沿用原有裁切方式。"
       }
     },
     "network": {
@@ -1113,5 +1136,18 @@
     "testConnection": "测试连接",
     "testSuccess": "连接成功，可读取 {{count}} 个演员",
     "testFailed": "连接失败"
+  },
+  "faceDetection": {
+    "helpLink": "说明",
+    "helpBody": "人脸检测仅参与海报裁切定位，不会修改或覆盖来源封面原图。必须同时开启上方的「裁切海报」总开关、本项人脸识别开关，并启用对应刮削源，才会执行检测。检测到人脸时以主体人脸中心定位；未检测到人脸时水平居中裁切。未选择的来源及 Tokyo-Hot 继续使用原有裁切方式。",
+    "sourceSelection": "刮削源选择",
+    "sourceDescription": "默认收起。仅以下来源可单独启用人脸检测；Tokyo-Hot 不参与。",
+    "selectedCount": "已启用 {{count}} / 8 个来源",
+    "discard": "放弃修改",
+    "save": "保存选择",
+    "confirmTitle": "确认保存刮削源选择",
+    "confirmBody": "确认保存当前启用的 {{count}} 个刮削源？",
+    "cancel": "取消",
+    "confirm": "确认保存"
   }
 }

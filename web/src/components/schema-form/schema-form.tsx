@@ -51,6 +51,7 @@ const WIDE_TEXT_KEYS = new Set([
   "notes",
   "comment",
   "summary",
+  "poster_crop_detect_face",
 ]);
 
 function isCompactFormField(key: string, schema: JSONSchemaObject): boolean {
@@ -157,6 +158,8 @@ interface SchemaFormProps {
    * The setter updates the field in the local form state (never persists directly).
    */
   fieldActions?: (fieldKey: string, setValue: (value: unknown) => void) => ReactNode;
+  /** Optional content rendered directly below a field, before the next field row. */
+  afterField?: (fieldKey: string) => ReactNode;
 }
 
 export function SchemaForm({
@@ -172,6 +175,7 @@ export function SchemaForm({
   submitDisabled = false,
   fieldLayout = "stack",
   fieldActions,
+  afterField,
 }: SchemaFormProps) {
   const { t } = useTranslation("common");
   const formId = useId();
@@ -329,17 +333,20 @@ export function SchemaForm({
         form.setFieldValue(`${prefix}.${key}` as never, value as never),
       );
       return (
-        <Group key={key} align="flex-start" wrap="nowrap" gap="xs">
-          <Box style={{ flex: 1, minWidth: 0 }}>
-            <FieldRouter
-              name={`${prefix}.${key}`}
-              schema={fieldSchema}
-              form={form}
-              i18nPrefix={i18nPrefix}
-            />
-          </Box>
-          {action}
-        </Group>
+        <Stack key={key} gap="xs">
+          <Group align="flex-start" wrap="nowrap" gap="xs">
+            <Box style={{ flex: 1, minWidth: 0 }}>
+              <FieldRouter
+                name={`${prefix}.${key}`}
+                schema={fieldSchema}
+                form={form}
+                i18nPrefix={i18nPrefix}
+              />
+            </Box>
+            {action}
+          </Group>
+          {afterField?.(key)}
+        </Stack>
       );
     });
     const rowStyle =

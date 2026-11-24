@@ -96,17 +96,33 @@
         "label": "Categories and Series",
         "genre": {
           "label": "Genre",
-          "cover_attributes": { "label": "Cover Attributes" },
-          "tags": { "label": "Existing Tags" },
-          "studio": { "label": "Studio" },
-          "publisher": { "label": "Publisher" }
+          "cover_attributes": {
+            "label": "Cover Attributes"
+          },
+          "tags": {
+            "label": "Existing Tags"
+          },
+          "studio": {
+            "label": "Studio"
+          },
+          "publisher": {
+            "label": "Publisher"
+          }
         },
         "tag": {
           "label": "Tag",
-          "cover_attributes": { "label": "Cover Attributes" },
-          "tags": { "label": "Existing Tags" },
-          "studio": { "label": "Studio" },
-          "publisher": { "label": "Publisher" }
+          "cover_attributes": {
+            "label": "Cover Attributes"
+          },
+          "tags": {
+            "label": "Existing Tags"
+          },
+          "studio": {
+            "label": "Studio"
+          },
+          "publisher": {
+            "label": "Publisher"
+          }
         },
         "series": {
           "label": "Series"
@@ -667,6 +683,10 @@
           "label": "Leaked Keywords",
           "description": "Comma-separated; replaces the defaults completely"
         }
+      },
+      "poster_crop_detect_face": {
+        "label": "Face Detection",
+        "description": "When enabled, face-guided cropping is used only for the selected uncensored sources below. When disabled, the existing crop behavior is preserved."
       }
     },
     "network": {
@@ -1118,5 +1138,18 @@
     "testFailed": "Connection failed",
     "testSuccess_one": "Connected; {{count}} person found",
     "testSuccess_other": "Connected; {{count}} people found"
+  },
+  "faceDetection": {
+    "helpLink": "About",
+    "helpBody": "Face detection only guides poster crop positioning; it never modifies or overwrites the original cover. Detection runs only when the Crop Poster master switch, this Face Detection switch, and the corresponding source toggle are all enabled. When a face is found, the crop is centered on the main face; when no face is found, the crop is horizontally centered. Unselected sources and Tokyo-Hot keep the existing crop behavior.",
+    "sourceSelection": "Scraping source selection",
+    "sourceDescription": "Collapsed by default. Face detection can be enabled independently for the sources below; Tokyo-Hot is excluded.",
+    "selectedCount": "{{count}} of 8 sources enabled",
+    "discard": "Discard changes",
+    "save": "Save selection",
+    "confirmTitle": "Confirm source selection",
+    "confirmBody": "Save the current selection of {{count}} sources?",
+    "cancel": "Cancel",
+    "confirm": "Confirm save"
   }
 }

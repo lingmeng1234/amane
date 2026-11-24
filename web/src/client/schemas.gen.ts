@@ -9190,8 +9190,8 @@ export const ScrapingConfigSchema = {
         poster_crop_detect_face: {
             type: 'boolean',
             title: 'Poster Crop Detect Face',
-            default: true,
-            description: '人脸检测总开关. 仅在裁切海报总开关开启且来源属于独立启用列表时生效.'
+            description: '人脸检测总开关. 仅在裁切海报总开关开启且来源属于下方独立启用列表时生效.',
+            default: true
         },
         poster_crop_face_sources: {
             items: {

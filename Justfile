@@ -78,8 +78,6 @@ typecheck-ty:
 # web: oxlint + oxfmt + tsc + i18n
 [working-directory('web')]
 check-web:
-    pnpm exec oxfmt src/components/schema-form/schema-form.tsx src/routes/settings.tsx
-    git diff -- src/components/schema-form/schema-form.tsx src/routes/settings.tsx
     pnpm check
 
 # worker 数按逻辑核计: `-n auto` 按物理核计, 在超线程机器 (含 GitHub runner, 4 vCPU / 2 物理核) 上只开一半

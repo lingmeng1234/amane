@@ -92,6 +92,7 @@ check: lint typecheck check-web test-cov
 
 # Fail if OpenAPI / generated client drifted from source
 _check-openapi: generate
+    git diff -- web/openapi.json
     git diff --exit-code --stat web/openapi.json web/src/client
 
 # Full CI gate after tool setup (uv/pnpm/node/just); GitHub Actions 中两者由两个 job 并行执行

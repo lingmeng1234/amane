@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import structlog
@@ -37,7 +38,11 @@ def model_available() -> bool:
 
 def _anchor_centers(height: int, width: int, stride: int, num_anchors: int) -> np.ndarray:
     """每个格子的中心坐标; 一格多 anchor 时按组重复, 与特征排布一致."""
-    centers = np.stack(np.mgrid[:height, :width][::-1], axis=-1).astype(np.float32)
+    grid_y = np.arange(height, dtype=np.float32)[:, None]
+    grid_x = np.arange(width, dtype=np.float32)[None, :]
+    centers = np.empty((height, width, 2), dtype=np.float32)
+    centers[..., 0] = np.broadcast_to(grid_x, (height, width))
+    centers[..., 1] = np.broadcast_to(grid_y, (height, width))
     centers = (centers * stride).reshape(-1, 2)
     if num_anchors > 1:
         centers = np.stack([centers] * num_anchors, axis=1).reshape(-1, 2)
@@ -116,7 +121,7 @@ class _Detector:
         # SCRFD 期望 (x - 127.5) / 128, BGR 顺序.
         blob = (canvas[:, :, ::-1] - 127.5) / 128.0
         blob = np.ascontiguousarray(blob.transpose(2, 0, 1)[None])
-        outputs = self._session.run(None, {self._input_name: blob})
+        outputs = cast(list[np.ndarray], self._session.run(None, {self._input_name: blob}))
 
         scores_list: list[np.ndarray] = []
         boxes_list: list[np.ndarray] = []
@@ -209,7 +214,8 @@ class _GenderModel:
         # 先 BGR, 再 (x-127.5)/128, 最后转成 NCHW.
         blob = (aligned[:, :, ::-1].astype(np.float32) - 127.5) / 128.0
         blob = np.ascontiguousarray(blob.transpose(2, 0, 1)[None])
-        pred = self._session.run(None, {self._input_name: blob})[0][0]
+        outputs = cast(list[np.ndarray], self._session.run(None, {self._input_name: blob}))
+        pred = outputs[0][0]
         if len(pred) < 2:
             return None
         # 前两位是性别对数, 取大者: 0=女, 1=男.

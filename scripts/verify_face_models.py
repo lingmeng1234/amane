@@ -16,7 +16,7 @@ MODELS = {
 
 def git_blob_sha1(path: Path) -> str:
     size = path.stat().st_size
-    digest = hashlib.sha1(f"blob {size}\0".encode())
+    digest = hashlib.sha1(f"blob {size}\\0".encode())
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
@@ -28,23 +28,23 @@ def main() -> int:
     for name, (expected_size, expected_sha) in MODELS.items():
         path = MODEL_DIR / name
         if not path.is_file():
-            print(  # noqa: T201f"MISSING: {path}", file=sys.stderr)
+            print(f"MISSING: {path}", file=sys.stderr)  # noqa: T201
             failed = True
             continue
         size = path.stat().st_size
         sha = git_blob_sha1(path)
         if size != expected_size or sha != expected_sha:
-            print(  # noqa: T201
+            print(
                 f"INVALID: {name}: size={size} (expected {expected_size}), "
                 f"git_blob_sha1={sha} (expected {expected_sha})",
                 file=sys.stderr,
-            )
+            )  # noqa: T201
             failed = True
             continue
-        print(  # noqa: T201f"OK: {name} ({size} bytes, {sha})")
+        print(f"OK: {name} ({size} bytes, {sha})")  # noqa: T201
     if failed:
         return 1
-    print(  # noqa: T201"Both bundled face models passed integrity verification.")
+    print("Both bundled face models passed integrity verification.")  # noqa: T201
     return 0
 
 

@@ -347,7 +347,11 @@ export function SchemaForm({
             </Box>
             {action}
           </Group>
-          {typeof afterField === "function" ? afterField(key) : afterFieldKey === key ? afterField : null}
+          {typeof afterField === "function"
+            ? afterField(key)
+            : afterFieldKey === key
+              ? afterField
+              : null}
         </Stack>
       );
     });

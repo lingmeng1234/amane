@@ -504,13 +504,16 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
                 )
                 if not poster_locked:
                     poster_out = materialized.poster_urls
-                    if face_crop_streaming and not poster_out and not cover_locked:
-                        poster_out = list(original_poster_urls)
-                    if cover_locked and not poster_out and identity_metadata is not None:
-                        poster_out = list(identity_metadata.poster_urls)
                 trailer_out = materialized.trailer_urls
             except Exception:
                 current().warning("image materialization failed, keeping raw urls", number=payload.number)
+
+        # 物化失败、无可用封面或人脸裁切未命中时, 保留原始封面海报; 锁定封面则沿用锁定记录.
+        if not poster_locked and not poster_out:
+            if cover_locked and identity_metadata is not None:
+                poster_out = list(identity_metadata.poster_urls)
+            elif face_crop_streaming:
+                poster_out = list(original_poster_urls)
 
         await self.report_progress(len(SCALAR_FIELDS) + 1, progress_total, "materialize")
 

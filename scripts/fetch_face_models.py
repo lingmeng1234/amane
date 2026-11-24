@@ -19,7 +19,7 @@ MODELS = (
 
 
 def _git_blob_sha1(data: bytes) -> str:
-    return hashlib.sha1(f"blob {len(data)}\\0".encode() + data).hexdigest()
+    return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
 
 
 def _download(name: str, expected_size: int, expected_sha: str) -> None:

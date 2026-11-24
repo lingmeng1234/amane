@@ -3330,16 +3330,7 @@ export const HotSettingsSchema = {
                 uncensored_poster_ratio: 0.87,
                 poster_crop_skip_ratio: 0.9,
                 poster_crop_detect_face: true,
-                poster_crop_face_sources: [
-                    '10musume',
-                    '1pondo',
-                    'caribbeancom',
-                    'pacopacomama',
-                    'caribbeancompr',
-                    'caribbeancom_index',
-                    'd2pass',
-                    'heyzo'
-                ],
+                poster_crop_face_sources: ['10musume', '1pondo', 'caribbeancom', 'pacopacomama', 'caribbeancompr', 'caribbeancom_index', 'd2pass', 'heyzo'],
                 jpeg_quality: 95,
                 content_routes: {
                     amateur: [
@@ -9196,16 +9187,7 @@ export const ScrapingConfigSchema = {
         poster_crop_face_sources: {
             items: {
                 type: 'string',
-                enum: [
-                    '10musume',
-                    '1pondo',
-                    'caribbeancom',
-                    'pacopacomama',
-                    'caribbeancompr',
-                    'caribbeancom_index',
-                    'd2pass',
-                    'heyzo'
-                ]
+                enum: ['10musume', '1pondo', 'caribbeancom', 'pacopacomama', 'caribbeancompr', 'caribbeancom_index', 'd2pass', 'heyzo']
             },
             type: 'array',
             title: 'Poster Crop Face Sources',

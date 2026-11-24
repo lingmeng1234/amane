@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Collapse,
   Center,
   Group,
@@ -14,6 +13,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Tabs,
   Text,
   Title,
@@ -113,6 +113,7 @@ function FaceDetectionHelp() {
     <Popover width={340} position="bottom" withArrow shadow="md">
       <Popover.Target>
         <Button
+          type="button"
           size="xs"
           variant="subtle"
           color="blue"
@@ -185,7 +186,7 @@ function FaceDetectionSourceSettings({
           <Stack gap="sm" mt="md">
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
               {POSTER_FACE_SOURCES.map((source) => (
-                <Checkbox
+                <Switch
                   key={source.id}
                   label={source.label}
                   checked={draft.includes(source.id)}
@@ -210,6 +211,7 @@ function FaceDetectionSourceSettings({
                 {t("faceDetection.discard")}
               </Button>
               <Button
+                type="button"
                 size="xs"
                 disabled={!changed || saving}
                 loading={saving}
@@ -233,10 +235,11 @@ function FaceDetectionSourceSettings({
             {t("faceDetection.confirmBody", { count: draft.length })}
           </Text>
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setConfirmOpen(false)}>
+            <Button type="button" variant="default" onClick={() => setConfirmOpen(false)}>
               {t("faceDetection.cancel")}
             </Button>
             <Button
+              type="button"
               loading={saving}
               onClick={() => {
                 onSave(draft);

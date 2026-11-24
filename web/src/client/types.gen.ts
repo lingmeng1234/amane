@@ -4869,10 +4869,14 @@ export type ScrapingConfig = {
     poster_crop_skip_ratio?: number;
     /**
      * Poster Crop Detect Face
+     *
+     * 人脸检测总开关. 仅在裁切海报总开关开启且来源属于下方独立启用列表时生效.
      */
     poster_crop_detect_face?: boolean;
     /**
      * Poster Crop Face Sources
+     *
+     * 允许使用人脸检测的无码来源; 其他来源和 Tokyo-Hot 始终沿用原有裁切方式.
      */
     poster_crop_face_sources?: Array<'10musume' | '1pondo' | 'caribbeancom' | 'pacopacomama' | 'caribbeancompr' | 'caribbeancom_index' | 'd2pass' | 'heyzo'>;
     /**

@@ -1161,7 +1161,7 @@
     "sourceSelection": "Scraping source selection",
     "sourceDescription": "Collapsed by default. Face detection can be enabled independently for the sources below; Tokyo-Hot is excluded.",
     "selectedCount": "{{count}} of 8 sources enabled",
-    "selectedCount_one": "{{count}} of 8 source enabled",
+    "selectedCount_one": "{{count}} of 8 sources enabled",
     "selectedCount_other": "{{count}} of 8 sources enabled",
     "discard": "Discard changes",
     "save": "Save selection",

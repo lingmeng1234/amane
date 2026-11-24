@@ -687,6 +687,22 @@
       "poster_crop_detect_face": {
         "label": "人脸识别",
         "description": "启用后，仅对下方已选择的无码来源进行人脸定位；关闭时沿用原有裁切方式。"
+      },
+      "poster_crop_face_sources": {
+        "label": "人脸识别来源",
+        "description": "仅勾选的来源使用人脸辅助海报裁切。",
+        "$": {
+          "options": {
+            "10musume": "10musume",
+            "1pondo": "1pondo",
+            "caribbeancom": "Caribbeancom",
+            "pacopacomama": "Pacopacomama",
+            "caribbeancompr": "Caribbeancompr",
+            "caribbeancom_index": "Caribbeancom Index",
+            "d2pass": "D2Pass",
+            "heyzo": "Heyzo"
+          }
+        }
       }
     },
     "network": {

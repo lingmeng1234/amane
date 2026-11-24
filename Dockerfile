@@ -18,9 +18,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-COPY scripts/fetch_face_models.py ./scripts/fetch_face_models.py
 COPY resources/mapping_table/minnano_actress_map.json ./resources/mapping_table/minnano_actress_map.json
-RUN python scripts/fetch_face_models.py
 RUN uv sync --no-dev --frozen --no-editable
 
 # --- 最终镜像 ---

@@ -687,6 +687,22 @@
       "poster_crop_detect_face": {
         "label": "Face Detection",
         "description": "When enabled, face-guided cropping is used only for the selected uncensored sources below. When disabled, the existing crop behavior is preserved."
+      },
+      "poster_crop_face_sources": {
+        "label": "Face Detection Sources",
+        "description": "Only selected sources use face-guided poster cropping.",
+        "$": {
+          "options": {
+            "10musume": "10musume",
+            "1pondo": "1pondo",
+            "caribbeancom": "Caribbeancom",
+            "pacopacomama": "Pacopacomama",
+            "caribbeancompr": "Caribbeancompr",
+            "caribbeancom_index": "Caribbeancom Index",
+            "d2pass": "D2Pass",
+            "heyzo": "Heyzo"
+          }
+        }
       }
     },
     "network": {

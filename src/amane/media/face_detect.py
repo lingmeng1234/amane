@@ -19,9 +19,6 @@ from PIL import Image
 
 logger = structlog.get_logger()
 
-_MODEL_FILES = ("face_detect_scrfd.onnx", "face_detect_genderage.onnx")
-
-
 def _model_path(filename: str) -> Path | None:
     """只从源码/发行包内读取模型；不执行任何网络下载或缓存回退。"""
     path = Path(__file__).with_name(filename)
@@ -29,7 +26,6 @@ def _model_path(filename: str) -> Path | None:
         return path
     logger.warning("bundled face model missing", model=filename, expected_path=str(path))
     return None
-
 
 
 #: 输出按 stride 分组, 每组依次是 score / bbox / kps.

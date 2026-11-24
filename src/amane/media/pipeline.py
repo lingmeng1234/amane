@@ -50,7 +50,6 @@ def _internal_url(store: ResourceStore, locator_url: str) -> str:
     return f"{RESOURCE_URL_PREFIX}/{store.url_hash(locator_url)}"
 
 
-
 def _should_detect_face(
     config: HotSettings,
     content_type: ContentType | None,

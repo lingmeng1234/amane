@@ -20881,16 +20881,16 @@
           },
           "poll_interval": {
             "type": "number",
-            "maximum": 10,
+            "maximum": 10.0,
             "minimum": 0.1,
             "title": "Poll Interval",
-            "default": 2,
+            "default": 2.0,
             "x-hidden": true
           },
           "shutdown_timeout": {
             "type": "number",
-            "maximum": 120,
-            "minimum": 0,
+            "maximum": 120.0,
+            "minimum": 0.0,
             "title": "Shutdown Timeout",
             "default": 0,
             "x-hidden": true

@@ -27,7 +27,7 @@
 ### ✨ 新功能与调整
 
 - **SCRFD 人脸识别辅助裁切**：为指定无码来源增加人脸定位裁切；检测到主体人脸时将裁切窗口对准人脸中心，检测不到人脸时改为水平居中裁切；关闭检测时完全沿用原有裁切规则。
-- **刮削源独立开关**：人脸识别总开关位于「海报裁切跳过阈值比例」下方，作为「裁切海报」总开关的下属设置；支持 10mususume、1pondo、Caribbeancom、Pacopacomama、Caribbeancompr、Caribbeancom Index、D2Pass、Heyzo 八个来源分别启用，Tokyo-Hot 明确排除。
+- **刮削源独立开关**：人脸识别总开关位于「海报裁切跳过阈值比例」下方，作为「裁切海报」总开关的下属设置；支持 10musume、1pondo、Caribbeancom、Pacopacomama、Caribbeancompr、Caribbeancom Index、D2Pass、Heyzo 八个来源分别启用，Tokyo-Hot 明确排除。
 - **折叠式来源选择**：来源选择默认收起，展开后管理各来源开关；修改后通过保存确认框统一保存。
 - **原图保护**：人脸检测只调整生成海报的裁切窗口，不修改或覆盖来源原始封面。
 - **模型随发布产物提供**：SCRFD 与性别/年龄辅助 ONNX 模型在构建阶段校验并打包，使用者无需自行下载或配置。

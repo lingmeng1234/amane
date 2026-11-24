@@ -37,7 +37,7 @@ _MODEL_BASE_URL = (
 def _matches_model(path: Path, expected_sha: str, expected_size: int) -> bool:
     if not path.is_file() or path.stat().st_size != expected_size:
         return False
-    digest = hashlib.sha1(f"blob {expected_size}\\0".encode())
+    digest = hashlib.sha1(f"blob {expected_size}\0".encode())
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
@@ -63,7 +63,7 @@ def _ensure_model(filename: str) -> Path | None:
             f"{_MODEL_BASE_URL}/{filename}",
             headers={"User-Agent": "Amane face-crop model loader"},
         )
-        digest = hashlib.sha1(f"blob {expected_size}\\0".encode())
+        digest = hashlib.sha1(f"blob {expected_size}\0".encode())
         received = 0
         with urlopen(request, timeout=90) as response, temporary.open("wb") as output:
             while chunk := response.read(1024 * 1024):

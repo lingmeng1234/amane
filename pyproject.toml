@@ -68,7 +68,7 @@ package = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amane"]
-include = [
+artifacts = [
     "src/amane/media/face_detect_scrfd.onnx",
     "src/amane/media/face_detect_genderage.onnx",
 ]
@@ -92,6 +92,10 @@ include = [
 
 [tool.hatch.build.targets.sdist]
 exclude = ["tests/", "docs/", "scripts/", "web/", ".github/"]
+artifacts = [
+    "src/amane/media/face_detect_scrfd.onnx",
+    "src/amane/media/face_detect_genderage.onnx",
+]
 
 [tool.pyright]
 include = ["src/amane/", "tests/", "scripts/"]

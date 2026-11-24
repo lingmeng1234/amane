@@ -34,11 +34,11 @@ def main() -> int:
         size = path.stat().st_size
         sha = git_blob_sha1(path)
         if size != expected_size or sha != expected_sha:
-            print(
+            print(  # noqa: T201
                 f"INVALID: {name}: size={size} (expected {expected_size}), "
                 f"git_blob_sha1={sha} (expected {expected_sha})",
                 file=sys.stderr,
-            )  # noqa: T201
+            )
             failed = True
             continue
         print(f"OK: {name} ({size} bytes, {sha})")  # noqa: T201

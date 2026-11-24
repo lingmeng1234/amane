@@ -34,6 +34,10 @@ def test_face_detection_is_limited_to_enabled_uncensored_sources():
     config.scraping.poster_crop_detect_face = False
     assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_streaming")
 
+    config.scraping.poster_crop_detect_face = True
+    config.scraping.crop_poster = False
+    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_streaming")
+
 
 class FakeClient:
     """伪 WebClient: download 按 url 写出预设尺寸的图片 (或视频占位); fail 集合内 URL 下载失败."""

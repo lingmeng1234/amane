@@ -57,7 +57,8 @@ def _should_detect_face(
 ) -> bool:
     """仅对明确启用的人脸检测来源生效；其他来源保留原有右侧裁切."""
     return (
-        content_type == ContentType.UNCENSORED
+        config.scraping.crop_poster
+        and content_type == ContentType.UNCENSORED
         and scrape_route == "uncensored_streaming"
         and config.scraping.poster_crop_detect_face
         and source_id is not None

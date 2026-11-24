@@ -50,7 +50,7 @@ def _internal_url(store: ResourceStore, locator_url: str) -> str:
 
 
 def _should_detect_face(
-    config: "HotSettings",
+    config: HotSettings,
     content_type: ContentType | None,
     source_id: str | None,
     scrape_route: str | None,

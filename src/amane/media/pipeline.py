@@ -60,7 +60,10 @@ def _should_detect_face(
     return (
         config.scraping.crop_poster
         and content_type in (ContentType.UNCENSORED, ContentType.WESTERN)
-        and scrape_route == "uncensored_streaming"
+        and (
+            scrape_route == "uncensored_streaming"
+            or (scrape_route == "uncensored_dvd" and source_id == "caribbeancom_index")
+        )
         and config.scraping.poster_crop_detect_face
         and source_id is not None
         and source_id in config.scraping.poster_crop_face_sources

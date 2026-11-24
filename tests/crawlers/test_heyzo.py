@@ -7,7 +7,6 @@ from amane.crawlers.models import SearchQuery
 from amane.crawlers.sites.heyzo import HeyzoCrawler, _detail, _number
 from amane.enums import SiteName
 
-
 _HTML = """
 <html>
 <head>

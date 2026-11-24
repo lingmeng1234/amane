@@ -11,6 +11,7 @@ from amane.media import (
     apply_cover_watermarks,
     crop_box,
     crop_poster,
+    face_crop_left,
     format_crop_box_args,
     needs_upscale,
     probe_oriented_size,
@@ -531,3 +532,45 @@ class TestCoverWatermarks:
             assert isinstance(top, tuple) and isinstance(bottom, tuple)
             assert top[2] > 180 and top[0] < 80
             assert bottom[0] > 180 and bottom[2] < 80
+
+
+class TestFaceCropPosition:
+    def test_face_center_controls_horizontal_crop_position(self, tmp_path: Path, monkeypatch):
+        from amane.media import face_detect
+
+        thumb = tmp_path / "thumb.jpg"
+        Image.new("RGB", (800, 538), "blue").save(thumb)
+        monkeypatch.setattr(face_detect, "main_subject_face", lambda _image: (500.0, 80.0, 600.0, 200.0))
+
+        left, reason = face_crop_left(thumb, 0.87)
+
+        assert reason == "face"
+        assert left == 316
+
+    def test_missing_face_uses_center_position(self, tmp_path: Path, monkeypatch):
+        from amane.media import face_detect
+
+        thumb = tmp_path / "thumb.jpg"
+        Image.new("RGB", (800, 538), "blue").save(thumb)
+        monkeypatch.setattr(face_detect, "main_subject_face", lambda _image: None)
+
+        left, reason = face_crop_left(thumb, 0.87)
+
+        assert reason == "center"
+        assert left == 166
+
+    def test_face_model_exception_uses_center_position(self, tmp_path: Path, monkeypatch):
+        from amane.media import face_detect
+
+        thumb = tmp_path / "thumb.jpg"
+        Image.new("RGB", (800, 538), "blue").save(thumb)
+
+        def broken(_image):
+            raise RuntimeError("model failure")
+
+        monkeypatch.setattr(face_detect, "main_subject_face", broken)
+
+        left, reason = face_crop_left(thumb, 0.87)
+
+        assert reason == "center"
+        assert left == 166

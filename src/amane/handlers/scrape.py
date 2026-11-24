@@ -474,6 +474,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
             and selected_streaming_site != str(SiteName.TOKYO_HOT)
             and self._config.scraping.crop_poster
             and self._config.scraping.poster_crop_detect_face
+            and selected_streaming_site in self._config.scraping.poster_crop_face_sources
         )
         # 指定无码流媒体源的人脸裁切以封面为唯一候选; 若最终来源未启用检测, 下方回退到原封面 URL.
         poster_input = [] if poster_locked or face_crop_streaming else list(result.metadata.poster_urls)

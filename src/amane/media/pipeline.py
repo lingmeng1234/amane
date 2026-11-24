@@ -109,8 +109,18 @@ async def materialize_images(
     """
     kinds = set(config.scraping.download_resources)
     image_sources = image_sources or {}
-    # 欧美不使用封面裁剪生成海报，其他分类保持原有裁剪规则.
-    can_crop_poster = content_type != ContentType.WESTERN and (config.scraping.crop_poster or force_crop_poster)
+    face_crop_config = config.scraping.poster_face_crop
+    # 无码流媒体路由在元数据层按 WESTERN 处理, 但明确启用的人脸来源仍允许从封面强制生成海报.
+    face_streaming_candidate = (
+        scrape_route == "uncensored_streaming"
+        and config.scraping.crop_poster
+        and face_crop_config.enabled
+        and any(image_sources.get(url) in face_crop_config.sources for url in cover_urls)
+    )
+    # 其他情况严格沿用旧版裁剪开关和 WESTERN 排除规则.
+    can_crop_poster = (
+        content_type != ContentType.WESTERN and (config.scraping.crop_poster or force_crop_poster)
+    ) or face_streaming_candidate
 
     # 下载封面资源.
     cover_ok: set[str] = set()
@@ -156,13 +166,12 @@ async def materialize_images(
     cover_size = probe_size(cover_local) if cover_local else None
     cand_size = probe_size(poster_candidate_local) if poster_candidate_local else None
 
-    face_crop_config = config.scraping.poster_face_crop
     face_crop_enabled = (
         config.scraping.crop_poster
-        and content_type != ContentType.WESTERN
         and face_crop_config.enabled
         and cover_src is not None
         and image_sources.get(cover_src) in face_crop_config.sources
+        and (content_type != ContentType.WESTERN or scrape_route == "uncensored_streaming")
     )
     should_crop = face_crop_enabled or should_crop_poster(
         cover_size, cand_size, skip_ratio=config.scraping.poster_crop_skip_ratio

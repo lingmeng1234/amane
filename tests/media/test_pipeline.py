@@ -733,6 +733,41 @@ async def test_face_crop_for_selected_source_forces_crop_and_uses_uncensored_rat
 
 
 @pytest.mark.asyncio
+async def test_face_crop_streaming_western_route_forces_crop(resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """选中的无码流媒体来源即使按 WESTERN 处理, 也强制使用无码比例裁剪."""
+    cover_url = "https://s/streaming-face-cover.jpg"
+    poster_url = "https://s/streaming-tall-poster.jpg"
+    client = FakeClient({cover_url: (800, 538), poster_url: (379, 538)})
+    cfg = HotSettings()
+    cfg.scraping.uncensored_poster_ratio = 0.82
+    cfg.scraping.poster_face_crop.enabled = True
+    cfg.scraping.poster_face_crop.sources = ["1pondo"]
+    monkeypatch.setattr(pipeline_mod, "face_crop_left", lambda _path, _ratio: (190, "center"))
+
+    out = await materialize_images(
+        [poster_url],
+        [cover_url],
+        [],
+        resource_store,
+        cast("WebClient", client),
+        cfg,
+        tmp_path,
+        content_type=ContentType.WESTERN,
+        image_sources={cover_url: "1pondo"},
+        scrape_route="uncensored_streaming",
+    )
+
+    assert out.poster_urls[0].startswith(pipeline_mod.RESOURCE_URL_PREFIX)
+    url_hash = out.poster_urls[0].rsplit("/", 1)[-1]
+    got = await resource_store.get_by_url_hash(url_hash)
+    assert got is not None
+    crop_res, crop_path = got
+    assert crop_res.meta is not None
+    assert crop_res.meta["args"] == "0.8200:face:center:190"
+    assert Image.open(crop_path).size == (441, 538)
+
+
+@pytest.mark.asyncio
 async def test_face_crop_without_face_uses_center_and_keeps_face_mode_ratio(
     resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

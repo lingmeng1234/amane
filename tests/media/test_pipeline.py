@@ -24,9 +24,17 @@ if TYPE_CHECKING:
 def test_face_detection_is_limited_to_enabled_uncensored_sources():
     config = HotSettings()
     config.scraping.poster_crop_detect_face = True
-    config.scraping.poster_crop_face_sources = ["heyzo"]
+    config.scraping.poster_crop_face_sources = ["heyzo", "caribbeancom_index"]
 
     assert pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_streaming")
+    # Caribbeancom Index is configured on the uncensored DVD route but is explicitly
+    # included in the user's face-detection source allowlist.
+    assert pipeline_mod._should_detect_face(
+        config, ContentType.UNCENSORED, "caribbeancom_index", "uncensored_dvd"
+    )
+    assert not pipeline_mod._should_detect_face(
+        config, ContentType.UNCENSORED, "aventertainments", "uncensored_dvd"
+    )
     # 非 Tokyo-Hot 无码流媒体在 ScrapeHandler 中按 WESTERN 图像模式处理,
     # 但启用人脸检测的来源必须允许执行裁切.
     assert pipeline_mod._should_detect_face(config, ContentType.WESTERN, "heyzo", "uncensored_streaming")
@@ -162,6 +170,37 @@ async def test_selected_streaming_cover_uses_face_guided_crop(resource_store: Re
     assert len(out.poster_urls) == 1
     assert out.poster_urls[0].startswith(pipeline_mod.RESOURCE_URL_PREFIX)
     assert out.cover_urls == [cover_url]
+    resource = await resource_store.get_by_url_hash(out.poster_urls[0].rsplit("/", 1)[-1])
+    assert resource is not None
+    crop_res, crop_path = resource
+    assert crop_res.meta is not None
+    assert crop_res.meta.get("args") == "0.8700:face=1"
+    assert Image.open(crop_path).size == (468, 538)
+
+
+@pytest.mark.asyncio
+async def test_caribbeancom_index_uses_face_guided_crop_on_uncensored_dvd_route(
+    resource_store: ResourceStore, tmp_path: Path
+):
+    cover_url = "https://s/caribbeancom-index-cover.jpg"
+    client = FakeClient({cover_url: (800, 538)})
+    cfg = HotSettings()
+    cfg.scraping.poster_crop_face_sources = ["caribbeancom_index"]
+
+    out = await materialize_images(
+        [],
+        [cover_url],
+        [],
+        resource_store,
+        cast("WebClient", client),
+        cfg,
+        tmp_path,
+        content_type=ContentType.UNCENSORED,
+        image_sources={cover_url: "caribbeancom_index"},
+        scrape_route="uncensored_dvd",
+    )
+
+    assert len(out.poster_urls) == 1
     resource = await resource_store.get_by_url_hash(out.poster_urls[0].rsplit("/", 1)[-1])
     assert resource is not None
     crop_res, crop_path = resource

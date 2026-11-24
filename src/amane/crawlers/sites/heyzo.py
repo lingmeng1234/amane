@@ -15,8 +15,8 @@ from ...utils.dates import normalize_calendar_date
 from ...utils.text import normalize_long_text
 
 _BASE_URL = "https://www.heyzo.com"
-_NUMBER_RE = re.compile(r"^HEYZO-(?P<digits>\\d{4})$", re.IGNORECASE)
-_DETAIL_RE = re.compile(r"/movie/(?P<movie_id>\\d+)/?(?:[?#].*)?$", re.IGNORECASE)
+_NUMBER_RE = re.compile(r"^HEYZO-(?P<digits>\d{4})$", re.IGNORECASE)
+_DETAIL_RE = re.compile(r"/movie/(?P<movie_id>\d+)/?(?:[?#].*)?$", re.IGNORECASE)
 
 
 def _number(value: str) -> str | None:
@@ -42,14 +42,14 @@ def _detail(html_text: str, page_url: str) -> tuple[dict[str, object], list[str]
     # 简介只读取 Movie_memo 元素本身. 多个简介段落分别归一后仍保留段落间距;
     # 后面的 Movie_disclaimer 是独立元素, 不会被拼入剧情.
     memo_fragments = html.css(".Movie_memo__Oq_R5").getall()
-    plot = normalize_long_text("\\n".join(memo_fragments)) if memo_fragments else None
+    plot = normalize_long_text("\n".join(memo_fragments)) if memo_fragments else None
 
     actor_item = _field_item(html, "出演")
     actors: list[str] = []
     if actor_item is not None:
         for anchor in actor_item.xpath(".//a"):
             raw_name = anchor.xpath("string(.)").get() or ""
-            name = re.sub(r"\\s+", " ", raw_name).strip()
+            name = re.sub(r"\s+", " ", raw_name).strip()
             if name:
                 actors.append(name)
 
@@ -58,7 +58,7 @@ def _detail(html_text: str, page_url: str) -> tuple[dict[str, object], list[str]
     if tag_item is not None:
         for anchor in tag_item.css(".Movie_tags__5D_UT a"):
             raw_tag = anchor.xpath("string(.)").get() or ""
-            tag = re.sub(r"\\s+", " ", raw_tag).strip()
+            tag = re.sub(r"\s+", " ", raw_tag).strip()
             if tag:
                 tags.append(tag)
 

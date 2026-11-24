@@ -57,7 +57,7 @@ def test_detail_keeps_plot_layout_and_separates_each_actor_and_tag() -> None:
     data, gallery, poster = _detail(_HTML, "https://www.heyzo.com/movie/1206")
 
     assert data["title"] == "作品标题"
-    assert data["plot"] == "第一段说明\\n第二行\\n\\n第二段说明"
+    assert data["plot"] == "第一段说明\n第二行\n\n第二段说明"
     assert "这段网站说明不属于简介" not in str(data["plot"])
     assert data["actors"] == ["演员甲", "演员乙"]
     assert data["tags"] == ["标签甲", "标签乙"]

@@ -155,7 +155,6 @@
         "description": "从封面自动裁切生成海报"
       },
       "poster_face_crop": {
-        "label": "人脸定位裁剪",
         "enabled": "启用人脸定位裁剪",
         "description": "开启后，仅对勾选的刮削源启用人脸定位，并强制从封面裁切海报。",
         "info": "说明",

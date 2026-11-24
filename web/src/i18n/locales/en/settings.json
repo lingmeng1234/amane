@@ -155,7 +155,6 @@
         "description": "Auto-crop poster from the cover image"
       },
       "poster_face_crop": {
-        "label": "Face-guided Poster Cropping",
         "enabled": "Enable face-guided poster cropping",
         "description": "When enabled, face-guided cropping is used only for the selected scraping sources and forces a crop from the cover.",
         "info": "Info",

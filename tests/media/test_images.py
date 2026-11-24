@@ -11,7 +11,6 @@ from amane.media import (
     apply_cover_watermarks,
     crop_box,
     crop_poster,
-    face_crop_left,
     format_crop_box_args,
     needs_upscale,
     probe_oriented_size,
@@ -21,6 +20,7 @@ from amane.media import (
     validate_crop_box,
 )
 from amane.parsing import DEFINITION_VALUES, Mosaic
+from amane.media.images import face_crop_left
 
 if TYPE_CHECKING:
     from pathlib import Path

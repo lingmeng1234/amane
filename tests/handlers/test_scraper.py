@@ -408,6 +408,65 @@ class TestScrapeHandler:
         assert metadata.cover_urls == ["https://example.com/streaming-cover.jpg"]
 
     @pytest.mark.asyncio(loop_scope="function")
+    async def test_non_face_enabled_streaming_keeps_western_image_flow(self, repo: Repository, resource_store, monkeypatch):
+        """未启用人脸识别的无码流媒体来源继续沿用欧美原图海报流程。"""
+        from types import SimpleNamespace
+
+        from amane.handlers import scrape as scrape_module
+
+        captured = {}
+
+        async def fake_materialize_images(*args, **kwargs):
+            captured["content_type"] = kwargs["content_type"]
+            captured["poster_input"] = args[0]
+            return SimpleNamespace(
+                poster_urls=list(args[0]),
+                cover_urls=list(args[1]),
+                trailer_urls=[],
+            )
+
+        monkeypatch.setattr(scrape_module, "materialize_images", fake_materialize_images)
+
+        class StreamingCrawler:
+            async def fetch(self, query, options=None) -> MediaMetadata:
+                return MediaMetadata(
+                    number=query.number,
+                    title="Streaming Title",
+                    cover_urls=["https://example.com/streaming-cover.jpg"],
+                )
+
+        config = _config_with({"uncensored_streaming": [SiteName.PONDO]})
+        config.scraping.poster_crop_face_sources = []
+        h = ScrapeHandler(
+            repo=repo,
+            factory=FakeFactory({str(SiteName.PONDO): StreamingCrawler()}),
+            resource_store=resource_store,
+            pipeline_config=config,
+            web_client=cast(Any, object()),
+        )
+
+        media = await repo.create_media_file(
+            library_id=1,
+            path="/media/PONDO-UNSELECTED-1234.mp4",
+        )
+        result = await h.handle(
+            ScrapePayload(
+                media_file_id=media.id,
+                number="PONDO-UNSELECTED-1234",
+                content_type=ContentType.UNCENSORED,
+            )
+        )
+
+        assert result.success is True
+        assert captured["content_type"] is ContentType.WESTERN
+        assert captured["poster_input"] == ["https://example.com/streaming-cover.jpg"]
+
+        metadata = await repo.get_metadata_by_number("PONDO-UNSELECTED-1234")
+        assert metadata is not None
+        assert metadata.poster_urls == ["https://example.com/streaming-cover.jpg"]
+        assert metadata.original_poster_urls == ["https://example.com/streaming-cover.jpg"]
+
+    @pytest.mark.asyncio(loop_scope="function")
     async def test_tokyo_hot_streaming_keeps_uncensored_image_flow(self, repo: Repository, resource_store, monkeypatch):
         """Tokyo-Hot streaming 固定使用无码裁剪模式, 不根据 double_page_* 判断。"""
         from types import SimpleNamespace

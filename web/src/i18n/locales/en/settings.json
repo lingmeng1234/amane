@@ -191,7 +191,7 @@
         },
         "description": "When enabled, face-guided cropping is used only for the selected scraping sources and forces a crop from the cover.",
         "info": "Info",
-        "help": "Both the global Crop Poster switch and this switch must be enabled, and the actual cover source must be selected. Face mode forces cropping regardless of the legacy skip threshold. It prioritizes a female subject face; no face or unavailable models falls back to a centered crop. Face mode always uses the uncensored poster ratio. Unselected sources retain the legacy crop conditions and their separate censored/uncensored ratios. SCRFD and gender-age models are downloaded on demand for local inference.",
+        "help": "Both the global Crop Poster switch and this switch must be enabled, and the actual cover source must be selected. Face mode forces cropping regardless of the legacy skip threshold. It prioritizes a female subject face; no face or unavailable models falls back to a centered crop. Face mode always uses the uncensored poster ratio. Unselected sources retain the legacy crop conditions and their separate censored/uncensored ratios. Models are included in release packages; if missing, they are downloaded on first use for local inference.",
         "sourceSelection": "Scraping source selection ({{count}}/7)"
       },
       "poster_crop_skip_ratio": {

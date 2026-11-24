@@ -31,7 +31,17 @@ if TYPE_CHECKING:
 
 @pytest.mark.parametrize(
     "number",
-    ["102910_01", "051014_807", "103126-001", "101726_100", "N0001", "HEYZO-1234", "HEYZO-0119", "HEYZO-3984", "heyzo-1234"],
+    [
+        "102910_01",
+        "051014_807",
+        "103126-001",
+        "101726_100",
+        "N0001",
+        "HEYZO-1234",
+        "HEYZO-0119",
+        "HEYZO-3984",
+        "heyzo-1234",
+    ],
 )
 def test_uncensored_route_uses_full_number_rules(number: str) -> None:
     rules = ScrapingConfig().uncensored_streaming_number_rules

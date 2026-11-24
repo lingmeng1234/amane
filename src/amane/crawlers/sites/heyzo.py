@@ -66,9 +66,7 @@ def _detail(html_text: str, page_url: str) -> tuple[dict[str, object], list[str]
     release_text = ""
     if release_item is not None:
         release_text = "".join(
-            part.strip()
-            for part in release_item.xpath("./text() | ./span[2]//text()").getall()
-            if part.strip()
+            part.strip() for part in release_item.xpath("./text() | ./span[2]//text()").getall() if part.strip()
         )
     release = normalize_calendar_date(release_text)
 

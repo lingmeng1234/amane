@@ -1,25 +1,42 @@
 import {
   Alert,
+  Anchor,
   Box,
+  Checkbox,
+  Collapse,
   Button,
   Center,
   Group,
   Loader,
   NavLink,
   Paper,
+  Popover,
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Tabs,
   Text,
   Title,
+  UnstyledButton,
 } from "@mantine/core";
-import { IconAlertCircle, IconPlugConnected, IconRefresh } from "@tabler/icons-react";
+import {
+  IconAlertCircle,
+  IconChevronDown,
+  IconChevronUp,
+  IconPlugConnected,
+  IconRefresh,
+} from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { isHidden, resolveSchema, type JSONSchemaObject } from "@/components/schema-form/schema";
+import {
+  isHidden,
+  resolveSchema,
+  type JSONSchemaObject,
+  type SchemaFormInstance,
+} from "@/components/schema-form/schema";
 import { SchemaForm } from "@/components/schema-form/schema-form";
 import { useConfig, useConfigSchema, useUpdateConfig } from "@/hooks/use-config";
 import { useNarrowViewport } from "@/hooks/use-narrow-viewport";
@@ -235,6 +252,115 @@ function NfoOutputSettings({ schema, values, saving, onSave }: NfoOutputSettings
   );
 }
 
+type PosterFaceCropSource =
+  | "10mususume"
+  | "1pondo"
+  | "caribbeancom"
+  | "pacopacomama"
+  | "caribbeancompr"
+  | "d2pass"
+  | "heyzo";
+
+const POSTER_FACE_CROP_SOURCES: PosterFaceCropSource[] = [
+  "10mususume",
+  "1pondo",
+  "caribbeancom",
+  "pacopacomama",
+  "caribbeancompr",
+  "d2pass",
+  "heyzo",
+];
+
+function PosterFaceCropField({ name, form }: { name: string; form: SchemaFormInstance }) {
+  const { t } = useTranslation("settings");
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <form.Field name={name}>
+      {(field) => {
+        const value =
+          field.state.value && typeof field.state.value === "object"
+            ? (field.state.value as { enabled?: boolean; sources?: string[] })
+            : {};
+        const enabled = value.enabled === true;
+        const selected = Array.isArray(value.sources) ? value.sources : [];
+        const selectedSet = new Set(selected);
+        const update = (patch: { enabled?: boolean; sources?: string[] }) =>
+          field.handleChange({ ...value, ...patch });
+
+        return (
+          <Stack gap="sm">
+            <Group align="center" justify="space-between" wrap="nowrap">
+              <Stack gap={2} style={{ minWidth: 0 }}>
+                <Group gap="xs">
+                  <Text fw={500}>{t("fields.scraping.poster_face_crop.enabled")}</Text>
+                  <Popover position="right" withArrow>
+                    <Popover.Target>
+                      <Anchor component="button" type="button" size="xs" c="blue">
+                        {t("fields.scraping.poster_face_crop.info")}
+                      </Anchor>
+                    </Popover.Target>
+                    <Popover.Dropdown>
+                      <Text size="sm" maw={360}>
+                        {t("fields.scraping.poster_face_crop.help")}
+                      </Text>
+                    </Popover.Dropdown>
+                  </Popover>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  {t("fields.scraping.poster_face_crop.description")}
+                </Text>
+              </Stack>
+              <Switch
+                checked={enabled}
+                onChange={(event) => update({ enabled: event.currentTarget.checked })}
+                aria-label={t("fields.scraping.poster_face_crop.enabled")}
+              />
+            </Group>
+
+            <UnstyledButton
+              type="button"
+              onClick={() => setExpanded((current) => !current)}
+              style={{ width: "100%" }}
+            >
+              <Group justify="space-between" wrap="nowrap">
+                <Text size="sm" fw={500}>
+                  {t("fields.scraping.poster_face_crop.sourceSelection", {
+                    count: selected.length,
+                  })}
+                </Text>
+                {expanded ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+              </Group>
+            </UnstyledButton>
+
+            <Collapse in={expanded}>
+              <Paper withBorder p="sm">
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                  {POSTER_FACE_CROP_SOURCES.map((source) => (
+                    <Checkbox
+                      key={source}
+                      label={t(("fields.scraping.poster_face_crop.sources." + source) as never)}
+                      checked={selectedSet.has(source)}
+                      onChange={(event) => {
+                        const next = new Set(selectedSet);
+                        if (event.currentTarget.checked) next.add(source);
+                        else next.delete(source);
+                        update({
+                          sources: POSTER_FACE_CROP_SOURCES.filter((item) => next.has(item)),
+                        });
+                      }}
+                    />
+                  ))}
+                </SimpleGrid>
+              </Paper>
+            </Collapse>
+          </Stack>
+        );
+      }}
+    </form.Field>
+  );
+}
+
 export const Route = createFileRoute("/settings")({
   validateSearch: settingsSearchSchema,
   component: SettingsPage,
@@ -398,6 +524,15 @@ function SettingsPage() {
                         i18nPrefix="settings:fields"
                         actionsPlacement="affix"
                         fieldActions={key === "scraping" ? scrapingFieldActions : undefined}
+                        fieldRenderers={
+                          key === "scraping"
+                            ? {
+                                poster_face_crop: ({ name, form }) => (
+                                  <PosterFaceCropField name={name} form={form} />
+                                ),
+                              }
+                            : undefined
+                        }
                         onSave={(patch) => saveMutation.mutate({ body: { [key]: patch } })}
                         saving={saveMutation.isPending}
                       />

@@ -6,7 +6,7 @@ import { UnsavedChangesBar } from "@/components/common/unsaved-changes-bar";
 import { isRecord } from "@/lib/utils";
 import { encodeFormBody } from "./encode";
 import { FieldRouter } from "./fields";
-import type { JSONSchemaObject } from "./schema";
+import type { JSONSchemaObject, SchemaFormInstance } from "./schema";
 import {
   createSchemaValidator,
   isArray,
@@ -157,6 +157,11 @@ interface SchemaFormProps {
    * The setter updates the field in the local form state (never persists directly).
    */
   fieldActions?: (fieldKey: string, setValue: (value: unknown) => void) => ReactNode;
+  /** Replace selected fields with custom controls while keeping them in the same form/save flow. */
+  fieldRenderers?: Record<
+    string,
+    (args: { name: string; schema: JSONSchemaObject; form: SchemaFormInstance }) => ReactNode
+  >;
 }
 
 export function SchemaForm({
@@ -172,6 +177,7 @@ export function SchemaForm({
   submitDisabled = false,
   fieldLayout = "stack",
   fieldActions,
+  fieldRenderers,
 }: SchemaFormProps) {
   const { t } = useTranslation("common");
   const formId = useId();
@@ -331,12 +337,16 @@ export function SchemaForm({
       return (
         <Group key={key} align="flex-start" wrap="nowrap" gap="xs">
           <Box style={{ flex: 1, minWidth: 0 }}>
-            <FieldRouter
-              name={`${prefix}.${key}`}
-              schema={fieldSchema}
-              form={form}
-              i18nPrefix={i18nPrefix}
-            />
+            {fieldRenderers?.[key] ? (
+              fieldRenderers[key]({ name: prefix + "." + key, schema: fieldSchema, form })
+            ) : (
+              <FieldRouter
+                name={prefix + "." + key}
+                schema={fieldSchema}
+                form={form}
+                i18nPrefix={i18nPrefix}
+              />
+            )}
           </Box>
           {action}
         </Group>

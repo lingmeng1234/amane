@@ -154,6 +154,23 @@
         "label": "裁切海报",
         "description": "从封面自动裁切生成海报"
       },
+      "poster_face_crop": {
+        "label": "人脸定位裁剪",
+        "enabled": "启用人脸定位裁剪",
+        "description": "开启后，仅对勾选的刮削源启用人脸定位，并强制从封面裁切海报。",
+        "info": "说明",
+        "help": "必须同时开启上方的「裁切海报」和此总开关，并勾选对应刮削源。人脸模式会强制裁剪，不受旧版跳过阈值影响；检测到人脸时优先选择女性主体人脸，无脸或模型不可用时居中裁剪。人脸模式统一使用无码海报裁剪比例；未勾选的来源继续使用原有裁剪条件和有码/无码各自的比例。首次启用时会按需下载本地 SCRFD 与性别年龄模型。",
+        "sourceSelection": "刮削源选择（{{count}}/7）",
+        "sources": {
+          "10mususume": "10mususume",
+          "1pondo": "1pondo",
+          "caribbeancom": "Caribbeancom",
+          "pacopacomama": "Pacopacomama",
+          "caribbeancompr": "Caribbeancompr",
+          "d2pass": "D2Pass",
+          "heyzo": "Heyzo"
+        }
+      },
       "poster_crop_skip_ratio": {
         "label": "海报裁切跳过阈值比例",
         "description": "已有海报与封面高度之比超过此值则不裁切"

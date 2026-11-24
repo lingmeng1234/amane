@@ -154,6 +154,23 @@
         "label": "Crop Poster",
         "description": "Auto-crop poster from the cover image"
       },
+      "poster_face_crop": {
+        "label": "Face-guided Poster Cropping",
+        "enabled": "Enable face-guided poster cropping",
+        "description": "When enabled, face-guided cropping is used only for the selected scraping sources and forces a crop from the cover.",
+        "info": "Info",
+        "help": "Both the global Crop Poster switch and this switch must be enabled, and the actual cover source must be selected. Face mode forces cropping regardless of the legacy skip threshold. It prioritizes a female subject face; no face or unavailable models falls back to a centered crop. Face mode always uses the uncensored poster ratio. Unselected sources retain the legacy crop conditions and their separate censored/uncensored ratios. SCRFD and gender-age models are downloaded on demand for local inference.",
+        "sourceSelection": "Scraping source selection ({{count}}/7)",
+        "sources": {
+          "10mususume": "10mususume",
+          "1pondo": "1pondo",
+          "caribbeancom": "Caribbeancom",
+          "pacopacomama": "Pacopacomama",
+          "caribbeancompr": "Caribbeancompr",
+          "d2pass": "D2Pass",
+          "heyzo": "Heyzo"
+        }
+      },
       "poster_crop_skip_ratio": {
         "label": "Poster crop skip threshold",
         "description": "Skip cropping when the existing poster's height exceeds this fraction of the cover height"

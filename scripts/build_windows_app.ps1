@@ -73,6 +73,7 @@ $StdlibArgs = @()
     --collect-all pydantic_ai `
     --collect-all pydantic_graph `
     --collect-all genai_prices `
+    --collect-all onnxruntime `
     --hidden-import socksio `
     @StdlibArgs `
     --copy-metadata genai_prices `

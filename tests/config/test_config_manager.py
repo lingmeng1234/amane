@@ -911,3 +911,23 @@ class TestMosaicAndNfoConfig:
         assert config.tag.cover_attributes is False
         assert config.tag.tags is True
         assert config.tag.publisher is True
+
+
+class TestPosterFaceCropConfig:
+    def test_defaults_disabled_without_selected_sources(self):
+        config = ScrapingConfig()
+        assert config.poster_face_crop.enabled is False
+        assert config.poster_face_crop.sources == []
+
+    def test_source_selection_deduplicates_values(self):
+        config = ScrapingConfig.model_validate(
+            {"poster_face_crop": {"enabled": True, "sources": ["1pondo", "heyzo", "1pondo"]}}
+        )
+        assert config.poster_face_crop.enabled is True
+        assert config.poster_face_crop.sources == ["1pondo", "heyzo"]
+
+    def test_rejects_sources_outside_supported_face_crop_list(self):
+        with pytest.raises(ValidationError):
+            ScrapingConfig.model_validate(
+                {"poster_face_crop": {"enabled": True, "sources": ["tokyo_hot"]}}
+            )

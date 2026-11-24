@@ -427,18 +427,20 @@ class ScrapingConfig(BaseModel):
     """海报裁剪跳过阈值. 当 poster 候选高度已达 thumb 高度的此比例以上时, 视为候选够用, 不再从 thumb 裁剪
     (裁剪有错位风险, 非必要不做). 默认 0.9."""
 
-    poster_crop_detect_face: bool = True
-    """人脸检测总开关. 仅在裁切海报总开关开启且来源属于下方独立启用列表时生效."""
+    poster_crop_detect_face: bool = Field(
+        default=True,
+        description="人脸检测总开关. 仅在裁切海报总开关开启且来源属于下方独立启用列表时生效.",
+    )
 
     poster_crop_face_sources: list[str] = Field(
         default_factory=lambda: list(_POSTER_CROP_FACE_SOURCE_IDS),
+        description="允许使用人脸检测的无码来源; 其他来源和 Tokyo-Hot 始终沿用原有裁切方式.",
         json_schema_extra={
             "x-hidden": True,
             "x-ordered": True,
             "items": {"type": "string", "enum": list(_POSTER_CROP_FACE_SOURCE_IDS)},
         },
     )
-    """允许使用人脸检测的无码来源; 其他来源和 Tokyo-Hot 始终沿用原有裁切方式."""
 
     jpeg_quality: int = Field(default=95, ge=50, le=100, json_schema_extra={"x-hidden": True})
 

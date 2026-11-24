@@ -53,10 +53,12 @@ def _should_detect_face(
     config: "HotSettings",
     content_type: ContentType | None,
     source_id: str | None,
+    scrape_route: str | None,
 ) -> bool:
     """仅对明确启用的人脸检测来源生效；其他来源保留原有右侧裁切."""
     return (
         content_type == ContentType.UNCENSORED
+        and scrape_route == "uncensored_streaming"
         and config.scraping.poster_crop_detect_face
         and source_id is not None
         and source_id in config.scraping.poster_crop_face_sources
@@ -113,6 +115,7 @@ async def materialize_images(
     image_sources: dict[str, str] | None = None,
     force_crop_poster: bool = False,
     preserve_cover_resource: bool = False,
+    scrape_route: str | None = None,
 ) -> MaterializedImages:
     """仅下载集合内的类型; 未选中的图片类型保留聚合 URL.
 
@@ -180,7 +183,7 @@ async def materialize_images(
             else config.scraping.poster_ratio
         )
         source_id = image_sources.get(cover_src or "")
-        detect_face = _should_detect_face(config, content_type, source_id)
+        detect_face = _should_detect_face(config, content_type, source_id, scrape_route)
         # 关闭检测时沿用旧派生键，避免无意义地重建既有右侧裁切结果。
         args = f"{ratio:.4f}" + (":face=1" if detect_face else "")
         local_cover = cover_local

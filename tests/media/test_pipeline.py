@@ -26,12 +26,13 @@ def test_face_detection_is_limited_to_enabled_uncensored_sources():
     config.scraping.poster_crop_detect_face = True
     config.scraping.poster_crop_face_sources = ["heyzo"]
 
-    assert pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo")
-    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "tokyo_hot")
-    assert not pipeline_mod._should_detect_face(config, ContentType.CENSORED, "heyzo")
+    assert pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_streaming")
+    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "tokyo_hot", "uncensored_streaming")
+    assert not pipeline_mod._should_detect_face(config, ContentType.CENSORED, "heyzo", "uncensored_streaming")
+    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_dvd")
 
     config.scraping.poster_crop_detect_face = False
-    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo")
+    assert not pipeline_mod._should_detect_face(config, ContentType.UNCENSORED, "heyzo", "uncensored_streaming")
 
 
 class FakeClient:

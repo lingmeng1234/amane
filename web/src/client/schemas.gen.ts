@@ -9192,7 +9192,6 @@ export const ScrapingConfigSchema = {
             type: 'array',
             title: 'Poster Crop Face Sources',
             description: '允许使用人脸检测的无码来源; 其他来源和 Tokyo-Hot 始终沿用原有裁切方式.',
-            default: ['10musume', '1pondo', 'caribbeancom', 'pacopacomama', 'caribbeancompr', 'caribbeancom_index', 'd2pass', 'heyzo'],
             'x-hidden': true,
             'x-ordered': true
         },

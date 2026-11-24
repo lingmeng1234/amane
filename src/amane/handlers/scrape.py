@@ -492,6 +492,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
                         **(identity_metadata.image_sources if identity_metadata else {}),
                     },
                     preserve_cover_resource=cover_locked,
+                    scrape_route=route_key,
                 )
                 if not poster_locked:
                     poster_out = materialized.poster_urls

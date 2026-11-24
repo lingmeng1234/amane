@@ -36,6 +36,17 @@ _MODEL_BASE_URL = (
 )
 
 
+@lru_cache(maxsize=1)
+def _onnxruntime_available() -> bool:
+    """先确认运行时存在, 避免在不支持 ONNX Runtime 的平台无意义下载模型."""
+    try:
+        import onnxruntime  # noqa: F401
+    except Exception as exc:
+        logger.warning("onnxruntime unavailable; face crop will use center fallback", error=str(exc))
+        return False
+    return True
+
+
 def _matches_model(path: Path, expected_sha: str, expected_size: int) -> bool:
     if not path.is_file() or path.stat().st_size != expected_size:
         return False
@@ -224,6 +235,8 @@ class _Detector:
 @lru_cache(maxsize=1)
 def _detector() -> _Detector | None:
     """会话只建一次; 模型缺失或 onnxruntime 不可用时返回 None, 调用方退回固定裁剪."""
+    if not _onnxruntime_available():
+        return None
     model_path = _ensure_model("face_detect_scrfd.onnx")
     if model_path is None:
         return None
@@ -304,6 +317,8 @@ def _warp_affine_center(rgb: np.ndarray, center: tuple[float, float], scale: flo
 
 @lru_cache(maxsize=1)
 def _gender_model() -> _GenderModel | None:
+    if not _onnxruntime_available():
+        return None
     model_path = _ensure_model("face_detect_genderage.onnx")
     if model_path is None:
         return None

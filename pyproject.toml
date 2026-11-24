@@ -68,6 +68,10 @@ package = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/amane"]
+include = [
+    "src/amane/media/face_detect_scrfd.onnx",
+    "src/amane/media/face_detect_genderage.onnx",
+]
 
 [tool.hatch.build.targets.wheel.force-include]
 "resources/mapping_table/minnano_actress_map.json" = "amane/resources/minnano_actress_map.json"
@@ -85,8 +89,6 @@ packages = ["src/amane"]
 "src/amane/media/watermarks/480p.png" = "amane/media/watermarks/480p.png"
 "src/amane/media/watermarks/hd.png" = "amane/media/watermarks/hd.png"
 "src/amane/media/watermarks/sd.png" = "amane/media/watermarks/sd.png"
-"src/amane/media/face_detect_scrfd.onnx" = "amane/media/face_detect_scrfd.onnx"
-"src/amane/media/face_detect_genderage.onnx" = "amane/media/face_detect_genderage.onnx"
 
 [tool.hatch.build.targets.sdist]
 exclude = ["tests/", "docs/", "scripts/", "web/", ".github/"]

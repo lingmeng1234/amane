@@ -57,8 +57,7 @@ def _should_detect_face(
 ) -> bool:
     """仅对明确启用的人脸检测来源生效；其他来源保留原有右侧裁切."""
     return (
-        config.scraping.crop_poster
-        and content_type in (ContentType.UNCENSORED, ContentType.WESTERN)
+        content_type == ContentType.UNCENSORED
         and scrape_route == "uncensored_streaming"
         and config.scraping.poster_crop_detect_face
         and source_id is not None
@@ -126,16 +125,8 @@ async def materialize_images(
     """
     kinds = set(config.scraping.download_resources)
     image_sources = image_sources or {}
-    # 欧美常规来源不裁切; 但启用人脸识别的指定无码流媒体来源需要将封面裁成海报.
-    face_streaming_candidate = (
-        scrape_route == "uncensored_streaming"
-        and config.scraping.crop_poster
-        and config.scraping.poster_crop_detect_face
-        and any(image_sources.get(url) in config.scraping.poster_crop_face_sources for url in cover_urls)
-    )
-    can_crop_poster = (
-        content_type != ContentType.WESTERN and (config.scraping.crop_poster or force_crop_poster)
-    ) or face_streaming_candidate
+    # 欧美不使用封面裁剪生成海报，其他分类保持原有裁剪规则.
+    can_crop_poster = content_type != ContentType.WESTERN and (config.scraping.crop_poster or force_crop_poster)
 
     # 下载封面资源.
     cover_ok: set[str] = set()
@@ -178,12 +169,6 @@ async def materialize_images(
                 cover_local, cover_src = local, url
                 break
 
-    source_id = image_sources.get(cover_src or "")
-    detect_face = _should_detect_face(config, content_type, source_id, scrape_route)
-    # streaming 来源在既有逻辑中按 WESTERN 处理; 仅明确启用的人脸来源允许覆盖该不裁切规则.
-    if content_type == ContentType.WESTERN and scrape_route == "uncensored_streaming":
-        can_crop_poster = detect_face
-
     cover_size = probe_size(cover_local) if cover_local else None
     cand_size = probe_size(poster_candidate_local) if poster_candidate_local else None
 
@@ -194,9 +179,11 @@ async def materialize_images(
     ):
         ratio = (
             config.scraping.uncensored_poster_ratio
-            if content_type == ContentType.UNCENSORED or scrape_route == "uncensored_streaming"
+            if content_type == ContentType.UNCENSORED
             else config.scraping.poster_ratio
         )
+        source_id = image_sources.get(cover_src or "")
+        detect_face = _should_detect_face(config, content_type, source_id, scrape_route)
         # 关闭检测时沿用旧派生键，避免无意义地重建既有右侧裁切结果。
         args = f"{ratio:.4f}" + (":face=1" if detect_face else "")
         local_cover = cover_local

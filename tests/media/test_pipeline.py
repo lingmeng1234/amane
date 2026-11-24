@@ -140,6 +140,37 @@ async def test_uncensored_uses_its_own_poster_ratio(resource_store: ResourceStor
 
 
 @pytest.mark.asyncio
+async def test_selected_streaming_cover_uses_face_guided_crop(resource_store: ResourceStore, tmp_path: Path):
+    cover_url = "https://s/streaming-cover.jpg"
+    client = FakeClient({cover_url: (800, 538)})
+    cfg = HotSettings()
+    cfg.scraping.poster_crop_face_sources = ["heyzo"]
+
+    out = await materialize_images(
+        [],
+        [cover_url],
+        [],
+        resource_store,
+        cast("WebClient", client),
+        cfg,
+        tmp_path,
+        content_type=ContentType.WESTERN,
+        image_sources={cover_url: "heyzo"},
+        scrape_route="uncensored_streaming",
+    )
+
+    assert len(out.poster_urls) == 1
+    assert out.poster_urls[0].startswith(pipeline_mod.RESOURCE_URL_PREFIX)
+    assert out.cover_urls == [cover_url]
+    resource = await resource_store.get_by_url_hash(out.poster_urls[0].rsplit("/", 1)[-1])
+    assert resource is not None
+    crop_res, crop_path = resource
+    assert crop_res.meta is not None
+    assert crop_res.meta.get("args") == "0.8700:face=1"
+    assert Image.open(crop_path).size == (469, 538)
+
+
+@pytest.mark.asyncio
 async def test_poster_external_when_candidate_tall(resource_store: ResourceStore, tmp_path: Path):
     """poster 候选够高 → 不裁剪, poster 记外部 URL."""
     client = FakeClient(

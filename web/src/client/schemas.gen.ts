@@ -3361,9 +3361,8 @@ export const HotSettingsSchema = {
                         '1pondo',
                         'caribbeancom',
                         'pacopacomama',
+                        'heyzo',
                         'tokyo_hot',
-                        'caribbeancompr',
-                        'd2pass',
                         'avsox'
                     ],
                     western: [
@@ -3634,6 +3633,18 @@ export const HotSettingsSchema = {
                         use_proxy: true
                     },
                     hanime1: {
+                        cookie: {},
+                        languages: [
+                            'zh',
+                            'ja',
+                            'en'
+                        ],
+                        official_routes: {},
+                        rate_limit: 2,
+                        use_browser: 'auto',
+                        use_proxy: true
+                    },
+                    heyzo: {
                         cookie: {},
                         languages: [
                             'zh',
@@ -9192,6 +9203,7 @@ export const ScrapingConfigSchema = {
                         'getchu',
                         'giga',
                         'hanime1',
+                        'heyzo',
                         'iqqtv',
                         'jav321',
                         'javbus',
@@ -9275,6 +9287,7 @@ export const ScrapingConfigSchema = {
                         'getchu',
                         'giga',
                         'hanime1',
+                        'heyzo',
                         'iqqtv',
                         'jav321',
                         'javbus',
@@ -9345,6 +9358,7 @@ export const ScrapingConfigSchema = {
                         'getchu',
                         'giga',
                         'hanime1',
+                        'heyzo',
                         'iqqtv',
                         'jav321',
                         'javbus',
@@ -10053,6 +10067,7 @@ export const SiteNameSchema = {
         'gfriends',
         'giga',
         'hanime1',
+        'heyzo',
         'iqqtv',
         'jav321',
         'javbus',

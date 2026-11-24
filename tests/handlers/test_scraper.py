@@ -31,14 +31,24 @@ if TYPE_CHECKING:
 
 @pytest.mark.parametrize(
     "number",
-    ["102910_01", "051014_807", "103126-001", "101726_100", "N0001", "HEYZO-1234", "heyzo-1234"],
+    [
+        "102910_01",
+        "051014_807",
+        "103126-001",
+        "101726_100",
+        "N0001",
+        "HEYZO-1234",
+        "HEYZO-0119",
+        "HEYZO-3984",
+        "heyzo-1234",
+    ],
 )
 def test_uncensored_route_uses_full_number_rules(number: str) -> None:
     rules = ScrapingConfig().uncensored_streaming_number_rules
     assert _scrape_route_key(ContentType.UNCENSORED, number, rules) == "uncensored_streaming"
 
 
-@pytest.mark.parametrize("number", ["XHEYZO-1234", "HEYZO-12345", "RED-163", "102910_0123"])
+@pytest.mark.parametrize("number", ["XHEYZO-1234", "HEYZO-123", "HEYZO-12345", "RED-163", "102910_0123"])
 def test_uncensored_route_defaults_to_dvd_when_full_number_does_not_match(number: str) -> None:
     rules = ScrapingConfig().uncensored_streaming_number_rules
     assert _scrape_route_key(ContentType.UNCENSORED, number, rules) == "uncensored_dvd"
@@ -1049,9 +1059,8 @@ class TestContentRoutesFiltering:
             str(SiteName.PONDO),
             str(SiteName.CARIBBEANCOM),
             str(SiteName.PACOPACOMAMA),
+            str(SiteName.HEYZO),
             str(SiteName.TOKYO_HOT),
-            str(SiteName.CARIBBEANCOMPR),
-            str(SiteName.D2PASS),
             str(SiteName.AVSOX),
         ]
         assert routes[ContentType.CHINESE.value] == []

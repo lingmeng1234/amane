@@ -434,10 +434,17 @@ class TestScrapingPriorityMigration:
         assert routes[ContentType.HENTAI] == [SiteName.DMM, SiteName.HANIME1]
         assert routes[ContentType.WESTERN] == [SiteName.THEPORNDB]
         assert routes["uncensored_dvd"] == [SiteName.AVENTERTAINMENTS, SiteName.CARIBBEANCOM_INDEX, SiteName.AVSOX]
-        assert routes["uncensored_streaming"][0] == SiteName.TENMUSUME
-        assert routes["uncensored_streaming"].index(SiteName.CARIBBEANCOMPR) < routes["uncensored_streaming"].index(
-            SiteName.D2PASS
-        )
+        assert routes["uncensored_streaming"] == [
+            SiteName.TENMUSUME,
+            SiteName.PONDO,
+            SiteName.CARIBBEANCOM,
+            SiteName.PACOPACOMAMA,
+            SiteName.HEYZO,
+            SiteName.TOKYO_HOT,
+            SiteName.AVSOX,
+        ]
+        assert SiteName.CARIBBEANCOMPR not in routes["uncensored_streaming"]
+        assert SiteName.D2PASS not in routes["uncensored_streaming"]
         assert routes[ContentType.FC2] == [SiteName.FC2]
 
 

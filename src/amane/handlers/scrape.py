@@ -494,7 +494,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
         }
         # 旧刮削源未显式记录 image_sources 时, 以本次成功返回的流媒体来源补齐.
         # setdefault 保留刮削器明确给出的来源归属, 避免误把其他源图片算作当前源.
-        if face_crop_streaming:
+        if face_crop_streaming and selected_streaming_site is not None:
             for url in cover_input:
                 image_sources.setdefault(url, selected_streaming_site)
         if self._web_client is not None:

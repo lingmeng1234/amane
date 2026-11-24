@@ -468,15 +468,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
 
         # 锁定类型在物化前直接沿用现有资源, 不触发重新下载 / 超分 / 派生覆盖.
         original_poster_urls = list(result.metadata.poster_urls or [])
-        face_crop_streaming = (
-            route_key == "uncensored_streaming"
-            and selected_streaming_site is not None
-            and selected_streaming_site != str(SiteName.TOKYO_HOT)
-            and self._config.scraping.crop_poster
-            and self._config.scraping.poster_crop_detect_face
-        )
-        # 指定无码流媒体源的人脸裁切以封面为唯一候选; 若最终来源未启用检测, 下方回退到原封面 URL.
-        poster_input = [] if poster_locked or face_crop_streaming else list(result.metadata.poster_urls)
+        poster_input = [] if poster_locked else list(result.metadata.poster_urls)
         cover_input = [] if cover_locked else list(result.metadata.cover_urls)
         if cover_locked and identity_metadata is not None:
             cover_input = [] if poster_locked else list(identity_metadata.cover_urls)
@@ -504,8 +496,6 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
                 )
                 if not poster_locked:
                     poster_out = materialized.poster_urls
-                    if face_crop_streaming and not poster_out and not cover_locked:
-                        poster_out = list(result.metadata.original_poster_urls or result.metadata.cover_urls)
                     if cover_locked and not poster_out and identity_metadata is not None:
                         poster_out = list(identity_metadata.poster_urls)
                 trailer_out = materialized.trailer_urls

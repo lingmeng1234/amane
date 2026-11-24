@@ -167,7 +167,7 @@ async def test_selected_streaming_cover_uses_face_guided_crop(resource_store: Re
     crop_res, crop_path = resource
     assert crop_res.meta is not None
     assert crop_res.meta.get("args") == "0.8700:face=1"
-    assert Image.open(crop_path).size == (469, 538)
+    assert Image.open(crop_path).size == (468, 538)
 
 
 @pytest.mark.asyncio

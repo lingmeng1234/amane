@@ -358,6 +358,7 @@ class TestScrapeHandler:
         async def fake_materialize_images(*args, **kwargs):
             captured["content_type"] = kwargs["content_type"]
             captured["poster_input"] = args[0]
+            captured["image_sources"] = kwargs["image_sources"]
             return SimpleNamespace(
                 poster_urls=[],
                 cover_urls=[],
@@ -398,6 +399,7 @@ class TestScrapeHandler:
         assert result.success is True
         assert captured["content_type"] is ContentType.WESTERN
         assert captured["poster_input"] == []  # 人脸裁切模式以封面为唯一候选
+        assert captured["image_sources"]["https://example.com/streaming-cover.jpg"] == "1pondo"
 
         metadata = await repo.get_metadata_by_number("HEYZO-1234")
         assert metadata is not None

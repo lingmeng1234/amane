@@ -485,6 +485,15 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
         trailer_out = result.metadata.trailer_urls
         if self._web_client is not None:
             try:
+                image_sources = {
+                    **result.metadata.image_sources,
+                    **(identity_metadata.image_sources if identity_metadata else {}),
+                }
+                # 旧刮削源未显式记录 image_sources 时, 以本次选中的流媒体源补齐封面来源.
+                if face_crop_streaming and not cover_locked and selected_streaming_site is not None:
+                    for url in cover_input:
+                        image_sources.setdefault(url, selected_streaming_site)
+
                 materialized = await materialize_images(
                     poster_input,
                     cover_input,
@@ -495,10 +504,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
                     self._resource_store.data_dir,
                     content_type=image_content_type,
                     extrafanart_urls=result.metadata.extrafanart_urls,
-                    image_sources={
-                        **result.metadata.image_sources,
-                        **(identity_metadata.image_sources if identity_metadata else {}),
-                    },
+                    image_sources=image_sources,
                     preserve_cover_resource=cover_locked,
                     scrape_route=route_key,
                 )

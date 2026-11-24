@@ -25,6 +25,7 @@ def _onnxruntime_available() -> bool:
     """检测可选的 ONNX Runtime 依赖是否可用。"""
     return find_spec("onnxruntime") is not None
 
+
 def _model_path(filename: str) -> Path | None:
     """只从源码/发行包内读取模型；不执行任何网络下载或缓存回退。"""
     path = Path(__file__).with_name(filename)

@@ -324,7 +324,7 @@ function PosterFaceCropField({ name, form }: { name: string; form: SchemaFormIns
               <Switch
                 checked={enabled}
                 onChange={(event) => update({ enabled: event.currentTarget.checked })}
-                aria-label={t("fields.scraping.poster_face_crop.enabled")}
+                aria-label={t("fields.scraping.poster_face_crop.enabled.label")}
               />
             </Group>
 

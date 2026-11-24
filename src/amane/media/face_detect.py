@@ -94,6 +94,7 @@ def _ensure_model(filename: str) -> Path | None:
             logger.warning("face model unavailable", model=filename, error=str(exc))
             return None
 
+
 #: 输出按 stride 分组, 每组依次是 score / bbox / kps.
 _STRIDES_3 = (8, 16, 32)
 _STRIDES_5 = (8, 16, 32, 64, 128)

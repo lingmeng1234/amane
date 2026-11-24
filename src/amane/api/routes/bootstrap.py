@@ -26,8 +26,7 @@ CLI 可管理多个实例, 每个实例是一份 profile, 存在 CLI 配置文�
 
 2. 按本机系统与架构从 GitHub Releases 取 amane-{os}-{arch} 并校验 SHA256SUMS:
    https://github.com/sqzw-x/amane/releases/latest/download/amane-{os}-{arch}
-   只有 linux/darwin 的 amd64 与 arm64, 以及 Windows amd64 (加 .exe), 其余组合没有产物.
-   用 curl/wget 下载, 不要用浏览器: macOS 下浏览器会加隔离属性, 导致无法运行.
+   只有 Linux 的 amd64 与 arm64, 以及 Windows amd64 (加 .exe), 其余组合没有产物.
    chmod +x (Windows 无需), 放到第 3 步确定的位置.
 
 3. 就安装位置征求同意, 建议 PATH 内的路径, 例如 ~/.local/bin/amane

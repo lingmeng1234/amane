@@ -17,7 +17,7 @@ port := env("AMANE_PORT", "8000")
 
 # Sync Python + web deps; pull test fixtures; enable Git hooks
 # --replace-all 收敛 core.hooksPath 的多值残留: 普通 set 在该键已有多个取值时报错退出
-setup: sync fixtures
+setup: sync fixtures face-models
     git config --replace-all core.hooksPath scripts/githooks
 
 # Local: full Python (extras+dev+packaging) + web
@@ -34,6 +34,10 @@ _web-install:
 # 无访问权限时打印警告并跳过, 爬虫用例会 skip 但不阻断 setup/check.
 fixtures:
     uv run python scripts/fetch_fixtures.py
+
+# Fetch pinned InsightFace ONNX assets used by face-guided poster cropping.
+face-models:
+    uv run --no-sync python scripts/fetch_face_models.py
 
 # CI static job: frozen Python(dev+extras) + frozen web
 ci-sync: _ci-sync-python _web-install-ci
@@ -168,11 +172,11 @@ sync-zhcdict:
     uv run python scripts/sync_zhcdict.py
 
 # macOS-only: sync → web → frontend build → PyInstaller .app
-macos-app: sync build
+macos-app: sync face-models build
     bash scripts/build_macos_app.sh
 
 # Windows-only: sync → web → frontend build → PyInstaller onedir + Native AOT shell
-windows-app: sync build
+windows-app: sync face-models build
     pwsh -NoProfile -File scripts/build_windows_app.ps1
 
 # SPA 由服务端提供, 不依赖 web/dist; 无 androidapp/keystore.properties 时退回 debug 包

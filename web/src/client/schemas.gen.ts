@@ -6959,35 +6959,6 @@ export const MosaicRulesConfigSchema = {
     description: '视频文件名中的破解/流出识别词; 保存内容完全替代默认值.'
 } as const;
 
-export const PosterFaceCropConfigSchema = {
-    properties: {
-        enabled: {
-            type: 'boolean',
-            title: 'Enabled',
-            default: false
-        },
-        sources: {
-            items: {
-                type: 'string',
-                enum: [
-                    '10mususume',
-                    '1pondo',
-                    'caribbeancom',
-                    'pacopacomama',
-                    'caribbeancompr',
-                    'd2pass',
-                    'heyzo'
-                ]
-            },
-            type: 'array',
-            title: 'Sources'
-        }
-    },
-    type: 'object',
-    title: 'PosterFaceCropConfig',
-    description: '按实际封面来源启用人脸定位裁剪; 未勾选来源沿用旧裁剪规则.'
-} as const;
-
 export const MoveModeSchema = {
     type: 'string',
     enum: [
@@ -7862,6 +7833,35 @@ export const PluginResponseSchema = {
         'config_schema'
     ],
     title: 'PluginResponse'
+} as const;
+
+export const PosterFaceCropConfigSchema = {
+    properties: {
+        enabled: {
+            type: 'boolean',
+            title: 'Enabled',
+            default: false
+        },
+        sources: {
+            items: {
+                type: 'string',
+                enum: [
+                    '10mususume',
+                    '1pondo',
+                    'caribbeancom',
+                    'pacopacomama',
+                    'caribbeancompr',
+                    'd2pass',
+                    'heyzo'
+                ]
+            },
+            type: 'array',
+            title: 'Sources'
+        }
+    },
+    type: 'object',
+    title: 'PosterFaceCropConfig',
+    description: '按实际封面来源启用人脸定位裁剪; 未勾选来源沿用旧裁剪规则.'
 } as const;
 
 export const R18ConfigSchema = {

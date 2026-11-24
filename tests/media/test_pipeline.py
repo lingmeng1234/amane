@@ -694,7 +694,6 @@ async def test_force_crop_uses_cached_locked_cover_without_reacquiring(resource_
     assert client.downloaded == [url]
 
 
-
 @pytest.mark.asyncio
 async def test_face_crop_for_selected_source_forces_crop_and_uses_uncensored_ratio(
     resource_store: ResourceStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

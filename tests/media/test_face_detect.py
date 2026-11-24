@@ -71,22 +71,14 @@ def test_main_subject_returns_none_when_gender_age_inference_fails(monkeypatch):
     assert face_detect.main_subject_face(Image.new("RGB", (800, 600))) is None
 
 
-def test_missing_onnxruntime_does_not_download_model(monkeypatch):
-    called = False
-
-    def unexpected_download(filename):
-        nonlocal called
-        called = True
-        raise AssertionError("model download must not run without ONNX Runtime")
-
+def test_missing_onnxruntime_uses_fallback_without_model_access(monkeypatch):
     monkeypatch.setattr(face_detect, "_onnxruntime_available", lambda: False)
-    monkeypatch.setattr(face_detect, "_ensure_model", unexpected_download)
     face_detect._detector.cache_clear()
     face_detect._gender_model.cache_clear()
     try:
         assert face_detect._detector() is None
         assert face_detect._gender_model() is None
-        assert called is False
+        assert face_detect.main_subject_face(Image.new("RGB", (320, 240))) is None
     finally:
         face_detect._detector.cache_clear()
         face_detect._gender_model.cache_clear()

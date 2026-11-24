@@ -159,7 +159,8 @@ interface SchemaFormProps {
    */
   fieldActions?: (fieldKey: string, setValue: (value: unknown) => void) => ReactNode;
   /** Optional content rendered directly below a field, before the next field row. */
-  afterField?: (fieldKey: string) => ReactNode;
+  afterField?: ReactNode | ((fieldKey: string) => ReactNode);
+  afterFieldKey?: string;
 }
 
 export function SchemaForm({
@@ -176,6 +177,7 @@ export function SchemaForm({
   fieldLayout = "stack",
   fieldActions,
   afterField,
+  afterFieldKey,
 }: SchemaFormProps) {
   const { t } = useTranslation("common");
   const formId = useId();
@@ -345,7 +347,7 @@ export function SchemaForm({
             </Box>
             {action}
           </Group>
-          {afterField?.(key)}
+          {typeof afterField === "function" ? afterField(key) : afterFieldKey === key ? afterField : null}
         </Stack>
       );
     });

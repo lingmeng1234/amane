@@ -21,7 +21,7 @@ import {
 } from "@mantine/core";
 import { IconAlertCircle, IconChevronDown, IconInfoCircle, IconPlugConnected, IconRefresh } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { isHidden, resolveSchema, type JSONSchemaObject } from "@/components/schema-form/schema";
@@ -143,10 +143,6 @@ function FaceDetectionSourceSettings({
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState<string[]>(savedSources);
   const [confirmOpen, setConfirmOpen] = useState(false);
-
-  useEffect(() => {
-    setDraft(savedSources);
-  }, [savedSources]);
 
   const changed =
     draft.length !== savedSources.length ||
@@ -519,6 +515,9 @@ function SettingsPage() {
               if (!sectionSchema || typeof sectionSchema === "boolean") return null;
               // Schema 顶层 key 运行时才知; 桥接到按 section 切分的表单 values.
               const sectionValues = (values as Record<string, Record<string, unknown>>)[key] ?? {};
+              const savedFaceSources = Array.isArray(sectionValues.poster_crop_face_sources)
+                ? (sectionValues.poster_crop_face_sources as string[])
+                : POSTER_FACE_SOURCES.map((source) => source.id);
 
               return (
                 <Paper key={key} withBorder p="md">
@@ -584,25 +583,20 @@ function SettingsPage() {
                         i18nPrefix="settings:fields"
                         actionsPlacement="affix"
                         fieldActions={key === "scraping" ? scrapingFieldActions : undefined}
+                        afterFieldKey={key === "scraping" ? "poster_crop_detect_face" : undefined}
                         afterField={
-                          key === "scraping"
-                            ? (field) =>
-                                field === "poster_crop_detect_face" ? (
-                                  <FaceDetectionSourceSettings
-                                    savedSources={
-                                      Array.isArray(sectionValues.poster_crop_face_sources)
-                                        ? (sectionValues.poster_crop_face_sources as string[])
-                                        : POSTER_FACE_SOURCES.map((source) => source.id)
-                                    }
-                                    saving={saveMutation.isPending}
-                                    onSave={(sources) =>
-                                      saveMutation.mutate({
-                                        body: { scraping: { poster_crop_face_sources: sources } },
-                                      })
-                                    }
-                                  />
-                                ) : null
-                            : undefined
+                          key === "scraping" ? (
+                            <FaceDetectionSourceSettings
+                              key={savedFaceSources.join("|")}
+                              savedSources={savedFaceSources}
+                              saving={saveMutation.isPending}
+                              onSave={(sources) =>
+                                saveMutation.mutate({
+                                  body: { scraping: { poster_crop_face_sources: sources } },
+                                })
+                              }
+                            />
+                          ) : undefined
                         }
                         onSave={(patch) => saveMutation.mutate({ body: { [key]: patch } })}
                         saving={saveMutation.isPending}

@@ -1,3 +1,5 @@
+from typing import cast
+
 from amane.crawlers.sites.avsox import _pick_movie_id
 
 
@@ -6,7 +8,7 @@ def test_pick_movie_id_rejects_different_dash_layout() -> None:
         {"movieFanHao": "0712250-01", "movieId": "wrong"},
         {"movieFanHao": "071225-001", "movieId": "right"},
     ]
-    assert _pick_movie_id(movies, "071225-001") == "right"
+    assert _pick_movie_id(cast(list[object], movies), "071225-001") == "right"
 
 
 def test_pick_movie_id_keeps_undashed_compatibility() -> None:

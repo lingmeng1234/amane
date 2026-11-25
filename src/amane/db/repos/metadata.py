@@ -867,7 +867,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
             )
             await session.commit()
             await session.refresh(metadata)
-            assert metadata.id is not None
+        assert metadata.id is not None
         if images_changed:
             await self.notify_media_changed(metadata.id)
         return metadata

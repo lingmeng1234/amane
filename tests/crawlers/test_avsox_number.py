@@ -13,4 +13,4 @@ def test_pick_movie_id_rejects_different_dash_layout() -> None:
 
 def test_pick_movie_id_keeps_undashed_compatibility() -> None:
     movies = [{"movieFanHao": "ABF355", "movieId": "same"}]
-    assert _pick_movie_id(movies, "ABF-355") == "same"
+    assert _pick_movie_id(cast(list[object], movies), "ABF-355") == "same"

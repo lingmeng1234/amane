@@ -11,11 +11,7 @@ if TYPE_CHECKING:
 
 class _Web:
     async def get_text(self, url: str, **kwargs: object) -> str:
-        return (
-            '<div class="category-page video-list-item">'
-            '<a href="/0712250-01">near match</a>'
-            "</div>"
-        )
+        return '<div class="category-page video-list-item"><a href="/0712250-01">near match</a></div>'
 
 
 @pytest.mark.asyncio

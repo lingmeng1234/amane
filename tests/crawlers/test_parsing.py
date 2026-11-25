@@ -173,6 +173,11 @@ def test_parse_western_number(number: str, expected: tuple[str, str, str, str] |
         # 大小写与短横线 / 空格无关
         ("ABF355", "ABF-355", True),
         ("Heyzo-3607", "HEYZO3607", True),
+        # 折叠后相同但短横线位置不同, 仍是不同作品
+        ("071225-001", "0712250-01", False),
+        ("JAC-079", "JAC0-79", False),
+        ("ABF-355", "ABF3-55", False),
+        ("SSIS-497", "SSIS4-97", False),
         # 前缀与相近番号不是同一部
         ("ABF-35", "ABF-355", False),
         ("SSIS-497", "SSIS-4970", False),
@@ -203,8 +208,16 @@ def test_is_same_number(left: str, right: str, expected: bool) -> None:
 
 
 NUMBER_MATCH_CASES: list[tuple[str, str, NumberMatch]] = [
-    # 折叠后相等
+    # 一侧不带短横线时保留宽松兼容
     ("ABF355", "ABF-355", NumberMatch.EXACT),
+    ("071225001", "071225-001", NumberMatch.EXACT),
+    ("HEYZO3607", "HEYZO-3607", NumberMatch.EXACT),
+    # 两侧都有短横线但位置不同, 折叠后同串也不命中
+    ("071225-001", "0712250-01", NumberMatch.NONE),
+    ("JAC-079", "JAC0-79", NumberMatch.NONE),
+    ("ABF-355", "ABF3-55", NumberMatch.NONE),
+    ("SSIS-497", "SSIS4-97", NumberMatch.NONE),
+    ("071225-001", "0712-25001", NumberMatch.NONE),
     ("Heyzo-3607", "HEYZO3607", NumberMatch.EXACT),
     # 欧美日期号: 只忽略片商大小写, 空格与标点必须一致
     ("Blacked.2026.03.29", "Blacked.26.03.29", NumberMatch.EXACT),
@@ -250,6 +263,7 @@ def test_number_match(found: str, query: str, expected: NumberMatch) -> None:
 SELECT_NUMBER_CASES: list[tuple[list[str], str, int | None]] = [
     # 精确命中优先于宽松命中, 即使它排在后面
     (["JAC-078", "JAC-079", "390JAC-079"], "JAC-079", 1),
+    (["0712250-01", "071225-001"], "071225-001", 1),
     # 只剩站点省略数字段这一种可能时取它
     (["JAC-078", "JAC-079"], "390JAC-079", 1),
     (["HYPN-038", "HYPN-037"], "107HYPN-037", 1),

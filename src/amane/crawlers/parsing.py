@@ -129,6 +129,7 @@ def fold_number(number: str) -> str:
     """大小写、短横线、空格视为同一番号, 供来源比对检索结果.
 
     不允许把 ``_`` 当作 ``-``: 010115_001 与 010115-001 是两部片.
+    折叠会丢失短横线位置, 因此折叠结果相等仍须经 number_match 判断结构.
     """
     return number.casefold().replace("-", "").replace(" ", "")
 
@@ -196,6 +197,20 @@ def _split_leading_digits(number: str) -> tuple[str, str]:
     return (match.group(), folded[match.end() :]) if match else ("", folded)
 
 
+def _number_structure(number: str) -> tuple[str, ...]:
+    """按短横线切段并折叠各段; 首段开头数字段不参与结构比较."""
+    segments = [fold_number(segment) for segment in number.split("-")]
+    _digits, head = _split_leading_digits(segments[0])
+    return (head, *segments[1:])
+
+
+def _same_dash_layout(left: str, right: str) -> bool:
+    """两侧都有短横线时, 其位置结构必须一致; 一侧无短横线时保留宽松兼容."""
+    if "-" not in left or "-" not in right:
+        return True
+    return _number_structure(left) == _number_structure(right)
+
+
 #: FC2 番号: 官方电子市场写 ``FC2-PPV-<id>``, 索引站多写 ``FC2-<id>``. 对折叠后的串匹配, 分隔符只可能剩 ``_``.
 _FC2_NUMBER = re.compile(r"^fc2(?:_?ppv)?_?(\d+)$")
 
@@ -250,7 +265,8 @@ def number_match(found: str, query: str) -> NumberMatch:
     """
     if not found or not query:
         return NumberMatch.NONE
-    if fold_number(found) == fold_number(query):
+    same_layout = _same_dash_layout(found, query)
+    if same_layout and fold_number(found) == fold_number(query):
         return NumberMatch.EXACT
     if (article_id := fc2_article_id(found)) is not None and article_id == fc2_article_id(query):
         return NumberMatch.EXACT
@@ -259,7 +275,7 @@ def number_match(found: str, query: str) -> NumberMatch:
         return NumberMatch.EXACT
     found_digits, found_rest = _split_leading_digits(found)
     query_digits, query_rest = _split_leading_digits(query)
-    if found_rest == query_rest and not (found_digits and query_digits):
+    if same_layout and found_rest == query_rest and not (found_digits and query_digits):
         return NumberMatch.WITHOUT_LEADING_DIGITS
     return NumberMatch.NONE
 

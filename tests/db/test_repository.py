@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, get_type_hints
 
 import pytest
+from sqlalchemy.pool import QueuePool
 from sqlmodel import select
 
 from amane.aggregate.actor import AggregatedActor
@@ -2762,3 +2763,35 @@ class TestOshashSubmissionRepo:
         uncertain_row = await repo.get_oshash_submission(uncertain_id)
         assert uncertain_row is not None
         assert uncertain_row.status == OshashSubmissionStatus.UNCERTAIN
+
+
+class TestMediaHookOutsideWriteSession:
+    """媒体通知会另开连接回查, 必须在元数据写会话退出后触发."""
+
+    @pytest.mark.asyncio(loop_scope="function")
+    @pytest.mark.parametrize("write", ["upsert_existing", "upsert_new", "update"])
+    async def test_hook_runs_after_session_closes(self, repo: Repository, write: str) -> None:
+        seeded = await repo.upsert_metadata(number="HOOK-001", studio="S")
+        assert seeded.id is not None
+        poster_urls = ["https://example.com/1.jpg"]
+        checked_out_during_hook: list[int] = []
+
+        class _Hook:
+            async def metadata_changed(self, metadata_id: int) -> None:
+                pool = cast("QueuePool", repo._engine.pool)
+                checked_out_during_hook.append(pool.checkedout())
+                rows, _total = await repo.list_metadata(ids=[metadata_id], limit=1)
+                assert rows
+
+        repo.set_media_hook(_Hook())
+        try:
+            if write == "upsert_existing":
+                await repo.upsert_metadata(number="HOOK-001", poster_urls=poster_urls)
+            elif write == "upsert_new":
+                await repo.upsert_metadata(number="HOOK-002", poster_urls=poster_urls)
+            else:
+                await repo.update_metadata(seeded.id, poster_urls=poster_urls)
+        finally:
+            repo.set_media_hook(None)
+
+        assert checked_out_during_hook == [0], "通知触发时写会话应已关闭"

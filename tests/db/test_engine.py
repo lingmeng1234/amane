@@ -2,6 +2,7 @@
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 from sqlmodel import select
 
 from amane.db.engine import create_async_engine_from_path, get_session
@@ -58,6 +59,8 @@ _ENGINE_PRAGMAS: dict[str, object] = {
 async def test_engine_connection_pragmas(db_path):
     """池里每个连接都应用同一套 PRAGMA, 而不只是第一个."""
     engine = await create_async_engine_from_path(db_path)
+    assert isinstance(engine.sync_engine.pool, AsyncAdaptedQueuePool)
+    assert engine.sync_engine.pool.size() == 5
     async with get_session(engine) as first, get_session(engine) as second:
         # 两个会话同时持有各自连接, 后者不会是池里复用的那一个
         for session in (first, second):

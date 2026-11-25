@@ -114,7 +114,7 @@
 | fc2ppvdb | fc2ppvdb.com | FC2 | | 可能被 Cloudflare 拦截, 拦截时由后续站点补位 |
 | fc2 | adult.contents.fc2.com | FC2 | | FC2 官方市场; 已下架的商品视为无此番号 |
 | airav | airav.io | | | 中文标题, 可手动加入需要的路由 |
-| iqqtv | iqq5.xyz | | | 国产站, 可手动加入需要的路由; 按「字段语言偏好」请求对应语言的页面 |
+| iqqtv | iqqbl.com | | | 国产站, 可手动加入需要的路由; 按「字段语言偏好」请求对应语言的页面 |
 | mgstage | mgstage.com | 有码、素人 | | 素人第一来源; 素人影片不记录站内化名为演员 |
 | theporndb | theporndb.net | 欧美 | :material-check: | 需要 API Token; 新文件按 OSHASH 匹配, 重新刮削 / 手动兜底可指定 Scene ID; 指纹未命中不按重复番号猜测 |
 | getchu | getchu.com | 动漫 | | 动漫第一来源 |

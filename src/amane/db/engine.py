@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 from .profiling import DbLogPolicy, install_profiling
 from .sqlite_migrate import upgrade_sqlite_database
@@ -30,18 +31,48 @@ async def create_async_engine_from_path(db_path: Path | str, *, policy: DbLogPol
         raise RuntimeError(f"Database migration failed: {e}") from e
 
     url = f"sqlite+aiosqlite:///{path}"
-    engine = create_async_engine(url, echo=False)
+    # 显式使用异步队列池, 避免每个 Session 都新建连接并重复初始化 WAL.
+    engine = create_async_engine(
+        url,
+        echo=False,
+        poolclass=AsyncAdaptedQueuePool,
+        pool_size=5,
+        max_overflow=5,
+        pool_timeout=30,
+        pool_recycle=1800,
+    )
+
+    @event.listens_for(engine.sync_engine, "first_connect")
+    def _initialize_journal_mode(dbapi_conn, connection_record):
+        # journal_mode 是数据库级持久设置, 每个连接池只初始化一次.
+        # 必须先设 busy_timeout: WAL 切换需要短暂排他锁, 多 worker 同时启动时可能竞争.
+        cursor = dbapi_conn.cursor()
+        try:
+            cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+            try:
+                cursor.execute("PRAGMA journal_mode=WAL")
+                mode = cursor.fetchone()
+                if not mode or str(mode[0]).casefold() != "wal":
+                    raise RuntimeError(f"SQLite refused WAL mode: {mode!r}")
+            except Exception as exc:
+                raise RuntimeError(
+                    f"无法将数据库 {path} 初始化为 WAL 模式: {exc}. "
+                    "请先停止所有 Amane 实例, 再检查数据库 WAL 状态; 可执行 "
+                    f'sqlite3 "{path}" "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA integrity_check;"'
+                ) from exc
+        finally:
+            cursor.close()
 
     @event.listens_for(engine.sync_engine, "connect")
     def _set_sqlite_pragma(dbapi_conn, connection_record):
-        # 这些设置都是连接级的: 每个新连接都必须重设, 漏设即退回驱动默认.
+        # 以下 PRAGMA 是连接级设置, 每条新连接都必须应用.
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        # WAL 下掉电最多丢最近若干已提交事务且不损坏库, 换来提交不再逐笔 fsync.
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+        try:
+            cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
 
     if policy is not None:
         install_profiling(engine, policy)

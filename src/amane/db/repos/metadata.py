@@ -852,6 +852,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
         **kwargs: Unpack[MetadataFields],
     ) -> Metadata:
         """独立事务入口; 统一收尾流程应调用 upsert_western_metadata_in_session()."""
+        images_changed = False
         async with self._session() as session:
             connection = await session.connection()
             await connection.exec_driver_sql("BEGIN IMMEDIATE")
@@ -867,9 +868,9 @@ class MetadataRepoMixin(RepositoryMixinBase):
             await session.commit()
             await session.refresh(metadata)
             assert metadata.id is not None
-            if images_changed:
-                await self.notify_media_changed(metadata.id)
-            return metadata
+        if images_changed:
+            await self.notify_media_changed(metadata.id)
+        return metadata
 
     async def finalize_western_scrape(
         self,
@@ -988,6 +989,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
                 dict.fromkeys(n.strip() for n in fields["series_names"] if isinstance(n, str) and n.strip())
             )
             fields["series"] = fields["series_names"][0] if fields["series_names"] else None
+        images_changed = False
         async with self._session() as session:
             # pysqlite 只在 DML 之前发出 BEGIN; 判定与写入必须处于同一写事务.
             connection = await session.connection()
@@ -1024,9 +1026,8 @@ class MetadataRepoMixin(RepositoryMixinBase):
                 await session.commit()
                 await session.refresh(existing)
                 assert existing.id is not None
-                if _image_signature(existing) != before:
-                    await self.notify_media_changed(existing.id)
-                return existing
+                images_changed = _image_signature(existing) != before
+                metadata = existing
             meta = Metadata(number=number, content_type=resolved_type, **fields)
             session.add(meta)
             await session.flush()
@@ -1036,9 +1037,11 @@ class MetadataRepoMixin(RepositoryMixinBase):
             await session.commit()
             await session.refresh(meta)
             assert meta.id is not None
-            if any(_image_signature(meta)):
-                await self.notify_media_changed(meta.id)
-            return meta
+            images_changed = any(_image_signature(meta))
+            metadata = meta
+        if images_changed:
+            await self.notify_media_changed(metadata.id)
+        return metadata
 
     async def update_metadata(
         self,
@@ -1050,6 +1053,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
     ) -> Metadata | None:
         """不存在返回 None; 写入策略见 WriteMode."""
         updates = _normalize_text_fields(updates)
+        images_changed = False
         async with self._session() as session:
             metadata = await session.get(Metadata, metadata_id)
             if metadata is None:
@@ -1162,9 +1166,10 @@ class MetadataRepoMixin(RepositoryMixinBase):
             await sync_metadata_facets(session, metadata)
             await session.commit()
             await session.refresh(metadata)
-            if _image_signature(metadata) != before:
-                await self.notify_media_changed(metadata_id)
-            return metadata
+            images_changed = _image_signature(metadata) != before
+        if images_changed:
+            await self.notify_media_changed(metadata_id)
+        return metadata
 
     async def set_metadata_locks(self, metadata_id: int, fields: Collection[MetadataField]) -> Metadata | None:
         """整体替换锁定字段集合, 不修改 ``updated_at``. 不存在返回 None."""

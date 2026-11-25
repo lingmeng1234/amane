@@ -1,5 +1,3 @@
-from parsel import Selector
-
 """iqqtv 的语言前缀与失效域名判定; 解析用例见 cases/iqqtv/ 下的数据驱动 TOML.
 
 站点按 ``Accept-Language`` 判定访问者地区: 落在中国大陆以外时非中文取值对任何语言前缀都回 404 空页,
@@ -12,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from parsel import Selector
 
 from amane.crawlers.http import HttpClient
 from amane.crawlers.models import FetchOptions, SearchQuery

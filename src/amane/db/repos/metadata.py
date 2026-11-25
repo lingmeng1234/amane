@@ -1040,6 +1040,7 @@ class MetadataRepoMixin(RepositoryMixinBase):
                 assert meta.id is not None
                 images_changed = any(_image_signature(meta))
                 metadata = meta
+        assert metadata.id is not None
         if images_changed:
             await self.notify_media_changed(metadata.id)
         return metadata

@@ -1028,17 +1028,18 @@ class MetadataRepoMixin(RepositoryMixinBase):
                 assert existing.id is not None
                 images_changed = _image_signature(existing) != before
                 metadata = existing
-            meta = Metadata(number=number, content_type=resolved_type, **fields)
-            session.add(meta)
-            await session.flush()
-            await clean_actor_names(session, meta, actor_genders)
-            await apply_facet_rules_to_metadata(session, meta)
-            await sync_metadata_facets(session, meta)
-            await session.commit()
-            await session.refresh(meta)
-            assert meta.id is not None
-            images_changed = any(_image_signature(meta))
-            metadata = meta
+            else:
+                meta = Metadata(number=number, content_type=resolved_type, **fields)
+                session.add(meta)
+                await session.flush()
+                await clean_actor_names(session, meta, actor_genders)
+                await apply_facet_rules_to_metadata(session, meta)
+                await sync_metadata_facets(session, meta)
+                await session.commit()
+                await session.refresh(meta)
+                assert meta.id is not None
+                images_changed = any(_image_signature(meta))
+                metadata = meta
         if images_changed:
             await self.notify_media_changed(metadata.id)
         return metadata

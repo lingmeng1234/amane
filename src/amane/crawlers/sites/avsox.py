@@ -177,7 +177,6 @@ class AvsoxCrawler(Crawler):
 def _pick_movie_id(movies: list[object], number: str) -> str | None:
     exact = number.casefold()
     folded_hit: str | None = None
-    folded_hit: str | None = None
     for item in movies:
         if not isinstance(item, dict):
             continue

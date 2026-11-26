@@ -163,7 +163,7 @@ Amane 不是 Emby / Jellyfin 的替代品, 而是它们的元数据补充: 媒�
 
 ## 开始使用
 
-桌面版 (macOS / Windows) 与 Android 客户端见 [Releases](https://github.com/lingmeng1234/aname/releases), Docker 镜像为 `ghcr.io/lingmeng1234/amane`. 安装步骤、使用说明与常见问题见 [用户文档](https://sqzw-x.github.io/amane/).
+Windows 桌面版与 Android 客户端见 [Releases](https://github.com/lingmeng1234/aname/releases), Docker 镜像为 `ghcr.io/lingmeng1234/amane`. 当前定制版不提供 macOS 客户端。 安装步骤、使用说明与常见问题见 [用户文档](https://sqzw-x.github.io/amane/).
 
 ## 社区生态
 
@@ -181,7 +181,7 @@ just dev     # 启动 API (:8000) 与前端开发服务器
 just check   # lint + typecheck + 测试
 ```
 
-技术栈: FastAPI · React + Mantine · SQLite · Swift / .NET 桌面壳 · Kotlin Android 壳. 开发入口见 [AGENTS.md](AGENTS.md).
+技术栈: FastAPI · React + Mantine · SQLite · .NET Windows 桌面壳 · Kotlin Android 壳. 开发入口见 [AGENTS.md](AGENTS.md).
 
 ## 相关项目
 

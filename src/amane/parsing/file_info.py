@@ -202,22 +202,6 @@ SUREN_LABELS: dict[str, str] = {
     "MAAN-": "300",
 }
 
-_WESTERN_NAMES: dict[str, str] = {
-    "vixen": "Vixen",
-    "blacked": "Blacked",
-    "tushy": "Tushy",
-    "sexart": "SexArt",
-    "x-art": "X-Art",
-    "nubilefilms": "NubileFilms",
-    "babes": "Babes",
-    "wgp": "WhenGirlsPlay",
-    "twistys": "Twistys",
-    "deeper": "Deeper",
-    "slayed": "Slayed",
-    "tushy raw": "TushyRaw",
-    "blackedraw": "BlackedRaw",
-}
-
 _CATALOG_NUMBER = re.compile(r"[A-Z]{2,}-\d{2,}[Z]?")
 #: 字母与数字同在前缀内的番号 (R18-292). 过宽回退会匹配其中的 18-292, 因此须在其之前按整段提取.
 _DIGIT_PREFIX_CATALOG = re.compile(r"[A-Z]{1,4}\d{1,4}-\d{2,4}[A-Z]?")
@@ -592,16 +576,10 @@ def _match(basename: str, escape_strings: list[str], *, generic: bool) -> tuple[
         if result:
             # 日期前最后一个短横线之前的内容属于文件名前缀, 不纳入片库番号.
             normalized_studio = result[0][0].strip()
-            short_name = normalized_studio.lower()
-            canonical_name = _WESTERN_NAMES.get(short_name)
-            if canonical_name is not None:
-                # 已登记厂牌继续使用既有规范名称, 不改变厂牌规范化规则.
-                studio_name = canonical_name
-            else:
-                # 仅保存时从原始文件名取厂商大小写.
-                raw_match = re.search(_WESTERN_PARSE.pattern, basename, re.IGNORECASE)
-                raw_studio = raw_match.group(1).strip() if raw_match else normalized_studio
-                studio_name = raw_studio.replace(".", "")
+            # 厂商名称直接保留文件名中的原始写法, 不再由硬编码表覆盖大小写或空格.
+            raw_match = re.search(_WESTERN_PARSE.pattern, basename, re.IGNORECASE)
+            raw_studio = raw_match.group(1).strip() if raw_match else normalized_studio
+            studio_name = raw_studio.replace(".", "")
             number = studio_name + "." + result[0][1].replace("-", ".")
             return number, ContentType.WESTERN
     # 其余规则用 catalog.

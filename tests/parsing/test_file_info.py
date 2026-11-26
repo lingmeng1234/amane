@@ -428,8 +428,25 @@ def test_western_dated_number_preserves_original_case() -> None:
     assert parse_file_info(text="lAnCeLoTStylesEvolution.26.04.05").number == "lAnCeLoTStylesEvolution.26.04.05"
 
 
-def test_western_dated_known_studio_keeps_canonical_name() -> None:
-    assert parse_file_info("vIxEn.23.04.15.mp4").number == "Vixen.23.04.15"
+@pytest.mark.parametrize(
+    "studio",
+    [
+        "vixen",
+        "blacked",
+        "tushy",
+        "sexart",
+        "nubilefilms",
+        "babes",
+        "wgp",
+        "twistys",
+        "deeper",
+        "slayed",
+        "tushy raw",
+        "blackedraw",
+    ],
+)
+def test_western_dated_studio_preserves_original_name(studio: str) -> None:
+    assert parse_file_info(f"{studio}.23.04.15.mp4").number == f"{studio}.23.04.15"
 
 
 @pytest.mark.parametrize(

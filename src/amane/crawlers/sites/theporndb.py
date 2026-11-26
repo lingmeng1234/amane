@@ -114,7 +114,20 @@ class ThePornDBCrawler(Crawler):
             return None
 
         scene = await self._search_scene(query, token)
-        return self._scene_to_metadata(scene) if scene is not None else None
+        if scene is None:
+            return None
+
+        # REST Movie 关联仅用于补充 series; 不读取 Movie 的其它字段.
+        # 复制 Scene, 避免把临时 REST 数据写回搜索结果对象或共享测试 fixture.
+        scene = dict(scene)
+        if "_tpdb_rest_details" not in scene:
+            scene_id = str(scene.get("id") or "")
+            scene["_tpdb_rest_details"] = (
+                await self._scene_rest_details(scene_id, {"Authorization": f"Bearer {token}"})
+                if scene_id
+                else None
+            )
+        return self._scene_to_metadata(scene)
 
     async def _search(self, query: SearchQuery, options: FetchOptions | None = None) -> str | None:
         """与 ``fetch`` 共用检索流程与命中判据."""
@@ -139,6 +152,8 @@ class ThePornDBCrawler(Crawler):
             scene = _gql_field(data, "findScene")
             if isinstance(scene, dict) and str(scene.get("id") or "").casefold() == query.theporndb_uuid.casefold():
                 details = await self._scene_rest_details(str(scene.get("id") or query.theporndb_uuid), headers)
+                scene = dict(scene)
+                scene["_tpdb_rest_details"] = details
                 scene["_tpdb_oshashes"] = _extract_oshashes(details)
                 return scene
             return None
@@ -210,6 +225,8 @@ class ThePornDBCrawler(Crawler):
                 selected = scenes[0]
                 scene_id = str(selected.get("id") or "")
                 details = await self._scene_rest_details(scene_id, headers) if scene_id else None
+                selected = dict(selected)
+                selected["_tpdb_rest_details"] = details
                 selected["_tpdb_oshashes"] = _extract_oshashes(details)
                 return selected
 
@@ -224,6 +241,8 @@ class ThePornDBCrawler(Crawler):
                     details = await self._scene_rest_details(scene_id, headers)
                     if details is None:
                         return None
+                    candidate = dict(candidate)
+                    candidate["_tpdb_rest_details"] = details
                     hashes = _extract_oshashes(details)
                     if query.file_hash.strip().casefold() in {value.casefold() for value in hashes}:
                         matched.append((candidate, hashes))
@@ -286,6 +305,8 @@ class ThePornDBCrawler(Crawler):
         scene = _gql_field(data, "findScene")
         if not isinstance(scene, dict):
             return None
+        scene = dict(scene)
+        scene["_tpdb_rest_details"] = await self._scene_rest_details(scene_id, headers)
         return self._scene_to_metadata(scene)
 
     def _gql_url(self, content_type: ContentType | None) -> str:
@@ -327,6 +348,7 @@ class ThePornDBCrawler(Crawler):
         return MediaMetadata(
             number=number,
             title=scene.get("title") or None,
+            series=_extract_movie_title(scene.get("_tpdb_rest_details")),
             actors=actors,
             studio=studio,
             release=scene.get("date") or None,
@@ -442,6 +464,16 @@ def _gql_field(payload: object, key: str) -> object:
         return None
     data = payload.get("data")
     return data.get(key) if isinstance(data, dict) else None
+
+
+def _extract_movie_title(details: object) -> str | None:
+    """仅当 Scene 恰好关联一个 Movie 时返回其标题; 其它结构一律留空."""
+    movies = details.get("movies") if isinstance(details, dict) else None
+    if not isinstance(movies, list) or len(movies) != 1:
+        return None
+    movie = movies[0]
+    title = movie.get("title") if isinstance(movie, dict) else None
+    return title.strip() if isinstance(title, str) and title.strip() else None
 
 
 def _extract_oshashes(details: object) -> list[str]:

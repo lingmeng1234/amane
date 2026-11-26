@@ -432,6 +432,7 @@ def test_western_dated_number_preserves_original_case() -> None:
     "studio",
     [
         "vixen",
+        "vIxEn",
         "blacked",
         "tushy",
         "sexart",

@@ -123,9 +123,7 @@ class ThePornDBCrawler(Crawler):
         if "_tpdb_rest_details" not in scene:
             scene_id = str(scene.get("id") or "")
             scene["_tpdb_rest_details"] = (
-                await self._scene_rest_details(scene_id, {"Authorization": f"Bearer {token}"})
-                if scene_id
-                else None
+                await self._scene_rest_details(scene_id, {"Authorization": f"Bearer {token}"}) if scene_id else None
             )
         return self._scene_to_metadata(scene)
 

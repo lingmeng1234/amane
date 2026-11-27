@@ -11,6 +11,7 @@ import {
   rem,
   Stack,
   Text,
+  TextInput,
   Title,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
@@ -62,6 +63,7 @@ import { metaSearchForFacet } from "@/lib/facets";
 import { ageFromBirthday } from "@/lib/format-birthday";
 import { nextOffsetPageParam } from "@/lib/infinite-list";
 import { DEFAULT_METADATA_SORT_PREFERENCE, METADATA_SORT_OPTIONS } from "@/lib/media/browse";
+import { apiFetch } from "@/lib/api-token";
 import { proxyImageUrl } from "@/lib/utils";
 import { ProxyImage } from "@/components/media/proxy-image";
 import { useUIStore } from "@/stores/ui";
@@ -440,6 +442,111 @@ function ActorDetailPage() {
   );
 }
 
+type ActorUncollectedBuildResult = {
+  matched: number;
+  added: number;
+  already_in_list: number;
+  already_collected: number;
+};
+
+async function requestUncollectedJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await apiFetch(url, init);
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { detail?: string } | null;
+    throw new Error(body?.detail ?? response.statusText);
+  }
+  return (await response.json()) as T;
+}
+
+function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
+  const queryClient = useQueryClient();
+  const [studio, setStudio] = useState("");
+  const [tag, setTag] = useState("");
+  const statusQuery = useQuery({
+    queryKey: ["uncollected-scene-status", actorName],
+    queryFn: () =>
+      requestUncollectedJson<{ exists: boolean }>(
+        "/api/uncollected-scenes/status?actor_name=" + encodeURIComponent(actorName),
+      ),
+    enabled: Boolean(actorName),
+  });
+  const buildMutation = useMutation({
+    mutationFn: () =>
+      requestUncollectedJson<ActorUncollectedBuildResult>(
+        "/api/theporndb-scenes/build-uncollected",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            performer: actorName,
+            studio: studio.trim(),
+            tag: tag.trim(),
+            record_actor_name: actorName,
+          }),
+        },
+      ),
+    onSuccess: (result) => {
+      notifications.show({
+        color: "blue",
+        message:
+          `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，` +
+          `名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
+      });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-status", actorName] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-facets"] });
+    },
+    onError: (error) => notifications.show({ message: error.message, color: "red" }),
+  });
+
+  return (
+    <Stack gap={5} mt="xs" w="100%">
+      <Group gap={6} justify="space-between">
+        <Badge
+          size="sm"
+          color={
+            statusQuery.isLoading || statusQuery.isError
+              ? "gray"
+              : statusQuery.data?.exists
+                ? "green"
+                : "yellow"
+          }
+          variant="light"
+        >
+          {statusQuery.isLoading
+            ? "检查建档状态…"
+            : statusQuery.isError
+              ? "状态读取失败"
+              : statusQuery.data?.exists
+                ? "已建档"
+                : "未建档"}
+        </Badge>
+      </Group>
+      <Group gap={6} grow wrap="nowrap">
+        <TextInput
+          size="xs"
+          placeholder="制作商"
+          aria-label="制作商"
+          value={studio}
+          onChange={(event) => setStudio(event.currentTarget.value)}
+        />
+        <TextInput
+          size="xs"
+          placeholder="标签"
+          aria-label="标签"
+          value={tag}
+          onChange={(event) => setTag(event.currentTarget.value)}
+        />
+      </Group>
+      <Group justify="flex-end">
+        <Button size="xs" loading={buildMutation.isPending} onClick={() => buildMutation.mutate()}>
+          建档
+        </Button>
+      </Group>
+    </Stack>
+  );
+}
+
 function ActorHero({
   actor,
   scrapePending,
@@ -575,6 +682,7 @@ function ActorHero({
         <Box mt="xs">
           <LockChip label={t("actors.imagesEdit")} {...lockProps("image_urls")} />
         </Box>
+        <ActorUncollectedBuilder actorName={actor.name} />
       </Box>
 
       {/* basis 不能为 0: 换行按 flex-basis 判定, 取 0 时信息列永不换行, 窄屏只会被压成几十像素宽. */}

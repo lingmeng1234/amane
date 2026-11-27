@@ -66,6 +66,20 @@ class UncollectedSceneRefreshResponse(BaseModel):
     deleted: int
 
 
+@router.get("/facets", include_in_schema=False)
+async def uncollected_scene_facets(repo: RepoDep) -> dict[str, list[str]]:
+    performers, studios = await repo.list_uncollected_scene_facets()
+    return {"performers": performers, "studios": studios}
+
+
+@router.get("/status", include_in_schema=False)
+async def uncollected_scene_status(
+    repo: RepoDep,
+    actor_name: Annotated[str, Query(min_length=1, max_length=200)],
+) -> dict[str, bool]:
+    return {"exists": await repo.has_uncollected_scene_actor_build(actor_name)}
+
+
 def _gender(value: object) -> SceneGender:
     if isinstance(value, str) and value in {
         "female",

@@ -1,4 +1,5 @@
 import { Badge, type MantineColor } from "@mantine/core";
+import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import type { ActorGender, FacetKind } from "@/client/types.gen";
 import { GenderMark } from "@/components/media/gender-mark";
@@ -16,6 +17,14 @@ const KIND_COLOR: Record<FacetKind, MantineColor> = {
 
 /** 去掉锚点行高, 让徽章高度就是 flex 项高度. */
 const BADGE_LINK_STYLE = { textDecoration: "none", display: "inline-flex", lineHeight: 1 } as const;
+const BADGE_TEXT_STYLE: CSSProperties = {
+  display: "block",
+  minWidth: 0,
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
 
 interface FacetBadgeProps {
   kind: FacetKind;
@@ -28,6 +37,7 @@ interface FacetBadgeProps {
   mode?: "meta" | "catalog";
   variant?: "filled" | "light" | "outline" | "dot" | "transparent";
   size?: "xs" | "sm" | "md" | "lg";
+  style?: CSSProperties;
 }
 
 /** 默认为实体页; `mode="meta"` 时进入片库筛选. */
@@ -39,18 +49,31 @@ export function FacetBadge({
   mode = "catalog",
   variant = "light",
   size = "sm",
+  style,
 }: FacetBadgeProps) {
   const color = KIND_COLOR[kind];
-  // 名称字段统一保留数据本身的大小写；不得由 Badge 默认样式自动转成大写。
+  // 名称字段统一保留数据本身的大小写；不得由 Badge 默认样式自动转成大写.
   const leftSection =
     kind === "actor" && gender != null && gender !== "unknown" ? (
       <GenderMark gender={gender} size={12} />
     ) : undefined;
+  const badgeStyle = style;
+  const textStyle = style ? { ...BADGE_TEXT_STYLE, ...style } : undefined;
 
   if (id == null) {
     return (
-      <Badge color={color} variant={variant} size={size} leftSection={leftSection} tt="none">
-        <span>{name}</span>
+      <Badge
+        color={color}
+        variant={variant}
+        size={size}
+        leftSection={leftSection}
+        tt="none"
+        title={name}
+        style={badgeStyle}
+      >
+        <span title={name} style={textStyle}>
+          {name}
+        </span>
       </Badge>
     );
   }
@@ -66,9 +89,12 @@ export function FacetBadge({
             size={size}
             leftSection={leftSection}
             tt="none"
-            style={{ cursor: "pointer" }}
+            title={name}
+            style={{ cursor: "pointer", ...badgeStyle }}
           >
-            <span>{name}</span>
+            <span title={name} style={BADGE_TEXT_STYLE}>
+              {name}
+            </span>
           </Badge>
         </Link>
       );
@@ -85,9 +111,12 @@ export function FacetBadge({
           variant={variant}
           size={size}
           tt="none"
-          style={{ cursor: "pointer" }}
+          title={name}
+          style={{ cursor: "pointer", ...badgeStyle }}
         >
-          <span>{name}</span>
+          <span title={name} style={BADGE_TEXT_STYLE}>
+            {name}
+          </span>
         </Badge>
       </Link>
     );
@@ -102,9 +131,12 @@ export function FacetBadge({
         size={size}
         leftSection={leftSection}
         tt="none"
-        style={{ cursor: "pointer" }}
+        title={name}
+        style={{ cursor: "pointer", ...badgeStyle }}
       >
-        <span>{name}</span>
+        <span title={name} style={BADGE_TEXT_STYLE}>
+          {name}
+        </span>
       </Badge>
     </Link>
   );

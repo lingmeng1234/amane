@@ -472,7 +472,9 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
   });
   const buildMutation = useMutation({
     mutationFn: () =>
-      requestUncollectedJson<ActorUncollectedBuildResult>("/api/theporndb-scenes/build-uncollected", {
+      requestUncollectedJson<ActorUncollectedBuildResult>(
+        "/api/theporndb-scenes/build-uncollected",
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -481,12 +483,14 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
           tag: tag.trim(),
           record_actor_name: actorName,
         }),
+        },
       }),
     onSuccess: (result) => {
       notifications.show({
         color: "blue",
         message:
-          `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
+          `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，` +
+            `名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
       });
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-status", actorName] });
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });

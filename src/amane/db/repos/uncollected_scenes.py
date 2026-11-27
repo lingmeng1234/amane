@@ -24,9 +24,7 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
             await acquire_write_lock(session)
             collected = (
                 await session.exec(
-                    select(Metadata.id).where(
-                        func.lower(col(Metadata.theporndb_uuid)) == normalized_uuid
-                    ).limit(1)
+                    select(Metadata.id).where(func.lower(col(Metadata.theporndb_uuid)) == normalized_uuid).limit(1)
                 )
             ).first()
             if collected is not None:
@@ -34,9 +32,7 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                 return None, False
             existing = (
                 await session.exec(
-                    select(UncollectedScene).where(
-                        func.lower(col(UncollectedScene.theporndb_uuid)) == normalized_uuid
-                    )
+                    select(UncollectedScene).where(func.lower(col(UncollectedScene.theporndb_uuid)) == normalized_uuid)
                 )
             ).first()
             if existing is not None:
@@ -98,9 +94,7 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
         async with self._session() as session:
             item = (
                 await session.exec(
-                    select(UncollectedScene).where(
-                        func.lower(col(UncollectedScene.theporndb_uuid)) == normalized_uuid
-                    )
+                    select(UncollectedScene).where(func.lower(col(UncollectedScene.theporndb_uuid)) == normalized_uuid)
                 )
             ).first()
             if item is None:
@@ -116,9 +110,8 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
             collected_uuids = select(func.lower(col(Metadata.theporndb_uuid))).where(
                 col(Metadata.theporndb_uuid).is_not(None)
             )
-            statement = (
-                UncollectedScene.__table__.delete()
-                .where(func.lower(UncollectedScene.theporndb_uuid).in_(collected_uuids))
+            statement = UncollectedScene.__table__.delete().where(
+                func.lower(UncollectedScene.theporndb_uuid).in_(collected_uuids)
             )
             result = await session.exec(statement)
             await session.commit()

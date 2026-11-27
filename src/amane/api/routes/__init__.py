@@ -29,6 +29,7 @@ from .system import router as system_router
 from .tag_mappings import router as tag_mappings_router
 from .tasks import router as tasks_router
 from .theporndb_scenes import router as theporndb_scenes_router
+from .uncollected_scenes import router as uncollected_scenes_router
 from .tools import router as tools_router
 from .webhooks import router as webhooks_router
 from .ws import router as ws_router
@@ -46,6 +47,7 @@ router.include_router(metadata_router)
 router.include_router(network_router)
 router.include_router(oshash_submissions_router)
 router.include_router(theporndb_scenes_router)
+router.include_router(uncollected_scenes_router)
 router.include_router(playback_router)
 router.include_router(plugins_router)
 router.include_router(actors_router)

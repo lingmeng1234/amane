@@ -29,6 +29,7 @@ import { Route as SchedulesRouteImport } from './routes/schedules'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TagMappingsRouteImport } from './routes/tag-mappings'
 import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as UncollectedScenesRouteImport } from './routes/uncollected-scenes'
 import { Route as ActorsIndexRouteImport } from './routes/actors.index'
 import { Route as ActorsActorIdRouteImport } from './routes/actors.$actorId'
 import { Route as CatalogIndexRouteImport } from './routes/catalog.index'
@@ -143,6 +144,11 @@ const TasksRoute = TasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UncollectedScenesRoute = UncollectedScenesRouteImport.update({
+  id: '/uncollected-scenes',
+  path: '/uncollected-scenes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ActorsIndexRoute = ActorsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/tag-mappings': typeof TagMappingsRoute
   '/tasks': typeof TasksRoute
+  '/uncollected-scenes': typeof UncollectedScenesRoute
   '/actors/$actorId': typeof ActorsActorIdRoute
   '/catalog/$kind': typeof CatalogKindRoute
   '/feeds/sources': typeof FeedsSourcesRoute
@@ -332,6 +339,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tag-mappings'
     | '/tasks'
+    | '/uncollected-scenes'
     | '/actors/$actorId'
     | '/catalog/$kind'
     | '/feeds/sources'
@@ -432,6 +440,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   TagMappingsRoute: typeof TagMappingsRoute
   TasksRoute: typeof TasksRoute
+  UncollectedScenesRoute: typeof UncollectedScenesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -574,6 +583,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/uncollected-scenes': {
+      id: '/uncollected-scenes'
+      path: '/uncollected-scenes'
+      fullPath: '/uncollected-scenes'
+      preLoaderRoute: typeof UncollectedScenesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/actors/': {
@@ -771,6 +787,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TagMappingsRoute: TagMappingsRoute,
   TasksRoute: TasksRoute,
+  UncollectedScenesRoute: UncollectedScenesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

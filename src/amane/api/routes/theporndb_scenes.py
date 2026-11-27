@@ -265,9 +265,7 @@ async def _search_scenes(
                     params["tags[" + tag_id + "]"] = tag_name
                     params["tag_and"] = "true"
 
-            search_pages = await asyncio.gather(
-                *(_fetch_scene_pages(client, params, headers) for params in searches)
-            )
+            search_pages = await asyncio.gather(*(_fetch_scene_pages(client, params, headers) for params in searches))
     except HTTPException:
         raise
     except Exception as exc:

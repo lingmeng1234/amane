@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any, cast
 
-from httpx2 import AsyncClient
 import pytest
+from httpx2 import AsyncClient
 
 from amane.api.routes.theporndb_scenes import (
     _fetch_scene_pages,

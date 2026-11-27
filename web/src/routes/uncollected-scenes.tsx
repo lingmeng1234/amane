@@ -213,7 +213,8 @@ function UncollectedScenesPage() {
       notifications.show({
         color: "blue",
         message:
-          `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
+          `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，` +
+            `名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
       });
       setPage(1);
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });

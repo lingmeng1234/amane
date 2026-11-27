@@ -288,9 +288,7 @@ async def apply_file_operations(
             )
             video_extensions = {ext.casefold() for ext in (config.watcher.media_extensions or MEDIA_EXTENSIONS)}
             names = [
-                Path(item.path).stem
-                for item in related_files
-                if Path(item.path).suffix.casefold() in video_extensions
+                Path(item.path).stem for item in related_files if Path(item.path).suffix.casefold() in video_extensions
             ]
             if not names and Path(media_file.path).suffix.casefold() in video_extensions:
                 names = [Path(media_file.path).stem]

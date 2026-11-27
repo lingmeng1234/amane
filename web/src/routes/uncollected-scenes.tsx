@@ -1,27 +1,29 @@
 import {
   ActionIcon,
-  Alert,
+  AspectRatio,
   Badge,
   Box,
   Button,
   Card,
+  Collapse,
   Group,
   Image,
   Pagination,
-  SegmentedControl,
+  Select,
   SimpleGrid,
   Stack,
-  Table,
   Text,
   TextInput,
   Title,
   Tooltip,
 } from "@mantine/core";
-import { IconRefresh, IconSearch, IconTrash, IconX } from "@tabler/icons-react";
+import { IconFilter, IconRefresh, IconTrash, IconX } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { notifications } from "@mantine/notifications";
+import type { ActorGender } from "@/client/types.gen";
+import { FacetBadge } from "@/components/media/facet-badge";
 import { apiFetch } from "@/lib/api-token";
 import { proxyImageUrl } from "@/lib/utils";
 
@@ -29,19 +31,10 @@ export const Route = createFileRoute("/uncollected-scenes")({
   component: UncollectedScenesPage,
 });
 
-type Gender =
-  | "female"
-  | "intersex"
-  | "male"
-  | "non_binary"
-  | "transgender_female"
-  | "transgender_male"
-  | "unknown";
-
 type Performer = {
   name: string;
-  gender: Gender;
-  official_gender?: Gender | null;
+  gender: ActorGender;
+  official_gender?: ActorGender | null;
 };
 
 type SearchScene = {
@@ -73,9 +66,21 @@ type SceneList = {
   per_page: number;
 };
 
+type SceneFacets = {
+  performers: string[];
+  studios: string[];
+};
+
 type Filters = {
   performer: string;
   studio: string;
+};
+
+type BuildResult = {
+  matched: number;
+  added: number;
+  already_in_list: number;
+  already_collected: number;
 };
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -87,116 +92,82 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-function genderSymbol(gender: Gender): string {
-  if (gender === "female") return "♀";
-  if (gender === "transgender_female" || gender === "transgender_male" || gender === "non_binary") {
-    return "⚧";
-  }
-  if (gender === "intersex") return "⚥";
-  if (gender === "male") return "♂";
-  return "?";
-}
-
-function genderName(gender: Gender): string {
-  if (gender === "female") return "女性";
-  if (gender === "transgender_female") return "跨性别女性";
-  if (gender === "transgender_male") return "跨性别男性";
-  if (gender === "intersex") return "间性";
-  if (gender === "non_binary") return "非二元性别";
-  if (gender === "male") return "男性";
-  return "未知性别";
-}
-
-function ActorText({ actor }: { actor: Performer }) {
-  return (
-    <Tooltip label={genderName(actor.gender)}>
-      <Text size="sm" lineClamp={1} title={actor.name}>
-        <Text span c="dimmed" fw={600} mr={4}>
-          {genderSymbol(actor.gender)}
-        </Text>
-        {actor.name}
-      </Text>
-    </Tooltip>
-  );
-}
-
 function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => void }) {
   const actors = [...scene.performers];
-  while (actors.length < 4) {
-    actors.push({ name: "—", gender: "unknown" });
-  }
+  while (actors.length < 4) actors.push({ name: "—", gender: "unknown" });
 
   return (
     <Card withBorder padding="sm" radius="md" style={{ position: "relative" }}>
-      <Box
-        style={{
-          display: "grid",
-          gridTemplateColumns: "144px minmax(0, 1fr)",
-          gap: 12,
-        }}
-      >
-        <Image
-          src={scene.image_url ? proxyImageUrl(scene.image_url, "theporndb") : undefined}
-          alt={scene.title}
-          w={144}
-          h={108}
-          fit="cover"
-          radius="sm"
-          fallbackSrc=""
-        />
-        <Stack gap={3} style={{ minWidth: 0 }}>
-          <Text fw={600} size="sm" lineClamp={1} title={scene.title}>
-            {scene.title || "—"}
-          </Text>
-          <Text size="xs" c="dimmed">
-            日期：{scene.date || "—"}
-          </Text>
-          <Text size="xs" c="dimmed" lineClamp={1} title={scene.studio}>
-            制作商：{scene.studio || "—"}
-          </Text>
-          <Text size="xs" c="dimmed" lineClamp={1} title={scene.theporndb_uuid}>
-            UUID：{scene.theporndb_uuid}
-          </Text>
+      <Box pos="relative">
+        <AspectRatio ratio={1.5}>
           <Box
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              columnGap: 10,
-              rowGap: 3,
-              paddingRight: 26,
-            }}
+            bg="var(--mantine-color-default-hover)"
+            style={{ overflow: "hidden", borderRadius: "var(--mantine-radius-sm)" }}
           >
-            {actors.map((actor, index) => (
-              <Box key={index} style={{ minWidth: 0 }}>
-                {actor.name === "—" ? (
-                  <Text size="sm" c="dimmed">
-                    —
-                  </Text>
-                ) : (
-                  <ActorText actor={actor} />
-                )}
-              </Box>
-            ))}
+            <Image
+              src={scene.image_url ? proxyImageUrl(scene.image_url, "theporndb") : undefined}
+              alt={scene.title}
+              w="100%"
+              h="100%"
+              fit="contain"
+              fallbackSrc=""
+            />
           </Box>
-        </Stack>
+        </AspectRatio>
+        <Tooltip label="从未收录名单移除">
+          <ActionIcon
+            color="red"
+            variant="filled"
+            size="sm"
+            aria-label="删除未收录记录"
+            onClick={onDelete}
+            style={{ position: "absolute", right: 8, bottom: 8, zIndex: 1 }}
+          >
+            <IconTrash size={15} />
+          </ActionIcon>
+        </Tooltip>
       </Box>
-      <Tooltip label="从未收录名单移除">
-        <ActionIcon
-          color="red"
-          variant="subtle"
-          size="sm"
-          aria-label="删除未收录记录"
-          onClick={onDelete}
+
+      <Stack gap={4} mt="sm" style={{ minWidth: 0 }}>
+        <Text fw={600} size="sm" lineClamp={2} title={scene.title}>
+          {scene.title || "—"}
+        </Text>
+        <Text size="xs" c="dimmed">
+          日期：{scene.date || "—"}
+        </Text>
+        <Text size="xs" c="dimmed" lineClamp={1} title={scene.studio}>
+          制作商：{scene.studio || "—"}
+        </Text>
+        <Text size="xs" c="dimmed" lineClamp={1} title={scene.theporndb_uuid}>
+          UUID：{scene.theporndb_uuid}
+        </Text>
+        <Box
           style={{
-            position: "absolute",
-            left: 144,
-            top: 108,
-            zIndex: 1,
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            columnGap: 8,
+            rowGap: 5,
+            paddingRight: 4,
           }}
         >
-          <IconTrash size={16} />
-        </ActionIcon>
-      </Tooltip>
+          {actors.map((actor, index) => (
+            <Box key={index} style={{ minWidth: 0, overflow: "hidden" }}>
+              {actor.name === "—" ? (
+                <Text size="sm" c="dimmed">—</Text>
+              ) : (
+                <FacetBadge
+                  kind="actor"
+                  id={null}
+                  name={actor.name}
+                  gender={actor.gender}
+                  size="sm"
+                  variant="light"
+                />
+              )}
+            </Box>
+          ))}
+        </Box>
+      </Stack>
     </Card>
   );
 }
@@ -206,30 +177,30 @@ function UncollectedScenesPage() {
   const [studioInput, setStudioInput] = useState("");
   const [performerInput, setPerformerInput] = useState("");
   const [tagInput, setTagInput] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchScene[]>([]);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const emptyFilters: Filters = { performer: "", studio: "" };
-  const [draft, setDraft] = useState<Filters>(emptyFilters);
-  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [performerOptionQuery, setPerformerOptionQuery] = useState("");
+  const [studioOptionQuery, setStudioOptionQuery] = useState("");
+  const [filters, setFilters] = useState<Filters>({ performer: "", studio: "" });
   const [page, setPage] = useState(1);
-  const [view, setView] = useState<"cover" | "list">("cover");
 
   const listQuery = useQuery({
     queryKey: ["uncollected-scenes", page, filters],
     queryFn: () => {
-      const params = new URLSearchParams({
-        page: String(page),
-        per_page: "30",
-      });
+      const params = new URLSearchParams({ page: String(page), per_page: "30" });
       if (filters.performer) params.set("performer", filters.performer);
       if (filters.studio) params.set("studio", filters.studio);
       return requestJson<SceneList>("/api/uncollected-scenes?" + params.toString());
     },
   });
 
-  const searchMutation = useMutation({
+  const facetsQuery = useQuery({
+    queryKey: ["uncollected-scene-facets"],
+    queryFn: () => requestJson<SceneFacets>("/api/uncollected-scenes/facets"),
+  });
+
+  const buildMutation = useMutation({
     mutationFn: () =>
-      requestJson<{ items: SearchScene[] }>("/api/theporndb-scenes/search-filtered", {
+      requestJson<BuildResult>("/api/theporndb-scenes/build-uncollected", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -238,40 +209,16 @@ function UncollectedScenesPage() {
           tag: tagInput.trim(),
         }),
       }),
-    onSuccess: (data) => {
-      setSearchResults(data.items);
-      setSearchError(null);
-    },
-    onError: (error) => setSearchError(error.message),
-  });
-
-  const addMutation = useMutation({
-    mutationFn: (scene: SearchScene) =>
-      requestJson<{ added: boolean; already_collected: boolean }>("/api/uncollected-scenes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          theporndb_uuid: scene.id,
-          title: scene.title,
-          date: scene.date,
-          studio: scene.studio,
-          performers: scene.performers.map((actor) => ({
-            name: actor.name,
-            official_gender: actor.official_gender ?? null,
-          })),
-          image_url: scene.image,
-        }),
-      }),
     onSuccess: (result) => {
       notifications.show({
-        message: result.already_collected
-          ? "该作品已存在于片库，不会加入名单"
-          : result.added
-            ? "已加入未收录名单"
-            : "该作品已在名单中",
-        color: result.already_collected ? "yellow" : "blue",
+        color: "blue",
+        message:
+          `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
       });
+      setPage(1);
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-facets"] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-status"] });
     },
     onError: (error) => notifications.show({ message: error.message, color: "red" }),
   });
@@ -284,50 +231,66 @@ function UncollectedScenesPage() {
     onSuccess: () => {
       notifications.show({ message: "已从未收录名单移除", color: "blue" });
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-facets"] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-status"] });
     },
     onError: (error) => notifications.show({ message: error.message, color: "red" }),
   });
 
   const refreshMutation = useMutation({
     mutationFn: () =>
-      requestJson<{ deleted: number }>("/api/uncollected-scenes/refresh", {
-        method: "POST",
-      }),
+      requestJson<{ deleted: number }>("/api/uncollected-scenes/refresh", { method: "POST" }),
     onSuccess: (result) => {
-      notifications.show({
-        message: "已清理 " + result.deleted + " 条已收录作品",
-        color: "blue",
-      });
+      notifications.show({ message: "已清理 " + result.deleted + " 条已收录作品", color: "blue" });
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-facets"] });
+      void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-status"] });
     },
     onError: (error) => notifications.show({ message: error.message, color: "red" }),
   });
 
   const list = listQuery.data;
   const totalPages = Math.max(1, Math.ceil((list?.total ?? 0) / 30));
+  const performerOptions = useMemo(
+    () =>
+      (facetsQuery.data?.performers ?? [])
+        .filter((name) => name.toLocaleLowerCase().includes(performerOptionQuery.trim().toLocaleLowerCase()))
+        .map((name) => ({ value: name, label: name })),
+    [facetsQuery.data?.performers, performerOptionQuery],
+  );
+  const studioOptions = useMemo(
+    () =>
+      (facetsQuery.data?.studios ?? [])
+        .filter((name) => name.toLocaleLowerCase().includes(studioOptionQuery.trim().toLocaleLowerCase()))
+        .map((name) => ({ value: name, label: name })),
+    [facetsQuery.data?.studios, studioOptionQuery],
+  );
   const activeFilters = [
-    filters.performer ? { key: "performer", label: "演员：" + filters.performer } : null,
-    filters.studio ? { key: "studio", label: "厂牌：" + filters.studio } : null,
-  ].filter((item): item is { key: string; label: string } => item !== null);
+    filters.performer ? { key: "performer" as const, label: "演员：" + filters.performer } : null,
+    filters.studio ? { key: "studio" as const, label: "制作商：" + filters.studio } : null,
+  ].filter((item): item is { key: "performer" | "studio"; label: string } => item !== null);
 
-  function removeFilter(key: string) {
-    const next = { ...filters, [key]: "" };
-    setFilters(next);
-    setDraft(next);
+  function updateFilter(key: keyof Filters, value: string | null) {
+    setFilters((current) => ({ ...current, [key]: value ?? "" }));
+    setPage(1);
+  }
+
+  function removeFilter(key: keyof Filters) {
+    setFilters((current) => ({ ...current, [key]: "" }));
     setPage(1);
   }
 
   return (
-    <Stack gap="lg">
+    <Stack gap="md">
       <Title order={2}>未收录影片</Title>
 
       <Card withBorder radius="md" padding="md">
         <Stack gap="sm">
           <Title order={4}>建档检索</Title>
-          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+          <Group grow align="end" wrap="nowrap">
             <TextInput
-              label="厂牌"
-              placeholder="输入 ThePornDB 厂牌名称"
+              label="制作商"
+              placeholder="输入 ThePornDB 制作商名称"
               value={studioInput}
               onChange={(event) => setStudioInput(event.currentTarget.value)}
             />
@@ -343,143 +306,92 @@ function UncollectedScenesPage() {
               value={tagInput}
               onChange={(event) => setTagInput(event.currentTarget.value)}
             />
-          </SimpleGrid>
+          </Group>
           <Group justify="flex-end">
             <Button
-              leftSection={<IconSearch size={16} />}
-              loading={searchMutation.isPending}
+              loading={buildMutation.isPending}
               disabled={!studioInput.trim() && !performerInput.trim() && !tagInput.trim()}
-              onClick={() => searchMutation.mutate()}
+              onClick={() => buildMutation.mutate()}
             >
-              搜索
+              建档
             </Button>
           </Group>
-
-          {searchError && <Alert color="red">{searchError}</Alert>}
-
-          {searchResults.length > 0 && (
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
-              {searchResults.map((scene) => (
-                <Card key={scene.id} withBorder padding="xs" radius="sm">
-                  <Group align="flex-start" wrap="nowrap">
-                    <Image
-                      src={scene.image ? proxyImageUrl(scene.image, "theporndb") : undefined}
-                      alt={scene.title}
-                      w={112}
-                      h={76}
-                      fit="cover"
-                      radius="sm"
-                      fallbackSrc=""
-                    />
-                    <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
-                      <Text size="sm" fw={600} lineClamp={2}>
-                        {scene.title || "—"}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {scene.date || "—"} · {scene.studio || "—"}
-                      </Text>
-                      <Text size="xs" c="dimmed" lineClamp={1}>
-                        UUID：{scene.id}
-                      </Text>
-                      <Text size="xs" c="dimmed" lineClamp={2}>
-                        {scene.performers
-                          .map((actor) => genderSymbol(actor.gender) + " " + actor.name)
-                          .join("、") || "—"}
-                      </Text>
-                      <Group gap={4} wrap="wrap">
-                        {scene.tags.slice(0, 4).map((tag) => (
-                          <Badge key={tag} size="xs" variant="light">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </Group>
-                    </Stack>
-                  </Group>
-                  <Group justify="flex-end" mt="xs">
-                    <Button
-                      size="xs"
-                      variant="light"
-                      loading={addMutation.isPending && addMutation.variables?.id === scene.id}
-                      disabled={addMutation.isPending}
-                      onClick={() => addMutation.mutate(scene)}
-                    >
-                      加入未收录名单
-                    </Button>
-                  </Group>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
-
-          {searchMutation.isSuccess && searchResults.length === 0 && (
-            <Text size="sm" c="dimmed" ta="center">
-              没有找到匹配的场景
-            </Text>
-          )}
         </Stack>
       </Card>
 
       <Stack gap="sm">
         <Group justify="space-between" align="center">
-          <Title order={4}>未收录名单（{list?.total ?? 0}）</Title>
-          <Group gap="xs">
-            <Button
-              size="sm"
-              variant="default"
-              leftSection={<IconRefresh size={15} />}
-              loading={refreshMutation.isPending}
-              onClick={() => refreshMutation.mutate()}
-            >
-              刷新并清理已收录
-            </Button>
-            <SegmentedControl
-              size="sm"
-              value={view}
-              onChange={(value) => setView(value as "cover" | "list")}
-              data={[
-                { label: "封面", value: "cover" },
-                { label: "列表", value: "list" },
-              ]}
-            />
-          </Group>
+          <Box>
+            <Title order={4}>未收录名单</Title>
+            <Text size="xs" c="dimmed">
+              当前显示 {list?.items.length ?? 0} / 全部 {list?.total ?? 0} 条
+            </Text>
+          </Box>
+          <Button
+            size="sm"
+            variant="default"
+            leftSection={<IconRefresh size={15} />}
+            loading={refreshMutation.isPending}
+            onClick={() => refreshMutation.mutate()}
+          >
+            刷新并清理已收录
+          </Button>
         </Group>
 
-        <Group align="end" gap="xs" wrap="wrap">
+        <Group gap="xs" align="end" wrap="nowrap">
           <TextInput
-            label="演员"
-            placeholder="搜索演员"
-            value={draft.performer}
-            onChange={(event) => setDraft({ ...draft, performer: event.currentTarget.value })}
-            style={{ flex: "1 1 160px" }}
+            size="sm"
+            placeholder="搜索演员选项"
+            aria-label="搜索演员筛选选项"
+            value={performerOptionQuery}
+            onChange={(event) => setPerformerOptionQuery(event.currentTarget.value)}
+            style={{ width: 170 }}
           />
           <TextInput
-            label="厂牌"
-            placeholder="搜索厂牌"
-            value={draft.studio}
-            onChange={(event) => setDraft({ ...draft, studio: event.currentTarget.value })}
-            style={{ flex: "1 1 160px" }}
+            size="sm"
+            placeholder="搜索制作商选项"
+            aria-label="搜索制作商筛选选项"
+            value={studioOptionQuery}
+            onChange={(event) => setStudioOptionQuery(event.currentTarget.value)}
+            style={{ width: 170 }}
           />
-          <Button
-            leftSection={<IconSearch size={15} />}
-            onClick={() => {
-              setFilters({ ...draft });
-              setPage(1);
-            }}
+          <ActionIcon
+            size="lg"
+            variant={filtersOpen ? "light" : "default"}
+            color={filtersOpen ? "blue" : "gray"}
+            aria-label={filtersOpen ? "收起筛选" : "展开筛选"}
+            onClick={() => setFiltersOpen((open) => !open)}
           >
-            筛选
-          </Button>
-          <Button
-            variant="subtle"
-            color="gray"
-            onClick={() => {
-              setDraft(emptyFilters);
-              setFilters(emptyFilters);
-              setPage(1);
-            }}
-          >
-            清除
-          </Button>
+            <IconFilter size={18} />
+          </ActionIcon>
         </Group>
+
+        <Collapse expanded={filtersOpen}>
+          <Group gap="sm" align="end" wrap="wrap">
+            <Select
+              label="演员"
+              placeholder="选择演员"
+              searchable
+              clearable
+              nothingFoundMessage="名单中没有匹配演员"
+              data={performerOptions}
+              value={filters.performer || null}
+              onChange={(value) => updateFilter("performer", value)}
+              w={240}
+            />
+            <Select
+              label="制作商"
+              placeholder="选择制作商"
+              searchable
+              clearable
+              nothingFoundMessage="名单中没有匹配制作商"
+              data={studioOptions}
+              value={filters.studio || null}
+              onChange={(value) => updateFilter("studio", value)}
+              w={240}
+            />
+          </Group>
+        </Collapse>
 
         {activeFilters.length > 0 && (
           <Group gap="xs">
@@ -492,7 +404,7 @@ function UncollectedScenesPage() {
                     size="xs"
                     variant="transparent"
                     color="gray"
-                    aria-label="移除筛选"
+                    aria-label={"移除" + filter.label}
                     onClick={() => removeFilter(filter.key)}
                   >
                     <IconX size={12} />
@@ -505,18 +417,18 @@ function UncollectedScenesPage() {
           </Group>
         )}
 
-        {listQuery.isError && <Alert color="red">{(listQuery.error as Error).message}</Alert>}
+        {listQuery.isError && (
+          <Text size="sm" c="red">{(listQuery.error as Error).message}</Text>
+        )}
 
         {listQuery.isLoading ? (
-          <Text size="sm" c="dimmed">
-            加载中…
-          </Text>
+          <Text size="sm" c="dimmed">加载中…</Text>
         ) : (list?.items.length ?? 0) === 0 ? (
           <Text size="sm" c="dimmed" ta="center" py="xl">
-            暂无未收录影片
+            {activeFilters.length > 0 ? "没有符合筛选条件的未收录影片" : "暂无未收录影片"}
           </Text>
-        ) : view === "cover" ? (
-          <SimpleGrid cols={{ base: 1, sm: 1, md: 2 }} spacing="sm">
+        ) : (
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
             {list?.items.map((scene) => (
               <SceneCard
                 key={scene.id}
@@ -525,46 +437,6 @@ function UncollectedScenesPage() {
               />
             ))}
           </SimpleGrid>
-        ) : (
-          <Table.ScrollContainer minWidth={720}>
-            <Table striped highlightOnHover withTableBorder>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>标题</Table.Th>
-                  <Table.Th>UUID</Table.Th>
-                  <Table.Th>日期</Table.Th>
-                  <Table.Th>厂牌</Table.Th>
-                  <Table.Th>全部演员</Table.Th>
-                  <Table.Th w={48}>操作</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {list?.items.map((scene) => (
-                  <Table.Tr key={scene.id}>
-                    <Table.Td>{scene.title || "—"}</Table.Td>
-                    <Table.Td>{scene.theporndb_uuid}</Table.Td>
-                    <Table.Td>{scene.date || "—"}</Table.Td>
-                    <Table.Td>{scene.studio || "—"}</Table.Td>
-                    <Table.Td>
-                      {scene.performers
-                        .map((actor) => genderSymbol(actor.gender) + " " + actor.name)
-                        .join("、") || "—"}
-                    </Table.Td>
-                    <Table.Td>
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        aria-label="删除"
-                        onClick={() => deleteMutation.mutate(scene.theporndb_uuid)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
         )}
 
         {totalPages > 1 && (

@@ -50,7 +50,6 @@ def test_scene_tags_are_names_only() -> None:
     ]
 
 
-
 def test_scene_performer_gender_falls_back_to_outer_relationship() -> None:
     scene = {
         "performers": [

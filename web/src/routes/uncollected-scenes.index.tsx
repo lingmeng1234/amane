@@ -23,7 +23,7 @@ type SavedScene = {
   performers: Performer[]; image_url: string | null; created_at: string;
 };
 type SceneList = { items: SavedScene[]; total: number; page: number; per_page: number };
-type Filters = { query: string; performer: string; studio: string };
+type Filters = { performer: string; studio: string };
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await apiFetch(url, init);
@@ -102,7 +102,7 @@ function UncollectedScenesPage() {
   const [tagInput, setTagInput] = useState("");
   const [searchResults, setSearchResults] = useState<SearchScene[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const emptyFilters: Filters = { query: "", performer: "", studio: "" };
+  const emptyFilters: Filters = { performer: "", studio: "" };
   const [draft, setDraft] = useState<Filters>(emptyFilters);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [page, setPage] = useState(1);
@@ -112,7 +112,6 @@ function UncollectedScenesPage() {
     queryKey: ["uncollected-scenes", page, filters],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: "30" });
-      if (filters.query) params.set("query", filters.query);
       if (filters.performer) params.set("performer", filters.performer);
       if (filters.studio) params.set("studio", filters.studio);
       return requestJson<SceneList>("/api/uncollected-scenes?" + params.toString());
@@ -175,7 +174,6 @@ function UncollectedScenesPage() {
   const list = listQuery.data;
   const totalPages = Math.max(1, Math.ceil((list?.total ?? 0) / 30));
   const activeFilters = [
-    filters.query ? { key: "query", label: "标题/UUID：" + filters.query } : null,
     filters.performer ? { key: "performer", label: "演员：" + filters.performer } : null,
     filters.studio ? { key: "studio", label: "厂牌：" + filters.studio } : null,
   ].filter((item): item is { key: string; label: string } => item !== null);
@@ -248,8 +246,6 @@ function UncollectedScenesPage() {
         </Group>
 
         <Group align="end" gap="xs" wrap="wrap">
-          <TextInput label="标题 / UUID" placeholder="搜索标题或 UUID" value={draft.query}
-            onChange={(e) => setDraft({ ...draft, query: e.currentTarget.value })} style={{ flex: "1 1 180px" }} />
           <TextInput label="演员" placeholder="搜索演员" value={draft.performer}
             onChange={(e) => setDraft({ ...draft, performer: e.currentTarget.value })} style={{ flex: "1 1 160px" }} />
           <TextInput label="厂牌" placeholder="搜索厂牌" value={draft.studio}

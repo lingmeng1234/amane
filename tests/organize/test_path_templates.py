@@ -1348,6 +1348,11 @@ class TestCommonName:
             (["ABC-123-C-4K-BDRIP", "ABC-123-1080P-BDRIP"], "ABC-123"),
             (["ABC-123-WEB-DL1080P", "ABC-123-BDRIP1080P"], "ABC-123"),
             (["ABC-123-WEB-DL-1080P", "ABC-123-WEB-DL-4K"], "ABC-123-WEB-DL"),
+            (
+                ["[ばにぃうぉ〜か〜] OVA彼女催眠 ＃1 [GLOD-0444]-1080P极彩有码", "[ばにぃうぉ〜か〜] OVA彼女催眠 ＃1 [GLOD-0444]-720P"],
+                "[ばにぃうぉ〜か〜] OVA彼女催眠 ＃1 [GLOD-0444]",
+            ),
+            (["ABC-123 -1080P", "ABC-123 -720P"], "ABC-123"),
             (["one", "two"], ""),
         ],
     )

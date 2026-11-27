@@ -22,6 +22,7 @@ class SceneSearchFilterRequest(BaseModel):
     studio: str = Field(default="", max_length=200)
     performer: str = Field(default="", max_length=200)
     tag: str = Field(default="", max_length=200)
+    record_actor_name: str = Field(default="", max_length=200)
 
 
 _PERFORMER_GENDER: dict[str, str] = {
@@ -393,6 +394,8 @@ async def build_uncollected_scenes(
         for scene in result["items"]
     ]
     added, already_listed, already_collected = await repo.add_uncollected_scenes(scenes)
+    if req.record_actor_name.strip():
+        await repo.record_uncollected_scene_actor_build(req.record_actor_name)
     return {
         "matched": len(scenes),
         "added": added,

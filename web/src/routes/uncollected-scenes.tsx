@@ -127,7 +127,12 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
         <Text size="xs" c="dimmed" lineClamp={1} title={scene.studio}>
           制作商：{scene.studio || "—"}
         </Text>
-        <Text size="xs" c="dimmed" lineClamp={1} title={scene.theporndb_uuid}>
+        <Text
+          size="xs"
+          c="dimmed"
+          title={scene.theporndb_uuid}
+          style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}
+        >
           UUID：{scene.theporndb_uuid}
         </Text>
         <Box
@@ -153,9 +158,9 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
                   variant="light"
                   style={{
                     maxWidth: "100%",
-                    height: "auto",
-                    whiteSpace: "normal",
-                    overflowWrap: "anywhere",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
                   }}
                 />
               )}

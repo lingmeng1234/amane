@@ -760,7 +760,7 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
                     watermark_dir=self._watermark_dir,
                     tag_mapping_path=self._tag_mapping_path,
                     file_phase=metadata_summary.phase if metadata_summary is not None else None,
-                    common_name=common_names_by_metadata_id.get(metadata.id),
+                    common_name=common_names_by_metadata_id.get(metadata.id) if metadata.id is not None else None,
                 )
                 if fop_result is None:
                     skipped += 1

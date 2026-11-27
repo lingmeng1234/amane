@@ -263,7 +263,11 @@ async def search_scenes(
             gender = official if official is not None else local_gender_by_name.get(
                 item["name"], ActorGender.UNKNOWN
             )
-            performers.append({"name": item["name"], "gender": str(gender)})
+            performers.append({
+                "name": item["name"],
+                "gender": str(gender),
+                "official_gender": str(official) if official is not None else None,
+            })
 
         result.append(
             {

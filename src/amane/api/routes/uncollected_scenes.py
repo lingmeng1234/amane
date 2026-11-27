@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -94,11 +94,11 @@ async def _scene_response(item: Any, local_gender_by_name: dict[str, ActorGender
 @router.get("", include_in_schema=False)
 async def list_uncollected_scenes(
     repo: RepoDep,
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=30, ge=1, le=100),
-    query: str | None = Query(default=None, max_length=200),
-    performer: str | None = Query(default=None, max_length=200),
-    studio: str | None = Query(default=None, max_length=200),
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 30,
+    query: Annotated[str | None, Query(max_length=200)] = None,
+    performer: Annotated[str | None, Query(max_length=200)] = None,
+    studio: Annotated[str | None, Query(max_length=200)] = None,
 ) -> UncollectedSceneListResponse:
     items, total = await repo.list_uncollected_scenes(
         offset=(page - 1) * per_page,

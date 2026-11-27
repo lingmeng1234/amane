@@ -3,7 +3,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from amane.api.routes.theporndb_scenes import _official_gender, _performer_entries, _tag_names
+from amane.api.routes.theporndb_scenes import (
+    _fetch_scene_pages,
+    _official_gender,
+    _performer_entries,
+    _tag_names,
+)
 from amane.api.routes.uncollected_scenes import _scene_response
 from amane.enums import ActorGender
 
@@ -43,6 +48,61 @@ def test_scene_tags_are_names_only() -> None:
         "Creampie",
         "Amateur",
     ]
+
+
+
+def test_scene_performer_gender_falls_back_to_outer_relationship() -> None:
+    scene = {
+        "performers": [
+            {
+                "as": "Display Alias",
+                "gender": "Female",
+                "performer": {"name": "Canonical Name", "extras": {}},
+            },
+            {
+                "as": "Another Alias",
+                "extras": {"gender": "Male"},
+                "performer": {"name": "Another Name", "extras": {}},
+            },
+        ]
+    }
+    assert _performer_entries(scene) == [
+        {"name": "Canonical Name", "official_gender": "female"},
+        {"name": "Another Name", "official_gender": "male"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_scene_search_fetches_all_pages() -> None:
+    class FakeResponse:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return self.payload
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.pages: list[int] = []
+
+        async def get(self, _url: str, *, params: dict[str, object], headers: dict[str, str]) -> FakeResponse:
+            page = int(params["page"])
+            self.pages.append(page)
+            batch = (
+                [{"id": f"scene-{index}"} for index in range(50)]
+                if page == 1
+                else [{"id": "scene-50"}, {"id": "scene-51"}]
+            )
+            return FakeResponse({"data": batch})
+
+    client = FakeClient()
+    scenes = await _fetch_scene_pages(client, {"orderBy": "recently_released"}, {})
+    assert client.pages == [1, 2]
+    assert len(scenes) == 52
+    assert scenes[-1]["id"] == "scene-51"
 
 
 @pytest.mark.asyncio

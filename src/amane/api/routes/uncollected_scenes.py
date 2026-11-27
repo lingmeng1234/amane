@@ -112,8 +112,9 @@ async def list_uncollected_scenes(
         if isinstance(performer, dict) and isinstance(performer.get("name"), str)
         and performer.get("official_gender") is None
     ))
-    actors = await repo.get_actors_by_names(names) if names else []
-    local_gender_by_name = {actor.name: actor.gender for actor in actors}
+    local_gender_by_name = (
+        await repo.get_actor_genders_by_names_or_aliases(names) if names else {}
+    )
     responses = [
         await _scene_response(item, local_gender_by_name)
         for item in items

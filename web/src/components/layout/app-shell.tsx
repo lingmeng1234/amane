@@ -89,6 +89,7 @@ const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.groups.manage",
     items: [
       { to: "/libraries", labelKey: "nav.libraries", icon: IconFolders },
+      { to: "/uncollected-scenes", labelKey: "nav.uncollectedScenes", icon: IconMovie },
       { to: "/plugins", labelKey: "nav.plugins", icon: IconPuzzle },
       { to: "/feeds/sources", labelKey: "nav.feedSources", icon: IconListTree },
       { to: "/manual", labelKey: "nav.manual", icon: IconBook },

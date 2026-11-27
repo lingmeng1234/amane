@@ -213,6 +213,24 @@ class OshashSubmission(SQLModel, table=True):
     last_error: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
 
+class UncollectedScene(SQLModel, table=True):
+    """用户手动登记的 ThePornDB 场景; 与片库 Metadata 完全独立."""
+
+    __tablename__ = "uncollected_scenes"  # type: ignore[assignment]
+    __table_args__ = (UniqueConstraint("theporndb_uuid", name="uq_uncollected_scenes_theporndb_uuid"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    theporndb_uuid: str = Field(nullable=False, index=True)
+    title: str = Field(default="", sa_column=Column(Text, nullable=False))
+    date: str = Field(default="", index=True)
+    studio: str = Field(default="", index=True)
+    # 仅保存演员姓名与官方性别; 官方缺失时由 API 响应阶段读取本地 Actor 档案兜底.
+    performers: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    image_url: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
 class MediaFile(SQLModel, table=True):
     __tablename__ = "media_files"  # type: ignore[assignment]
 

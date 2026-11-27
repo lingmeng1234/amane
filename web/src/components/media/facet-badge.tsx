@@ -52,7 +52,7 @@ export function FacetBadge({
 
   if (id == null) {
     return (
-      <Badge color={color} variant={variant} size={size} leftSection={leftSection} tt="none">
+      <Badge color={color} variant={variant} size={size} leftSection={leftSection} tt="none" style={style}>
         <span>{name}</span>
       </Badge>
     );
@@ -88,7 +88,7 @@ export function FacetBadge({
           variant={variant}
           size={size}
           tt="none"
-          style={{ cursor: "pointer" }}
+          style={{ cursor: "pointer", ...style }}
         >
           <span>{name}</span>
         </Badge>

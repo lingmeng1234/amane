@@ -212,6 +212,7 @@ function UncollectedScenesPage() {
                     <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
                       <Text size="sm" fw={600} lineClamp={2}>{scene.title || "—"}</Text>
                       <Text size="xs" c="dimmed">{scene.date || "—"} · {scene.studio || "—"}</Text>
+                      <Text size="xs" c="dimmed" lineClamp={1}>UUID：{scene.id}</Text>
                       <Text size="xs" c="dimmed" lineClamp={2}>
                         {scene.performers.map((actor) => genderSymbol(actor.gender) + " " + actor.name).join("、") || "—"}
                       </Text>

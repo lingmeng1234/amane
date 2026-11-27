@@ -1,7 +1,7 @@
 """persist manually collected ThePornDB scenes
 
 Revision ID: 7c2e9a1b4d60
-Revises: f28a0c1d9e31
+Revises: a74d8c2e1f60
 Create Date: 2026-11-28
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "7c2e9a1b4d60"
-down_revision: str | None = "f28a0c1d9e31"
+down_revision: str | None = "a74d8c2e1f60"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

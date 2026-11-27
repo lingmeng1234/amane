@@ -48,6 +48,7 @@
     "actors": "Actors",
     "catalog": "Catalog",
     "libraries": "Libraries",
+    "uncollectedScenes": "Uncollected scenes",
     "feeds": "Feeds",
     "feedSources": "Feed sources",
     "savedQueries": "Saved queries",

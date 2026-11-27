@@ -84,14 +84,16 @@ def _organize_followups(result: TaskResult[ScrapeResult]) -> list[FollowupTask]:
 
 @pytest.mark.asyncio(loop_scope="function")
 async def test_auto_organize_chains_single_file_scope(repo: Repository, tmp_path: Path) -> None:
-    """开关开启时, 为本次刮削的那一个文件描述 ORGANIZE 后继 (范围单文件, priority=-1)."""
+    """开关开启时, 为当前作品在媒体库中的关联文件描述 ORGANIZE 后继."""
     lib_id, media_id = await _library_with_file(repo, tmp_path, auto_organize=True)
     result = await _handler(repo).handle(ScrapePayload(number="MIDV-123", media_file_id=media_id))
 
     assert result.success is True
     organize = _organize_followups(result)
     assert len(organize) == 1
-    assert organize[0].key == f"organize:{media_id}"
+    media = await repo.get_media_file(media_id)
+    assert media is not None and media.metadata_id is not None
+    assert organize[0].key == f"organize:{lib_id}:{media.metadata_id}"
     assert organize[0].priority == -1
     assert organize[0].payload["library_id"] == lib_id
     assert organize[0].payload["media_file_ids"] == [media_id]

@@ -127,10 +127,7 @@ async def _resolve_exact_tag(client: AsyncClient, token: str, name: str) -> dict
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list):
         raise HTTPException(502, detail="ThePornDB TAG 搜索返回了无效响应")
-    matches = [
-        item for item in data
-        if isinstance(item, dict) and item.get("name") == name
-    ]
+    matches = [item for item in data if isinstance(item, dict) and item.get("name") == name]
     unique: dict[str, dict[str, Any]] = {}
     for item in matches:
         identifier = str(item.get("_id") or item.get("id") or item.get("uuid") or "")
@@ -156,8 +153,7 @@ async def _resolve_exact_site(client: AsyncClient, token: str, name: str) -> int
     if not isinstance(data, list):
         raise HTTPException(502, detail="ThePornDB 厂牌搜索返回了无效响应")
     matches = [
-        item for item in data
-        if isinstance(item, dict) and item.get("name") == name and item.get("id") is not None
+        item for item in data if isinstance(item, dict) and item.get("name") == name and item.get("id") is not None
     ]
     unique = {int(item["id"]) for item in matches}
     if not unique:
@@ -257,14 +253,10 @@ async def _search_scenes(
                 scenes_by_id.setdefault(str(scene["id"]), scene)
 
     # 官方明确提供的性别优先; 只有官方缺失时才查询本地演员档案.
-    performer_names = list(dict.fromkeys(
-        performer["name"]
-        for scene in scenes_by_id.values()
-        for performer in _performer_entries(scene)
-    ))
-    local_gender_by_name = (
-        await repo.get_actor_genders_by_names_or_aliases(performer_names) if performer_names else {}
+    performer_names = list(
+        dict.fromkeys(performer["name"] for scene in scenes_by_id.values() for performer in _performer_entries(scene))
     )
+    local_gender_by_name = await repo.get_actor_genders_by_names_or_aliases(performer_names) if performer_names else {}
 
     result: list[dict[str, Any]] = []
     for scene in scenes_by_id.values():
@@ -295,15 +287,15 @@ async def _search_scenes(
         for item in _performer_entries(scene):
             official = item["official_gender"]
             gender = (
-                official
-                if official is not None
-                else local_gender_by_name.get(item["name"], ActorGender.UNKNOWN).value
+                official if official is not None else local_gender_by_name.get(item["name"], ActorGender.UNKNOWN).value
             )
-            performers.append({
-                "name": item["name"],
-                "gender": gender,
-                "official_gender": official,
-            })
+            performers.append(
+                {
+                    "name": item["name"],
+                    "gender": gender,
+                    "official_gender": official,
+                }
+            )
 
         result.append(
             {

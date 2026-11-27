@@ -9,16 +9,19 @@ from amane.enums import ActorGender
 
 
 def test_theporndb_official_gender_is_normalized() -> None:
-    assert _official_gender({"extras": {"gender": "Female"}}) is ActorGender.FEMALE
-    assert _official_gender({"extras": {"gender": "TRANSGENDER_FEMALE"}}) is ActorGender.TRANSGENDER_FEMALE
-    assert _official_gender({"extras": {"gender": "Male"}}) is ActorGender.MALE
-    assert _official_gender({"extras": {"gender": "Unknown"}}) is ActorGender.UNKNOWN
+    assert _official_gender({"extras": {"gender": "Female"}}) == "female"
+    assert _official_gender({"extras": {"gender": "TRANSGENDER_FEMALE"}}) == "transgender_female"
+    assert _official_gender({"extras": {"gender": "Male"}}) == "male"
+    assert _official_gender({"extras": {"gender": "Unknown"}}) == "unknown"
+    assert _official_gender({"extras": {"gender": "INTERSEX"}}) == "intersex"
+    assert _official_gender({"extras": {"gender": "NON_BINARY"}}) == "non_binary"
+    assert _official_gender({"extras": {"gender": "TRANSGENDER_MALE"}}) == "transgender_male"
 
 
 def test_missing_official_gender_is_distinct_from_explicit_unknown() -> None:
     assert _official_gender({"extras": {}}) is None
     assert _official_gender({"extras": {"gender": ""}}) is None
-    assert _official_gender({"extras": {"gender": "Non_Binary"}}) is ActorGender.UNKNOWN
+    assert _official_gender({"extras": {"gender": "Non_Binary"}}) == "non_binary"
 
 
 def test_scene_performers_accept_rest_and_graphql_shapes() -> None:
@@ -29,7 +32,7 @@ def test_scene_performers_accept_rest_and_graphql_shapes() -> None:
         ]
     }
     assert _performer_entries(scene) == [
-        {"name": "Official Name", "official_gender": ActorGender.FEMALE},
+        {"name": "Official Name", "official_gender": "female"},
         {"name": "Canonical Name", "official_gender": None},
     ]
 
@@ -68,8 +71,8 @@ async def test_saved_scene_gender_uses_official_then_local_then_unknown() -> Non
         },
     )
     assert [performer.gender for performer in response.performers] == [
-        ActorGender.FEMALE,
-        ActorGender.MALE,
-        ActorGender.UNKNOWN,
-        ActorGender.UNKNOWN,
+        "female",
+        "male",
+        "unknown",
+        "unknown",
     ]

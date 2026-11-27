@@ -1338,6 +1338,7 @@ def test_resolve_paths_uses_actress_placeholder(media: Path) -> None:
     )
     assert result.video == media / "F" / "ABC-123.mp4"
 
+
 class TestCommonName:
     @pytest.mark.parametrize(
         ("names", "expected"),
@@ -1356,7 +1357,9 @@ class TestCommonName:
     def test_common_name_placeholder(self, media: Path) -> None:
         wp = Library(name="t", path=str(media), video_template="{common_name}/{raw_name}.{ext}")
         result = resolve_paths(
-            wp, _meta(), ext="mp4",
+            wp,
+            _meta(),
+            ext="mp4",
             source_path=media / "incoming" / "ABC-123-1080P.mp4",
             common_name="ABC-123",
         )

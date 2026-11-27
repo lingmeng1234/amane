@@ -1,4 +1,4 @@
-"""库级自动整理: 刮削成功后的单文件 ORGANIZE 后继, 与单文件范围在整理侧的行为.
+"""库级自动整理: 刮削成功后为同一作品的关联文件创建 ORGANIZE 后继.
 
 fixture 无法表达的部分: 后继的 key / 范围 / 优先级, 缺文件与缺库时的降级, 以及范围消失不再显示为全零成功.
 """
@@ -86,17 +86,28 @@ def _organize_followups(result: TaskResult[ScrapeResult]) -> list[FollowupTask]:
 async def test_auto_organize_chains_single_file_scope(repo: Repository, tmp_path: Path) -> None:
     """开关开启时, 为当前作品在媒体库中的关联文件描述 ORGANIZE 后继."""
     lib_id, media_id = await _library_with_file(repo, tmp_path, auto_organize=True)
+    meta = await repo.upsert_metadata(number="MIDV-123", studio="Studio X")
+    assert meta.id is not None
+    second = await repo.create_media_file(
+        lib_id,
+        path=str(tmp_path / "lib" / "incoming" / "MIDV-123-4K.mp4"),
+        number="MIDV-123",
+        status=MediaFileStatus.SCRAPED,
+        metadata_id=meta.id,
+    )
+    assert second.id is not None
+
     result = await _handler(repo).handle(ScrapePayload(number="MIDV-123", media_file_id=media_id))
 
     assert result.success is True
     organize = _organize_followups(result)
     assert len(organize) == 1
     media = await repo.get_media_file(media_id)
-    assert media is not None and media.metadata_id is not None
-    assert organize[0].key == f"organize:{lib_id}:{media.metadata_id}"
+    assert media is not None and media.metadata_id == meta.id
+    assert organize[0].key == f"organize:{lib_id}:{meta.id}"
     assert organize[0].priority == -1
     assert organize[0].payload["library_id"] == lib_id
-    assert organize[0].payload["media_file_ids"] == [media_id]
+    assert set(organize[0].payload["media_file_ids"]) == {media_id, second.id}
 
 
 @pytest.mark.asyncio(loop_scope="function")

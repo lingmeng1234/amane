@@ -10,36 +10,6 @@ from .base import RepositoryMixinBase, acquire_write_lock
 
 
 class UncollectedScenesRepoMixin(RepositoryMixinBase):
-    async def record_uncollected_scene_actor_build(self, actor_name: str) -> None:
-        """记录演员本人主动发起且成功完成的建档; 按展示名精确去重."""
-        normalized_name = actor_name.strip()
-        if not normalized_name:
-            return
-        async with self._session() as session:
-            await acquire_write_lock(session)
-            existing = (
-                await session.exec(
-                    select(UncollectedSceneActorBuild).where(
-                        col(UncollectedSceneActorBuild.actor_name) == normalized_name
-                    )
-                )
-            ).first()
-            if existing is None:
-                session.add(UncollectedSceneActorBuild(actor_name=normalized_name))
-            await session.commit()
-
-    async def has_uncollected_scene_actor_build(self, actor_name: str) -> bool:
-        normalized_name = actor_name.strip()
-        if not normalized_name:
-            return False
-        async with self._session() as session:
-            result = await session.exec(
-                select(UncollectedSceneActorBuild.id)
-                .where(col(UncollectedSceneActorBuild.actor_name) == normalized_name)
-                .limit(1)
-            )
-            return result.first() is not None
-
     async def add_uncollected_scene(
         self,
         *,
@@ -86,6 +56,8 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
     async def add_uncollected_scenes(
         self,
         scenes: list[dict[str, Any]],
+        *,
+        actor_name: str | None = None,
     ) -> tuple[int, int, int]:
         """批量幂等登记; 返回 (新增, 已在名单, 已在片库)."""
         normalized: dict[str, dict[str, Any]] = {}
@@ -132,8 +104,31 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                         )
                     )
                     added += 1
+            if actor_name and actor_name.strip():
+                actor_name = actor_name.strip()
+                actor_record = (
+                    await session.exec(
+                        select(UncollectedSceneActorBuild).where(
+                            col(UncollectedSceneActorBuild.actor_name) == actor_name
+                        )
+                    )
+                ).first()
+                if actor_record is None:
+                    session.add(UncollectedSceneActorBuild(actor_name=actor_name))
             await session.commit()
             return added, already_listed, already_collected
+
+    async def has_uncollected_scene_actor_build(self, actor_name: str) -> bool:
+        normalized_name = actor_name.strip()
+        if not normalized_name:
+            return False
+        async with self._session() as session:
+            result = await session.exec(
+                select(UncollectedSceneActorBuild.id)
+                .where(col(UncollectedSceneActorBuild.actor_name) == normalized_name)
+                .limit(1)
+            )
+            return result.first() is not None
 
     async def list_uncollected_scenes(
         self,

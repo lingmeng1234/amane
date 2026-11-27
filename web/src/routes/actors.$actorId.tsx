@@ -484,7 +484,7 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
             record_actor_name: actorName,
           }),
         },
-      }),
+      ),
     onSuccess: (result) => {
       notifications.show({
         color: "blue",

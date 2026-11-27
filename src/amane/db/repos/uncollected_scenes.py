@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, cast, func, or_
+from sqlalchemy import String, cast, delete, func, or_
 from sqlmodel import col, select
 
 from ..models import Metadata, UncollectedScene
@@ -110,8 +110,8 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
             collected_uuids = select(func.lower(col(Metadata.theporndb_uuid))).where(
                 col(Metadata.theporndb_uuid).is_not(None)
             )
-            statement = UncollectedScene.__table__.delete().where(
-                func.lower(UncollectedScene.theporndb_uuid).in_(collected_uuids)
+            statement = delete(UncollectedScene).where(
+                func.lower(col(UncollectedScene.theporndb_uuid)).in_(collected_uuids)
             )
             result = await session.exec(statement)
             await session.commit()

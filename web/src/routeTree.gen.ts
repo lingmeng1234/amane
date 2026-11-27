@@ -266,6 +266,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/tag-mappings': typeof TagMappingsRoute
   '/tasks': typeof TasksRoute
+  '/uncollected-scenes': typeof UncollectedScenesRoute
   '/actors/$actorId': typeof ActorsActorIdRoute
   '/catalog/$kind': typeof CatalogKindRoute
   '/feeds/sources': typeof FeedsSourcesRoute
@@ -302,6 +303,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/tag-mappings': typeof TagMappingsRoute
   '/tasks': typeof TasksRoute
+  '/uncollected-scenes': typeof UncollectedScenesRoute
   '/actors/$actorId': typeof ActorsActorIdRoute
   '/catalog/$kind': typeof CatalogKindRoute
   '/feeds/sources': typeof FeedsSourcesRoute
@@ -369,6 +371,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tag-mappings'
     | '/tasks'
+    | '/uncollected-scenes'
     | '/actors/$actorId'
     | '/catalog/$kind'
     | '/feeds/sources'
@@ -404,6 +407,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tag-mappings'
     | '/tasks'
+    | '/uncollected-scenes'
     | '/actors/$actorId'
     | '/catalog/$kind'
     | '/feeds/sources'

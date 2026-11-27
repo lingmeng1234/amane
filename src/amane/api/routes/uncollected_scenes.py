@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -8,10 +8,20 @@ from ..deps import RepoDep
 
 router = APIRouter(prefix="/uncollected-scenes", tags=["uncollected-scenes"])
 
+SceneGender = Literal[
+    "female",
+    "intersex",
+    "male",
+    "non_binary",
+    "transgender_female",
+    "transgender_male",
+    "unknown",
+]
+
 
 class ScenePerformerInput(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    official_gender: ActorGender | None = None
+    official_gender: SceneGender | None = None
 
 
 class UncollectedSceneCreateRequest(BaseModel):
@@ -25,7 +35,7 @@ class UncollectedSceneCreateRequest(BaseModel):
 
 class UncollectedScenePerformerResponse(BaseModel):
     name: str
-    gender: ActorGender
+    gender: SceneGender
 
 
 class UncollectedSceneResponse(BaseModel):
@@ -56,13 +66,18 @@ class UncollectedSceneRefreshResponse(BaseModel):
     deleted: int
 
 
-def _gender(value: object) -> ActorGender:
-    if isinstance(value, str):
-        try:
-            return ActorGender(value)
-        except ValueError:
-            return ActorGender.UNKNOWN
-    return ActorGender.UNKNOWN
+def _gender(value: object) -> SceneGender:
+    if isinstance(value, str) and value in {
+        "female",
+        "intersex",
+        "male",
+        "non_binary",
+        "transgender_female",
+        "transgender_male",
+        "unknown",
+    }:
+        return value  # type: ignore[return-value]
+    return "unknown"
 
 
 async def _scene_response(item: Any, local_gender_by_name: dict[str, ActorGender]) -> UncollectedSceneResponse:
@@ -75,8 +90,10 @@ async def _scene_response(item: Any, local_gender_by_name: dict[str, ActorGender
             continue
         official = performer.get("official_gender")
         # 官方明确给出性别时始终优先; 只有字段缺失才使用本地演员档案.
-        gender = _gender(official) if official is not None else local_gender_by_name.get(
-            name, ActorGender.UNKNOWN
+        gender = (
+            _gender(official)
+            if official is not None
+            else _gender(local_gender_by_name.get(name, ActorGender.UNKNOWN).value)
         )
         performers.append(UncollectedScenePerformerResponse(name=name, gender=gender))
     return UncollectedSceneResponse(
@@ -140,7 +157,7 @@ async def add_uncollected_scene(
     performers = [
         {
             "name": item.name.strip(),
-            "official_gender": item.official_gender.value if item.official_gender is not None else None,
+            "official_gender": item.official_gender,
         }
         for item in req.performers
         if item.name.strip()

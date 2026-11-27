@@ -1608,12 +1608,18 @@ async def test_organize_common_name_without_shared_prefix_skips_without_moving(
     meta = await repo.upsert_metadata(number="A-123", studio="Studio")
     assert meta.id is not None
     await repo.create_media_file(
-        lib.id, path=str(first), number="A-123",
-        status=MediaFileStatus.SCRAPED, metadata_id=meta.id,
+        lib.id,
+        path=str(first),
+        number="A-123",
+        status=MediaFileStatus.SCRAPED,
+        metadata_id=meta.id,
     )
     await repo.create_media_file(
-        lib.id, path=str(second), number="A-123",
-        status=MediaFileStatus.SCRAPED, metadata_id=meta.id,
+        lib.id,
+        path=str(second),
+        number="A-123",
+        status=MediaFileStatus.SCRAPED,
+        metadata_id=meta.id,
     )
 
     result = await OrganizeHandler(repo, HotSettings(), resource_store).handle(

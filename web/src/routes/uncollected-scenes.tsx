@@ -140,7 +140,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
           }}
         >
           {actors.map((actor, index) => (
-            <Box key={index} style={{ minWidth: 0, overflow: "hidden" }}>
+            <Box key={index} style={{ minWidth: 0 }}>
               {actor.name === "—" ? (
                 <Text size="sm" c="dimmed">—</Text>
               ) : (
@@ -151,6 +151,12 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
                   gender={actor.gender}
                   size="sm"
                   variant="light"
+                  style={{
+                    maxWidth: "100%",
+                    height: "auto",
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                  }}
                 />
               )}
             </Box>

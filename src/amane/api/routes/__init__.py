@@ -29,8 +29,8 @@ from .system import router as system_router
 from .tag_mappings import router as tag_mappings_router
 from .tasks import router as tasks_router
 from .theporndb_scenes import router as theporndb_scenes_router
-from .uncollected_scenes import router as uncollected_scenes_router
 from .tools import router as tools_router
+from .uncollected_scenes import router as uncollected_scenes_router
 from .webhooks import router as webhooks_router
 from .ws import router as ws_router
 

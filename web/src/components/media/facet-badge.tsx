@@ -1,4 +1,5 @@
 import { Badge, type MantineColor } from "@mantine/core";
+import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import type { ActorGender, FacetKind } from "@/client/types.gen";
 import { GenderMark } from "@/components/media/gender-mark";
@@ -28,6 +29,7 @@ interface FacetBadgeProps {
   mode?: "meta" | "catalog";
   variant?: "filled" | "light" | "outline" | "dot" | "transparent";
   size?: "xs" | "sm" | "md" | "lg";
+  style?: CSSProperties;
 }
 
 /** 默认为实体页; `mode="meta"` 时进入片库筛选. */
@@ -39,6 +41,7 @@ export function FacetBadge({
   mode = "catalog",
   variant = "light",
   size = "sm",
+  style,
 }: FacetBadgeProps) {
   const color = KIND_COLOR[kind];
   // 名称字段统一保留数据本身的大小写；不得由 Badge 默认样式自动转成大写。
@@ -66,7 +69,7 @@ export function FacetBadge({
             size={size}
             leftSection={leftSection}
             tt="none"
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", ...style }}
           >
             <span>{name}</span>
           </Badge>

@@ -63,9 +63,16 @@ logger = structlog.get_logger()
 def _library_uses_common_name(library: object) -> bool:
     """只在任一媒体库模板实际引用共同文件名时启用关联文件名查询."""
     fields = (
-        "video_template", "link_template", "strm_content_template", "thumb_template",
-        "poster_template", "fanart_template", "extrafanart_template", "nfo_template",
-        "trailer_template", "subtitle_template",
+        "video_template",
+        "link_template",
+        "strm_content_template",
+        "thumb_template",
+        "poster_template",
+        "fanart_template",
+        "extrafanart_template",
+        "nfo_template",
+        "trailer_template",
+        "subtitle_template",
     )
     return any("{common_name}" in (getattr(library, field, None) or "") for field in fields)
 

@@ -119,7 +119,7 @@ function UncollectedScenesPage() {
   });
 
   const searchMutation = useMutation({
-    mutationFn: () => requestJson<{ items: SearchScene[] }>("/api/theporndb-scenes/search", {
+    mutationFn: () => requestJson<{ items: SearchScene[] }>("/api/theporndb-scenes/search-filtered", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ studio: studioInput.trim(), performer: performerInput.trim(), tag: tagInput.trim() }),
     }),

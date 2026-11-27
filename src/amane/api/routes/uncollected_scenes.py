@@ -1,5 +1,3 @@
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -144,7 +142,7 @@ async def add_uncollected_scene(
         for item in req.performers
         if item.name.strip()
     ]
-    _, added = await repo.add_uncollected_scene(
+    item, added = await repo.add_uncollected_scene(
         theporndb_uuid=uuid,
         title=req.title.strip(),
         date=req.date.strip(),
@@ -152,16 +150,12 @@ async def add_uncollected_scene(
         performers=performers,
         image_url=req.image_url,
     )
-    already_collected = _is_collected_result(added, _)
+    already_collected = item is None
     return UncollectedSceneAddResponse(
         added=added,
         already_collected=already_collected,
         theporndb_uuid=uuid.casefold(),
     )
-
-
-def _is_collected_result(item: Any, added: bool) -> bool:
-    return item is None and not added
 
 
 @router.delete("/{theporndb_uuid}")

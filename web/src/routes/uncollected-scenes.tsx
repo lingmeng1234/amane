@@ -89,11 +89,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 function genderSymbol(gender: Gender): string {
   if (gender === "female") return "♀";
-  if (
-    gender === "transgender_female" ||
-    gender === "transgender_male" ||
-    gender === "non_binary"
-  ) {
+  if (gender === "transgender_female" || gender === "transgender_male" || gender === "non_binary") {
     return "⚧";
   }
   if (gender === "intersex") return "⚥";
@@ -124,13 +120,7 @@ function ActorText({ actor }: { actor: Performer }) {
   );
 }
 
-function SceneCard({
-  scene,
-  onDelete,
-}: {
-  scene: SavedScene;
-  onDelete: () => void;
-}) {
+function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => void }) {
   const actors = [...scene.performers];
   while (actors.length < 4) {
     actors.push({ name: "—", gender: "unknown" });
@@ -288,10 +278,9 @@ function UncollectedScenesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (uuid: string) =>
-      requestJson<{ deleted: boolean }>(
-        "/api/uncollected-scenes/" + encodeURIComponent(uuid),
-        { method: "DELETE" },
-      ),
+      requestJson<{ deleted: boolean }>("/api/uncollected-scenes/" + encodeURIComponent(uuid), {
+        method: "DELETE",
+      }),
     onSuccess: () => {
       notifications.show({ message: "已从未收录名单移除", color: "blue" });
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
@@ -317,9 +306,7 @@ function UncollectedScenesPage() {
   const list = listQuery.data;
   const totalPages = Math.max(1, Math.ceil((list?.total ?? 0) / 30));
   const activeFilters = [
-    filters.performer
-      ? { key: "performer", label: "演员：" + filters.performer }
-      : null,
+    filters.performer ? { key: "performer", label: "演员：" + filters.performer } : null,
     filters.studio ? { key: "studio", label: "厂牌：" + filters.studio } : null,
   ].filter((item): item is { key: string; label: string } => item !== null);
 
@@ -361,11 +348,7 @@ function UncollectedScenesPage() {
             <Button
               leftSection={<IconSearch size={16} />}
               loading={searchMutation.isPending}
-              disabled={
-                !studioInput.trim() &&
-                !performerInput.trim() &&
-                !tagInput.trim()
-              }
+              disabled={!studioInput.trim() && !performerInput.trim() && !tagInput.trim()}
               onClick={() => searchMutation.mutate()}
             >
               搜索
@@ -380,11 +363,7 @@ function UncollectedScenesPage() {
                 <Card key={scene.id} withBorder padding="xs" radius="sm">
                   <Group align="flex-start" wrap="nowrap">
                     <Image
-                      src={
-                        scene.image
-                          ? proxyImageUrl(scene.image, "theporndb")
-                          : undefined
-                      }
+                      src={scene.image ? proxyImageUrl(scene.image, "theporndb") : undefined}
                       alt={scene.title}
                       w={112}
                       h={76}
@@ -420,10 +399,7 @@ function UncollectedScenesPage() {
                     <Button
                       size="xs"
                       variant="light"
-                      loading={
-                        addMutation.isPending &&
-                        addMutation.variables?.id === scene.id
-                      }
+                      loading={addMutation.isPending && addMutation.variables?.id === scene.id}
                       disabled={addMutation.isPending}
                       onClick={() => addMutation.mutate(scene)}
                     >
@@ -473,18 +449,14 @@ function UncollectedScenesPage() {
             label="演员"
             placeholder="搜索演员"
             value={draft.performer}
-            onChange={(event) =>
-              setDraft({ ...draft, performer: event.currentTarget.value })
-            }
+            onChange={(event) => setDraft({ ...draft, performer: event.currentTarget.value })}
             style={{ flex: "1 1 160px" }}
           />
           <TextInput
             label="厂牌"
             placeholder="搜索厂牌"
             value={draft.studio}
-            onChange={(event) =>
-              setDraft({ ...draft, studio: event.currentTarget.value })
-            }
+            onChange={(event) => setDraft({ ...draft, studio: event.currentTarget.value })}
             style={{ flex: "1 1 160px" }}
           />
           <Button
@@ -533,9 +505,7 @@ function UncollectedScenesPage() {
           </Group>
         )}
 
-        {listQuery.isError && (
-          <Alert color="red">{(listQuery.error as Error).message}</Alert>
-        )}
+        {listQuery.isError && <Alert color="red">{(listQuery.error as Error).message}</Alert>}
 
         {listQuery.isLoading ? (
           <Text size="sm" c="dimmed">

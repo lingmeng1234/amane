@@ -180,10 +180,12 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
     async def list_uncollected_scene_facets(self) -> tuple[list[str], list[str]]:
         """返回未收录名单中实际出现的演员展示名与制作商原名."""
         async with self._session() as session:
-            rows = (await session.exec(select(UncollectedScene.studio, UncollectedScene.performers))).all()
+            rows = (await session.exec(select(UncollectedScene))).all()
         studios: dict[str, str] = {}
         performers: dict[str, str] = {}
-        for studio, entries in rows:
+        for item in rows:
+            studio = item.studio
+            entries = item.performers
             if isinstance(studio, str) and studio.strip():
                 studios.setdefault(studio.casefold(), studio.strip())
             for entry in entries or []:

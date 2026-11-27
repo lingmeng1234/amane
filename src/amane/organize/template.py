@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
@@ -54,6 +55,7 @@ TemplateVariables = TypedDict(
         "ext": str,
         "raw_dir": str,
         "raw_name": str,
+        "common_name": str,
         "raw_relpath": str,
         "cd?": str,
         "sub?": str,
@@ -302,6 +304,27 @@ def video_relpath(dest: Path, library_root: Path) -> str:
     return rel
 
 
+def common_name_from_names(names: Sequence[str]) -> str:
+    """单个文件保留完整文件名; 多个文件取最长公共前缀并清理末尾标点/符号."""
+    items = list(names)
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    prefix = items[0]
+    for name in items[1:]:
+        limit = min(len(prefix), len(name))
+        index = 0
+        while index < limit and prefix[index] == name[index]:
+            index += 1
+        prefix = prefix[:index]
+        if not prefix:
+            return ""
+    while prefix and (prefix[-1].isspace() or unicodedata.category(prefix[-1])[0] in {"P", "S"}):
+        prefix = prefix[:-1]
+    return prefix
+
+
 def actress_names(actors: Sequence[str], genders: Mapping[str, ActorGender] | None = None) -> list[str]:
     """按 ``Metadata.actors`` 顺序排除明确 ``male``; 未入表或 ``unknown`` 保留."""
     if not actors:
@@ -319,6 +342,7 @@ def _build_variables(
     cd: int | None = None,
     actor_genders: Mapping[str, ActorGender] | None = None,
     library_root: Path | None = None,
+    common_name: str = "",
 ) -> TemplateVariables:
     year = metadata.release[:4] if metadata.release and len(metadata.release) >= 4 else None
     actor = metadata.actors[0] if metadata.actors else None
@@ -370,6 +394,7 @@ def _build_variables(
         "ext": ext,
         "raw_dir": raw_dir,
         "raw_name": raw_name,
+        "common_name": common_name,
         "raw_relpath": _relpath_or_empty(source_path, library_root),
         "cd?": str(cd) if cd is not None else "",
         "sub?": "C" if file_info is not None and file_info.has_subtitle else "",
@@ -419,8 +444,9 @@ class TemplateContext:
         cd: int | None = None,
         actor_genders: Mapping[str, ActorGender] | None = None,
         library_root: Path | None = None,
+        common_name: str = "",
     ) -> TemplateContext:
-        built = _build_variables(metadata, ext, source_path, file_info, cd, actor_genders, library_root)
+        built = _build_variables(metadata, ext, source_path, file_info, cd, actor_genders, library_root, common_name)
         variables = cast(dict[str, str], {**built})
         # {dir} 是 {raw_dir} 的别名, 不下发 schema.
         variables["dir"] = built["raw_dir"]

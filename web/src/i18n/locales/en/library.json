@@ -204,7 +204,8 @@
       "video_relpath": "Rendered video path relative to the library root. Link, sidecar, and STRM content templates",
       "link_dir": "Directory of the link; same as {video_dir} when the link template is unset",
       "link_name": "Rendered link filename (no extension); same as {video_name} when the link template is unset",
-      "raw_srt_name": "Source subtitle filename. e.g. A/foo.zh.srt → foo.zh"
+      "raw_srt_name": "Source subtitle filename. e.g. A/foo.zh.srt → foo.zh",
+      "common_name": "Common filename. Keeps the full name for one linked video; for multiple videos, uses their longest shared prefix and trims trailing punctuation."
     }
   },
   "tpl": {

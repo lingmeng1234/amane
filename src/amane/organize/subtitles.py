@@ -72,6 +72,7 @@ def place_subtitles(
     link_dir: Path | None = None,
     link_name: str | None = None,
     actor_genders: Mapping[str, ActorGender] | None = None,
+    common_name: str = "",
 ) -> list[SubtitleConflict]:
     """失败与冲突只记日志, 不抛异常; 返回被占用而跳过的字幕源与其目标."""
     conflicted: list[SubtitleConflict] = []
@@ -96,6 +97,7 @@ def place_subtitles(
             file_info=file_info,
             safe_dirs=safe_dirs,
             actor_genders=actor_genders,
+            common_name=common_name,
         )
         result = execute_organize.sync(
             source=sub,

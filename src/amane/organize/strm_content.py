@@ -45,6 +45,7 @@ def render_strm_content(
     file_info: FileInfo | None = None,
     link: Path | None = None,
     actor_genders: Mapping[str, ActorGender] | None = None,
+    common_name: str = "",
 ) -> str:
     """空模板写 dest 的字面绝对路径.
     模板引用 `{video_relpath}` 且整理后的路径不在本库内时抛 ValueError, 不写出错误正文.
@@ -59,6 +60,7 @@ def render_strm_content(
         file_info=file_info,
         actor_genders=actor_genders,
         library_root=library_root,
+        common_name=common_name,
     )
     ctx.apply_video(dest, library_root)
     ctx.apply_link(link)

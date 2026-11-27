@@ -619,7 +619,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
         # 为尚未刮削的演员扇出 ACTOR_SCRAPE.
         actor_followups = await self._actor_scrape_followups(meta.actors)
         # 库开启自动整理时为本次刮削的文件扇出 ORGANIZE.
-        organize_followups = await self._auto_organize_followups(payload, file)
+        organize_followups = await self._auto_organize_followups(payload, file, meta.id)
 
         await self.report_progress(progress_total, progress_total, "done")
 
@@ -656,7 +656,9 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
             outcomes=outcomes,
         )
 
-    async def _auto_organize_followups(self, payload: ScrapePayload, file: MediaFile | None) -> list[FollowupTask]:
+    async def _auto_organize_followups(
+        self, payload: ScrapePayload, file: MediaFile | None, metadata_id: int
+    ) -> list[FollowupTask]:
         """库开启自动整理时为本次刮削的那一个文件描述 ORGANIZE 后继.
 
         范围只有该文件, 且后继只在父成功后创建, 因此整理必然发生在它刮削完成之后.
@@ -683,7 +685,13 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
             # 自动整理只允许唯一落盘根目录; 多目录配置仅用于扫描/监控/刷新/刮削.
             if not library.auto_organize or len(organize_paths) != 1:
                 return []
-            organize = OrganizePayload(library_id=file.library_id, media_file_ids=[file.id])
+            linked_files = await self._repo.list_media_files(
+                library_id=file.library_id, metadata_ids=[metadata_id], limit=None
+            )
+            media_file_ids = [item.id for item in linked_files if item.id is not None]
+            if file.id not in media_file_ids:
+                media_file_ids.append(file.id)
+            organize = OrganizePayload(library_id=file.library_id, media_file_ids=media_file_ids)
             return [
                 FollowupTask(
                     key=f"organize:{file.id}",

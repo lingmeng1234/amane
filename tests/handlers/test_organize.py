@@ -1538,3 +1538,84 @@ async def test_organize_other_modes_leave_source_dir(
     assert result.result.pruned_dirs == 0
     assert src.exists()
     assert src_dir.is_dir()
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_organize_common_name_uses_all_linked_video_names(
+    repo: Repository, resource_store: ResourceStore, tmp_path: Path
+) -> None:
+    lib_root = tmp_path / "lib"
+    incoming = lib_root / "incoming"
+    incoming.mkdir(parents=True)
+    first = incoming / "A-123-1080P.mp4"
+    second = incoming / "A-123-4K.mp4"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    lib = await repo.create_library(
+        name="t",
+        path=str(lib_root),
+        organize_path=str(lib_root),
+        video_template="{common_name}/{raw_name}.{ext}",
+        write_nfo=False,
+    )
+    assert lib.id is not None
+    meta = await repo.upsert_metadata(number="A-123", studio="Studio")
+    assert meta.id is not None
+    await repo.create_media_file(
+        lib.id, path=str(first), number="A-123",
+        status=MediaFileStatus.SCRAPED, metadata_id=meta.id,
+    )
+    await repo.create_media_file(
+        lib.id, path=str(second), number="A-123",
+        status=MediaFileStatus.SCRAPED, metadata_id=meta.id,
+    )
+
+    result = await OrganizeHandler(repo, HotSettings(), resource_store).handle(
+        OrganizePayload(library_id=lib.id, path=str(lib_root))
+    )
+    assert result.success is True
+    assert result.result is not None
+    assert result.result.organized == 2
+    assert (lib_root / "A-123" / first.name).read_bytes() == b"first"
+    assert (lib_root / "A-123" / second.name).read_bytes() == b"second"
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_organize_common_name_without_shared_prefix_skips_without_moving(
+    repo: Repository, resource_store: ResourceStore, tmp_path: Path
+) -> None:
+    lib_root = tmp_path / "lib"
+    incoming = lib_root / "incoming"
+    incoming.mkdir(parents=True)
+    first = incoming / "alpha.mp4"
+    second = incoming / "beta.mp4"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    lib = await repo.create_library(
+        name="t",
+        path=str(lib_root),
+        organize_path=str(lib_root),
+        video_template="{common_name}/{raw_name}.{ext}",
+        write_nfo=False,
+    )
+    assert lib.id is not None
+    meta = await repo.upsert_metadata(number="A-123", studio="Studio")
+    assert meta.id is not None
+    await repo.create_media_file(
+        lib.id, path=str(first), number="A-123",
+        status=MediaFileStatus.SCRAPED, metadata_id=meta.id,
+    )
+    await repo.create_media_file(
+        lib.id, path=str(second), number="A-123",
+        status=MediaFileStatus.SCRAPED, metadata_id=meta.id,
+    )
+
+    result = await OrganizeHandler(repo, HotSettings(), resource_store).handle(
+        OrganizePayload(library_id=lib.id, path=str(lib_root))
+    )
+    assert result.success is True
+    assert result.result is not None
+    assert result.result.skipped == 2
+    assert first.read_bytes() == b"first"
+    assert second.read_bytes() == b"second"
+    assert not (lib_root / "alpha").exists()
+    assert not (lib_root / "beta").exists()

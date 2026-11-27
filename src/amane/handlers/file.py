@@ -35,6 +35,7 @@ from ..organize import (
     video_dest,
 )
 from ..organize.link import create_video_link
+from ..organize.template import common_name_from_names
 from ..parsing import ContentType, FileInfo, FilePhaseSummary, file_phase_from_path, parse_file_info
 from ..utils.path import existing_disk_path as existing_disk_path_sync
 from ..utils.path import is_descendant, nfc_path, path_is_under
@@ -57,6 +58,16 @@ if TYPE_CHECKING:
     from ..net.http import WebClient
 
 logger = structlog.get_logger()
+
+
+def _library_uses_common_name(library: object) -> bool:
+    """只在任一媒体库模板实际引用共同文件名时启用关联文件名查询."""
+    fields = (
+        "video_template", "link_template", "strm_content_template", "thumb_template",
+        "poster_template", "fanart_template", "extrafanart_template", "nfo_template",
+        "trailer_template", "subtitle_template",
+    )
+    return any("{common_name}" in (getattr(library, field, None) or "") for field in fields)
 
 
 def _uses_western_image_flow(metadata: Metadata, config: HotSettings | None) -> bool:
@@ -108,6 +119,7 @@ async def execute_file_operations(
     actor_genders: dict[str, ActorGender] | None = None,
     tag_mapping_path: Path | None = None,
     file_phase: FilePhaseSummary | None = None,
+    common_name: str = "",
 ) -> FileOperationsResult:
     """``file_info`` 由渲染路径的那一次 ``parse_file_info`` 产出, 必须带上 ``has_external_subtitle``.
 
@@ -184,6 +196,7 @@ async def execute_file_operations(
                     file_info=file_info,
                     link=paths.link,
                     actor_genders=actor_genders,
+                    common_name=common_name,
                 )
             except ValueError as e:
                 return FileOperationsResult(outcome=PlaceOutcome.FAILED, dest=org_result.dest, error=str(e))
@@ -218,6 +231,7 @@ async def execute_file_operations(
             link_dir=paths.link.parent if paths.link is not None else None,
             link_name=paths.link.stem if paths.link is not None else None,
             actor_genders=actor_genders,
+            common_name=common_name,
         )
 
     if org_result.outcome is PlaceOutcome.PLACED:
@@ -243,6 +257,7 @@ async def apply_file_operations(
     watermark_dir: Path | None = None,
     tag_mapping_path: Path | None = None,
     file_phase: FilePhaseSummary | None = None,
+    common_name: str | None = None,
 ) -> FileOperationsResult | None:
     """缺少 media_file_id 或对应记录时返回 None (跳过, 不视为失败).
     Library 由 MediaFile.library_id 派生.
@@ -255,6 +270,29 @@ async def apply_file_operations(
     library = await repo.get_library(media_file.library_id)
     if library is None:
         return None
+
+    # {common_name} 只在模板引用时计算, 且仅比较同一媒体库中关联到同一 Metadata 的视频.
+    if _library_uses_common_name(library):
+        if common_name is None:
+            related_files = (
+                await repo.list_media_files(library_id=media_file.library_id, metadata_ids=[metadata.id], limit=None)
+                if metadata.id is not None
+                else [media_file]
+            )
+            video_extensions = {ext.casefold() for ext in (config.watcher.media_extensions or MEDIA_EXTENSIONS)}
+            names = [
+                Path(item.path).stem
+                for item in related_files
+                if Path(item.path).suffix.casefold() in video_extensions
+            ]
+            if not names and Path(media_file.path).suffix.casefold() in video_extensions:
+                names = [Path(media_file.path).stem]
+            common_name = common_name_from_names(names)
+        if not common_name:
+            logger.info("organize skipped: linked videos have no common filename prefix", metadata_id=metadata.id)
+            return None
+    else:
+        common_name = ""
 
     # 渲染路径后执行落盘.
     ext = Path(media_file.path).suffix.lstrip(".")
@@ -277,6 +315,7 @@ async def apply_file_operations(
         source_path=Path(media_file.path),
         safe_dirs=safe_dirs,
         actor_genders=actor_genders,
+        common_name=common_name,
     )
     return await execute_file_operations(
         media_file,
@@ -296,6 +335,7 @@ async def apply_file_operations(
         actor_genders=actor_genders,
         tag_mapping_path=tag_mapping_path,
         file_phase=file_phase,
+        common_name=common_name,
     )
 
 
@@ -668,6 +708,19 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
             if metadata is not None:
                 metadata_by_id[item.metadata_id] = metadata
         summaries = await self._repo.summarize_media_by_metadata(list(metadata_by_id.values()))
+        common_names_by_metadata_id: dict[int, str] = {}
+        if _library_uses_common_name(library):
+            video_extensions = {ext.casefold() for ext in media_extensions}
+            for metadata_id in metadata_by_id:
+                linked_files = await self._repo.list_media_files(
+                    library_id=library.id, metadata_ids=[metadata_id], limit=None
+                )
+                names = [
+                    Path(item.path).stem
+                    for item in linked_files
+                    if Path(item.path).suffix.casefold() in video_extensions
+                ]
+                common_names_by_metadata_id[metadata_id] = common_name_from_names(names)
         if total == 0:
             await self.report_progress(1, 1, "done")
         else:
@@ -702,6 +755,7 @@ class OrganizeHandler(TaskHandler[OrganizePayload, OrganizeResult]):
                     watermark_dir=self._watermark_dir,
                     tag_mapping_path=self._tag_mapping_path,
                     file_phase=metadata_summary.phase if metadata_summary is not None else None,
+                    common_name=common_names_by_metadata_id.get(metadata.id),
                 )
                 if fop_result is None:
                     skipped += 1

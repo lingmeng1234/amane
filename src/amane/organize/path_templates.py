@@ -84,6 +84,7 @@ def resolve_paths(
     file_info: FileInfo | None = None,
     safe_dirs: Sequence[Path] | None = (),
     actor_genders: Mapping[str, ActorGender] | None = None,
+    common_name: str = "",
 ) -> ResolvedPaths:
     """``safe_dirs is None`` 时不限制绝对模板写出的路径; 相对模板仍须在 base_path 下."""
     base_path = _resolve_organize_base_path(library)
@@ -95,6 +96,7 @@ def resolve_paths(
         cd=cd,
         actor_genders=actor_genders,
         library_root=base_path,
+        common_name=common_name,
     )
 
     # 先渲染视频, 注入 `{video_*}` 后再渲染链接与刮削产物.
@@ -163,6 +165,7 @@ def resolve_subtitle_path(
     file_info: FileInfo | None = None,
     safe_dirs: Sequence[Path] | None = (),
     actor_genders: Mapping[str, ActorGender] | None = None,
+    common_name: str = "",
 ) -> Path:
     """`{ext}` / `{raw_srt_name}` 取自该字幕源文件; `{raw_name}` / `{raw_dir}` / `{raw_relpath}` 仍是视频源.
     `{video_dir}` / `{video_name}` 为整理后视频父目录与文件名 (不含扩展名);
@@ -177,6 +180,7 @@ def resolve_subtitle_path(
         file_info=file_info,
         actor_genders=actor_genders,
         library_root=base_path,
+        common_name=common_name,
     )
     if video_dest is not None:
         ctx.apply_video(video_dest, base_path)

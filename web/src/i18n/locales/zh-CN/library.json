@@ -202,7 +202,8 @@
       "video_relpath": "整理后视频相对库根目录的路径. 链接模板、附属资源模板与 STRM 内容模板可用",
       "link_dir": "链接所在目录; 未设置链接模板时同 {video_dir}",
       "link_name": "整理后链接文件名 (不含扩展名); 未设置链接模板时同 {video_name}",
-      "raw_srt_name": "字幕源文件名. 例 A/foo.zh.srt → foo.zh"
+      "raw_srt_name": "字幕源文件名. 例 A/foo.zh.srt → foo.zh",
+      "common_name": "共同文件名。单个关联视频保留完整文件名；多个视频取开头的最长共同部分，并清理末尾符号"
     }
   },
   "tpl": {

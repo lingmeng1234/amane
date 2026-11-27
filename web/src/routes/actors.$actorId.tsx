@@ -490,7 +490,7 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
         color: "blue",
         message:
           `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，` +
-            `名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
+          `名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
       });
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scene-status", actorName] });
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
@@ -539,11 +539,7 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
         />
       </Group>
       <Group justify="flex-end">
-        <Button
-          size="xs"
-          loading={buildMutation.isPending}
-          onClick={() => buildMutation.mutate()}
-        >
+        <Button size="xs" loading={buildMutation.isPending} onClick={() => buildMutation.mutate()}>
           建档
         </Button>
       </Group>

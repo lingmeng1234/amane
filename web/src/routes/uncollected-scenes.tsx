@@ -147,7 +147,9 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
           {actors.map((actor, index) => (
             <Box key={index} style={{ minWidth: 0 }}>
               {actor.name === "—" ? (
-                <Text size="sm" c="dimmed">—</Text>
+                <Text size="sm" c="dimmed">
+                  —
+                </Text>
               ) : (
                 <FacetBadge
                   kind="actor"
@@ -214,7 +216,7 @@ function UncollectedScenesPage() {
         color: "blue",
         message:
           `建档完成：命中 ${result.matched} 条，新增 ${result.added} 条，` +
-            `名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
+          `名单重复 ${result.already_in_list} 条，片库已有 ${result.already_collected} 条`,
       });
       setPage(1);
       void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
@@ -423,11 +425,15 @@ function UncollectedScenesPage() {
         )}
 
         {listQuery.isError && (
-          <Text size="sm" c="red">{(listQuery.error as Error).message}</Text>
+          <Text size="sm" c="red">
+            {(listQuery.error as Error).message}
+          </Text>
         )}
 
         {listQuery.isLoading ? (
-          <Text size="sm" c="dimmed">加载中…</Text>
+          <Text size="sm" c="dimmed">
+            加载中…
+          </Text>
         ) : (list?.items.length ?? 0) === 0 ? (
           <Text size="sm" c="dimmed" ta="center" py="xl">
             {activeFilters.length > 0 ? "没有符合筛选条件的未收录影片" : "暂无未收录影片"}

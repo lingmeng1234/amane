@@ -319,8 +319,7 @@ def common_name_from_names(names: Sequence[str]) -> str:
         prefix = prefix[:index]
         if not prefix:
             return ""
-    prefix = prefix.rstrip().rstrip("-").rstrip()
-    return prefix
+    return prefix.rstrip().rstrip("-").rstrip()
 
 
 def actress_names(actors: Sequence[str], genders: Mapping[str, ActorGender] | None = None) -> list[str]:

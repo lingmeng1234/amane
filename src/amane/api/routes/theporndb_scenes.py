@@ -14,6 +14,11 @@ router = APIRouter(prefix="/theporndb-scenes", tags=["theporndb-scenes"])
 class SceneSearchRequest(BaseModel):
     query: str = Field(default="", max_length=200)
     date: str = Field(default="", max_length=40)
+
+
+class SceneSearchFilterRequest(BaseModel):
+    query: str = Field(default="", max_length=200)
+    date: str = Field(default="", max_length=40)
     studio: str = Field(default="", max_length=200)
     performer: str = Field(default="", max_length=200)
     tag: str = Field(default="", max_length=200)
@@ -159,9 +164,8 @@ async def _resolve_exact_site(client: AsyncClient, token: str, name: str) -> int
     return next(iter(unique))
 
 
-@router.post("/search")
-async def search_scenes(
-    req: SceneSearchRequest,
+async def _search_scenes(
+    req: SceneSearchFilterRequest,
     runtime: RuntimeDep,
     repo: RepoDep,
 ) -> dict[str, list[dict[str, Any]]]:
@@ -317,6 +321,28 @@ async def search_scenes(
             }
         )
     return {"items": result}
+
+
+@router.post("/search")
+async def search_scenes(
+    req: SceneSearchRequest,
+    runtime: RuntimeDep,
+    repo: RepoDep,
+) -> dict[str, list[dict[str, Any]]]:
+    return await _search_scenes(
+        SceneSearchFilterRequest(query=req.query, date=req.date),
+        runtime,
+        repo,
+    )
+
+
+@router.post("/search-filtered", include_in_schema=False)
+async def search_scenes_filtered(
+    req: SceneSearchFilterRequest,
+    runtime: RuntimeDep,
+    repo: RepoDep,
+) -> dict[str, list[dict[str, Any]]]:
+    return await _search_scenes(req, runtime, repo)
 
 
 async def _empty_filter() -> None:

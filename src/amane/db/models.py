@@ -231,6 +231,17 @@ class UncollectedScene(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_utcnow)
 
 
+class UncollectedSceneActorBuild(SQLModel, table=True):
+    """演员详情页主动发起成功建档的记录; 与场景名单中的出演者独立."""
+
+    __tablename__ = "uncollected_scene_actor_builds"  # type: ignore[assignment]
+    __table_args__ = (UniqueConstraint("actor_name", name="uq_uncollected_scene_actor_builds_actor_name"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    actor_name: str = Field(nullable=False, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class MediaFile(SQLModel, table=True):
     __tablename__ = "media_files"  # type: ignore[assignment]
 

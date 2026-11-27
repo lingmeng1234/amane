@@ -24,11 +24,21 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
         studio: str,
         performers: list[dict[str, str | None]],
         image_url: str | None,
-    ) -> tuple[UncollectedScene, bool]:
+    ) -> tuple[UncollectedScene | None, bool]:
         """按 UUID 幂等登记; 已存在时保留原记录."""
         normalized_uuid = theporndb_uuid.strip().casefold()
         async with self._session() as session:
             await acquire_write_lock(session)
+            collected = (
+                await session.exec(
+                    select(Metadata.id).where(
+                        func.lower(col(Metadata.theporndb_uuid)) == normalized_uuid
+                    ).limit(1)
+                )
+            ).first()
+            if collected is not None:
+                await session.commit()
+                return None, False
             existing = (
                 await session.exec(
                     select(UncollectedScene).where(

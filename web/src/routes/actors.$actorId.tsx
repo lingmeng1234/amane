@@ -62,8 +62,8 @@ import { metaSearchForFacet } from "@/lib/facets";
 import { ageFromBirthday } from "@/lib/format-birthday";
 import { nextOffsetPageParam } from "@/lib/infinite-list";
 import { DEFAULT_METADATA_SORT_PREFERENCE, METADATA_SORT_OPTIONS } from "@/lib/media/browse";
-import { proxyImageUrl } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-token";
+import { proxyImageUrl } from "@/lib/utils";
 import { ProxyImage } from "@/components/media/proxy-image";
 import { useUIStore } from "@/stores/ui";
 
@@ -457,16 +457,27 @@ async function requestUncollectedJson<T>(url: string, init?: RequestInit): Promi
   return (await response.json()) as T;
 }
 
-function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
+function ActorUncollectedBuilder({
+  actorName,
+  actorAliases,
+}: {
+  actorName: string;
+  actorAliases: string[];
+}) {
   const queryClient = useQueryClient();
   const [studio, setStudio] = useState("");
   const [tag, setTag] = useState("");
   const statusQuery = useQuery({
     queryKey: ["uncollected-scene-status", actorName],
-    queryFn: () =>
-      requestUncollectedJson<{ exists: boolean }>(
-        "/api/uncollected-scenes/status?performer=" + encodeURIComponent(actorName),
-      ),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      for (const name of new Set([actorName, ...actorAliases])) {
+        if (name.trim()) params.append("performer", name);
+      }
+      return requestUncollectedJson<{ exists: boolean }>(
+        "/api/uncollected-scenes/status?" + params.toString(),
+      );
+    },
     enabled: Boolean(actorName),
   });
   const buildMutation = useMutation({
@@ -664,7 +675,7 @@ function ActorHero({
         <Box mt="xs">
           <LockChip label={t("actors.imagesEdit")} {...lockProps("image_urls")} />
         </Box>
-        <ActorUncollectedBuilder actorName={actor.name} />
+        <ActorUncollectedBuilder actorName={actor.name} actorAliases={actor.aliases ?? []} />
       </Box>
 
       {/* basis 不能为 0: 换行按 flex-basis 判定, 取 0 时信息列永不换行, 窄屏只会被压成几十像素宽. */}

@@ -12,7 +12,7 @@ import { proxyImageUrl } from "@/lib/utils";
 
 export const Route = createFileRoute("/uncollected-scenes/")({ component: UncollectedScenesPage });
 
-type Gender = "female" | "transgender_female" | "male" | "unknown";
+type Gender = "female" | "intersex" | "male" | "non_binary" | "transgender_female" | "transgender_male" | "unknown";
 type Performer = { name: string; gender: Gender; official_gender?: Gender | null };
 type SearchScene = {
   id: string; title: string; date: string; duration: number | null; studio: string;
@@ -36,7 +36,8 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 function genderSymbol(gender: Gender): string {
   if (gender === "female") return "♀";
-  if (gender === "transgender_female") return "⚧";
+  if (gender === "transgender_female" || gender === "transgender_male" || gender === "non_binary") return "⚧";
+  if (gender === "intersex") return "⚥";
   if (gender === "male") return "♂";
   return "?";
 }
@@ -44,6 +45,9 @@ function genderSymbol(gender: Gender): string {
 function genderName(gender: Gender): string {
   if (gender === "female") return "女性";
   if (gender === "transgender_female") return "跨性别女性";
+  if (gender === "transgender_male") return "跨性别男性";
+  if (gender === "intersex") return "间性";
+  if (gender === "non_binary") return "非二元性别";
   if (gender === "male") return "男性";
   return "未知性别";
 }

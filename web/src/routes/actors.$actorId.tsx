@@ -457,27 +457,16 @@ async function requestUncollectedJson<T>(url: string, init?: RequestInit): Promi
   return (await response.json()) as T;
 }
 
-function ActorUncollectedBuilder({
-  actorName,
-  actorAliases,
-}: {
-  actorName: string;
-  actorAliases: string[];
-}) {
+function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
   const queryClient = useQueryClient();
   const [studio, setStudio] = useState("");
   const [tag, setTag] = useState("");
   const statusQuery = useQuery({
     queryKey: ["uncollected-scene-status", actorName],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      for (const name of new Set([actorName, ...actorAliases])) {
-        if (name.trim()) params.append("performer", name);
-      }
-      return requestUncollectedJson<{ exists: boolean }>(
-        "/api/uncollected-scenes/status?" + params.toString(),
-      );
-    },
+    queryFn: () =>
+      requestUncollectedJson<{ exists: boolean }>(
+        "/api/uncollected-scenes/status?actor_name=" + encodeURIComponent(actorName),
+      ),
     enabled: Boolean(actorName),
   });
   const buildMutation = useMutation({
@@ -485,7 +474,12 @@ function ActorUncollectedBuilder({
       requestUncollectedJson<ActorUncollectedBuildResult>("/api/theporndb-scenes/build-uncollected", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ performer: actorName, studio: studio.trim(), tag: tag.trim() }),
+        body: JSON.stringify({
+          performer: actorName,
+          studio: studio.trim(),
+          tag: tag.trim(),
+          record_actor_name: actorName,
+        }),
       }),
     onSuccess: (result) => {
       notifications.show({
@@ -675,7 +669,7 @@ function ActorHero({
         <Box mt="xs">
           <LockChip label={t("actors.imagesEdit")} {...lockProps("image_urls")} />
         </Box>
-        <ActorUncollectedBuilder actorName={actor.name} actorAliases={actor.aliases ?? []} />
+        <ActorUncollectedBuilder actorName={actor.name} />
       </Box>
 
       {/* basis 不能为 0: 换行按 flex-basis 判定, 取 0 时信息列永不换行, 窄屏只会被压成几十像素宽. */}

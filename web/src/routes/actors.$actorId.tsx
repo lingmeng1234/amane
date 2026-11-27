@@ -500,7 +500,13 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
       <Group gap={6} justify="space-between">
         <Badge
           size="sm"
-          color={statusQuery.isLoading || statusQuery.isError ? "gray" : statusQuery.data?.exists ? "green" : "yellow"}
+          color={
+            statusQuery.isLoading || statusQuery.isError
+              ? "gray"
+              : statusQuery.data?.exists
+                ? "green"
+                : "yellow"
+          }
           variant="light"
         >
           {statusQuery.isLoading

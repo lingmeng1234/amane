@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from sqlalchemy import String, cast, func, or_
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
-
-from .base import RepositoryMixinBase, acquire_write_lock
 from ..models import Metadata, UncollectedScene
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
-
+from .base import RepositoryMixinBase, acquire_write_lock
 
 class UncollectedScenesRepoMixin(RepositoryMixinBase):
     async def add_uncollected_scene(

@@ -254,14 +254,18 @@ function UncollectedScenesPage() {
   const performerOptions = useMemo(
     () =>
       (facetsQuery.data?.performers ?? [])
-        .filter((name) => name.toLocaleLowerCase().includes(performerOptionQuery.trim().toLocaleLowerCase()))
+        .filter((name) =>
+          name.toLocaleLowerCase().includes(performerOptionQuery.trim().toLocaleLowerCase()),
+        )
         .map((name) => ({ value: name, label: name })),
     [facetsQuery.data?.performers, performerOptionQuery],
   );
   const studioOptions = useMemo(
     () =>
       (facetsQuery.data?.studios ?? [])
-        .filter((name) => name.toLocaleLowerCase().includes(studioOptionQuery.trim().toLocaleLowerCase()))
+        .filter((name) =>
+          name.toLocaleLowerCase().includes(studioOptionQuery.trim().toLocaleLowerCase()),
+        )
         .map((name) => ({ value: name, label: name })),
     [facetsQuery.data?.studios, studioOptionQuery],
   );

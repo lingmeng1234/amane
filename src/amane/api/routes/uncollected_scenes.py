@@ -125,20 +125,18 @@ async def list_uncollected_scenes(
         performer=performer,
         studio=studio,
     )
-    names = list(dict.fromkeys(
-        performer["name"]
-        for item in items
-        for performer in (item.performers or [])
-        if isinstance(performer, dict) and isinstance(performer.get("name"), str)
-        and performer.get("official_gender") is None
-    ))
-    local_gender_by_name = (
-        await repo.get_actor_genders_by_names_or_aliases(names) if names else {}
+    names = list(
+        dict.fromkeys(
+            performer["name"]
+            for item in items
+            for performer in (item.performers or [])
+            if isinstance(performer, dict)
+            and isinstance(performer.get("name"), str)
+            and performer.get("official_gender") is None
+        )
     )
-    responses = [
-        await _scene_response(item, local_gender_by_name)
-        for item in items
-    ]
+    local_gender_by_name = await repo.get_actor_genders_by_names_or_aliases(names) if names else {}
+    responses = [await _scene_response(item, local_gender_by_name) for item in items]
     return UncollectedSceneListResponse(
         items=responses,
         total=total,

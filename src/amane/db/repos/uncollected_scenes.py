@@ -5,11 +5,41 @@ from typing import Any
 from sqlalchemy import delete, func, or_
 from sqlmodel import col, select
 
-from ..models import Metadata, UncollectedScene
+from ..models import Metadata, UncollectedScene, UncollectedSceneActorBuild
 from .base import RepositoryMixinBase, acquire_write_lock
 
 
 class UncollectedScenesRepoMixin(RepositoryMixinBase):
+    async def record_uncollected_scene_actor_build(self, actor_name: str) -> None:
+        """记录演员本人主动发起且成功完成的建档; 按展示名精确去重."""
+        normalized_name = actor_name.strip()
+        if not normalized_name:
+            return
+        async with self._session() as session:
+            await acquire_write_lock(session)
+            existing = (
+                await session.exec(
+                    select(UncollectedSceneActorBuild).where(
+                        col(UncollectedSceneActorBuild.actor_name) == normalized_name
+                    )
+                )
+            ).first()
+            if existing is None:
+                session.add(UncollectedSceneActorBuild(actor_name=normalized_name))
+            await session.commit()
+
+    async def has_uncollected_scene_actor_build(self, actor_name: str) -> bool:
+        normalized_name = actor_name.strip()
+        if not normalized_name:
+            return False
+        async with self._session() as session:
+            result = await session.exec(
+                select(UncollectedSceneActorBuild.id)
+                .where(col(UncollectedSceneActorBuild.actor_name) == normalized_name)
+                .limit(1)
+            )
+            return result.first() is not None
+
     async def add_uncollected_scene(
         self,
         *,

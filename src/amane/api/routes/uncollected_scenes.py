@@ -91,7 +91,7 @@ async def _scene_response(item: Any, local_gender_by_name: dict[str, ActorGender
     )
 
 
-@router.get("")
+@router.get("", include_in_schema=False)
 async def list_uncollected_scenes(
     repo: RepoDep,
     page: int = Query(default=1, ge=1),
@@ -129,7 +129,7 @@ async def list_uncollected_scenes(
     )
 
 
-@router.post("")
+@router.post("", include_in_schema=False)
 async def add_uncollected_scene(
     req: UncollectedSceneCreateRequest,
     repo: RepoDep,
@@ -161,13 +161,13 @@ async def add_uncollected_scene(
     )
 
 
-@router.delete("/{theporndb_uuid}")
+@router.delete("/{theporndb_uuid}", include_in_schema=False)
 async def delete_uncollected_scene(theporndb_uuid: str, repo: RepoDep) -> dict[str, bool]:
     deleted = await repo.delete_uncollected_scene(theporndb_uuid)
     return {"deleted": deleted}
 
 
-@router.post("/refresh")
+@router.post("/refresh", include_in_schema=False)
 async def refresh_uncollected_scenes(repo: RepoDep) -> UncollectedSceneRefreshResponse:
     deleted = await repo.prune_collected_uncollected_scenes()
     return UncollectedSceneRefreshResponse(deleted=deleted)

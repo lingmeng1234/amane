@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import re
-import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
@@ -305,7 +304,7 @@ def video_relpath(dest: Path, library_root: Path) -> str:
 
 
 def common_name_from_names(names: Sequence[str]) -> str:
-    """单个文件保留完整文件名; 多个文件取最长公共前缀并清理末尾标点/符号."""
+    """单个文件保留完整文件名; 多个文件取最长公共前缀, 仅清理末尾空白和连字符."""
     items = list(names)
     if not items:
         return ""
@@ -320,8 +319,7 @@ def common_name_from_names(names: Sequence[str]) -> str:
         prefix = prefix[:index]
         if not prefix:
             return ""
-    while prefix and (prefix[-1].isspace() or unicodedata.category(prefix[-1])[0] in {"P", "S"}):
-        prefix = prefix[:-1]
+    prefix = prefix.rstrip().rstrip("-").rstrip()
     return prefix
 
 

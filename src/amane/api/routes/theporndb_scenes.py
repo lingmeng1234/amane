@@ -350,9 +350,10 @@ async def build_uncollected_scenes(
         }
         for scene in result["items"]
     ]
-    added, already_listed, already_collected = await repo.add_uncollected_scenes(scenes)
-    if scenes and req.record_actor_name.strip():
-        await repo.record_uncollected_scene_actor_build(req.record_actor_name)
+    added, already_listed, already_collected = await repo.add_uncollected_scenes(
+        scenes,
+        actor_name=req.record_actor_name or None,
+    )
     return {
         "matched": len(scenes),
         "added": added,

@@ -520,7 +520,6 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
         <Button
           size="xs"
           loading={buildMutation.isPending}
-          disabled={!studio.trim() && !tag.trim()}
           onClick={() => buildMutation.mutate()}
         >
           建档

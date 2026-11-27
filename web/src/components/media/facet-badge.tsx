@@ -57,7 +57,7 @@ export function FacetBadge({
     kind === "actor" && gender != null && gender !== "unknown" ? (
       <GenderMark gender={gender} size={12} />
     ) : undefined;
-  const badgeStyle = { overflow: "hidden", whiteSpace: "nowrap", ...style };
+  const badgeStyle: CSSProperties = { overflow: "hidden", whiteSpace: "nowrap", ...style };
 
   if (id == null) {
     return (

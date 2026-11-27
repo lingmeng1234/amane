@@ -499,10 +499,16 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
       <Group gap={6} justify="space-between">
         <Badge
           size="sm"
-          color={statusQuery.data?.exists ? "green" : "yellow"}
+          color={statusQuery.isLoading || statusQuery.isError ? "gray" : statusQuery.data?.exists ? "green" : "yellow"}
           variant="light"
         >
-          {statusQuery.isLoading ? "检查建档状态…" : statusQuery.data?.exists ? "已建档" : "未建档"}
+          {statusQuery.isLoading
+            ? "检查建档状态…"
+            : statusQuery.isError
+              ? "状态读取失败"
+              : statusQuery.data?.exists
+                ? "已建档"
+                : "未建档"}
         </Badge>
       </Group>
       <Group gap={6} grow wrap="nowrap">

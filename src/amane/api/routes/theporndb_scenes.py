@@ -61,7 +61,11 @@ def _performer_entries(scene: dict[str, Any]) -> list[dict[str, Any]]:
         name = performer.get("name") or item.get("as")
         if not isinstance(name, str) or not name.strip():
             continue
-        result.append({"name": name.strip(), "official_gender": _official_gender(performer)})
+        official_gender = _official_gender(performer)
+        if official_gender is None and performer is not item:
+            # ThePornDB 不同响应形态可能把性别放在外层关联对象.
+            official_gender = _official_gender(item)
+        result.append({"name": name.strip(), "official_gender": official_gender})
     return result
 
 
@@ -151,7 +155,7 @@ async def _resolve_exact_site(client: AsyncClient, token: str, name: str) -> int
     payload = response.json()
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list):
-        raise HTTPException(502, detail="ThePornDB 厂牌搜索返回了无效响应")
+        raise HTTPException(502, detail="ThePornDB 制作商搜索返回了无效响应")
     matches = [
         item for item in data if isinstance(item, dict) and item.get("name") == name and item.get("id") is not None
     ]
@@ -159,8 +163,44 @@ async def _resolve_exact_site(client: AsyncClient, token: str, name: str) -> int
     if not unique:
         return None
     if len(unique) > 1:
-        raise HTTPException(422, detail=f"ThePornDB 中存在多个完全匹配的厂牌：{name}")
+        raise HTTPException(422, detail=f"ThePornDB 中存在多个完全匹配的制作商：{name}")
     return next(iter(unique))
+
+
+async def _fetch_scene_pages(
+    client: AsyncClient,
+    params: dict[str, Any],
+    headers: dict[str, str],
+) -> list[dict[str, Any]]:
+    """读取 ThePornDB 场景搜索的全部分页, 不把首屏 50 条误当成完整结果."""
+    per_page = 50
+    page = 1
+    scenes: list[dict[str, Any]] = []
+    while True:
+        response = await client.get(
+            "https://api.theporndb.net/scenes",
+            params={**params, "per_page": per_page, "page": page},
+            headers=headers,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            raise HTTPException(502, detail="ThePornDB 返回了无效响应")
+        batch = [item for item in payload["data"] if isinstance(item, dict)]
+        scenes.extend(batch)
+
+        meta = payload.get("meta")
+        pagination = meta.get("pagination") if isinstance(meta, dict) else None
+        last_page = meta.get("last_page") if isinstance(meta, dict) else None
+        if not isinstance(last_page, int) and isinstance(pagination, dict):
+            last_page = pagination.get("total_pages") or pagination.get("last_page")
+        if isinstance(last_page, int) and last_page > 0:
+            if page >= last_page:
+                break
+        elif len(batch) < per_page:
+            break
+        page += 1
+    return scenes
 
 
 async def _search_scenes(
@@ -174,7 +214,7 @@ async def _search_scenes(
     performer = req.performer.strip()
     tag = req.tag.strip()
     if not any((query, date, studio, performer, tag)):
-        raise HTTPException(422, detail="标题、日期、厂牌、演员或 TAG 至少填写一项")
+        raise HTTPException(422, detail="标题、日期、制作商、演员或 TAG 至少填写一项")
 
     cfg = runtime.config.hot.scraping.site_config.get(str(SiteName.THEPORNDB))
     token = cfg.api_token if cfg else None
@@ -225,31 +265,18 @@ async def _search_scenes(
                     params["tags[" + tag_id + "]"] = tag_name
                     params["tag_and"] = "true"
 
-            responses = await asyncio.gather(
-                *(
-                    client.get(
-                        "https://api.theporndb.net/scenes",
-                        params=params,
-                        headers=headers,
-                    )
-                    for params in searches
-                )
+            search_pages = await asyncio.gather(
+                *(_fetch_scene_pages(client, params, headers) for params in searches)
             )
-            payloads = []
-            for response in responses:
-                response.raise_for_status()
-                payloads.append(response.json())
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(502, detail=f"ThePornDB 搜索请求失败：{exc}") from exc
 
     scenes_by_id: dict[str, dict[str, Any]] = {}
-    for payload in payloads:
-        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-            raise HTTPException(502, detail="ThePornDB 返回了无效响应")
-        for scene in payload["data"]:
-            if isinstance(scene, dict) and scene.get("id"):
+    for batch in search_pages:
+        for scene in batch:
+            if scene.get("id"):
                 scenes_by_id.setdefault(str(scene["id"]), scene)
 
     # 官方明确提供的性别优先; 只有官方缺失时才查询本地演员档案.
@@ -340,6 +367,40 @@ async def search_scenes_filtered(
     repo: RepoDep,
 ) -> dict[str, list[dict[str, Any]]]:
     return await _search_scenes(req, runtime, repo)
+
+
+@router.post("/build-uncollected", include_in_schema=False)
+async def build_uncollected_scenes(
+    req: SceneSearchFilterRequest,
+    runtime: RuntimeDep,
+    repo: RepoDep,
+) -> dict[str, int]:
+    """按检索条件搜索全部分页并一次性幂等写入未收录名单."""
+    result = await _search_scenes(req, runtime, repo)
+    scenes = [
+        {
+            "theporndb_uuid": scene["id"],
+            "title": scene["title"],
+            "date": scene["date"],
+            "studio": scene["studio"],
+            "performers": [
+                {
+                    "name": performer["name"],
+                    "official_gender": performer.get("official_gender"),
+                }
+                for performer in scene["performers"]
+            ],
+            "image_url": scene["image"],
+        }
+        for scene in result["items"]
+    ]
+    added, already_listed, already_collected = await repo.add_uncollected_scenes(scenes)
+    return {
+        "matched": len(scenes),
+        "added": added,
+        "already_in_list": already_listed,
+        "already_collected": already_collected,
+    }
 
 
 async def _empty_filter() -> None:

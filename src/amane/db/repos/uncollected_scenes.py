@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import String, cast, delete, func, or_
 from sqlmodel import col, select
 
@@ -51,6 +53,58 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
             await session.refresh(item)
             return item, True
 
+    async def add_uncollected_scenes(
+        self,
+        scenes: list[dict[str, Any]],
+    ) -> tuple[int, int, int]:
+        """批量幂等登记; 返回 (新增, 已在名单, 已在片库)."""
+        normalized: dict[str, dict[str, Any]] = {}
+        for scene in scenes:
+            uuid = str(scene.get("theporndb_uuid") or "").strip().casefold()
+            if uuid:
+                normalized.setdefault(uuid, {**scene, "theporndb_uuid": uuid})
+        if not normalized:
+            return 0, 0, 0
+
+        uuids = list(normalized)
+        async with self._session() as session:
+            await acquire_write_lock(session)
+            collected_rows = await session.exec(
+                select(func.lower(col(Metadata.theporndb_uuid))).where(
+                    func.lower(col(Metadata.theporndb_uuid)).in_(uuids)
+                )
+            )
+            collected = {str(value) for value in collected_rows.all() if value}
+            existing_rows = await session.exec(
+                select(func.lower(col(UncollectedScene.theporndb_uuid))).where(
+                    func.lower(col(UncollectedScene.theporndb_uuid)).in_(uuids)
+                )
+            )
+            existing = {str(value) for value in existing_rows.all() if value}
+
+            added = 0
+            already_listed = 0
+            already_collected = 0
+            for uuid, scene in normalized.items():
+                if uuid in collected:
+                    already_collected += 1
+                elif uuid in existing:
+                    already_listed += 1
+                else:
+                    session.add(
+                        UncollectedScene(
+                            theporndb_uuid=uuid,
+                            title=str(scene.get("title") or ""),
+                            date=str(scene.get("date") or ""),
+                            studio=str(scene.get("studio") or ""),
+                            performers=scene.get("performers") or [],
+                            image_url=scene.get("image_url"),
+                        )
+                    )
+                    added += 1
+            await session.commit()
+            return added, already_listed, already_collected
+
     async def list_uncollected_scenes(
         self,
         *,
@@ -69,25 +123,52 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                     col(UncollectedScene.theporndb_uuid).ilike(pattern),
                 )
             )
-        if performer:
-            conditions.append(cast(col(UncollectedScene.performers), String).ilike(f"%{performer.strip()}%"))
         if studio:
-            conditions.append(col(UncollectedScene.studio).ilike(f"%{studio.strip()}%"))
+            conditions.append(func.lower(col(UncollectedScene.studio)) == studio.strip().casefold())
         async with self._session() as session:
+            stmt = select(UncollectedScene)
+            if conditions:
+                stmt = stmt.where(*conditions)
+            stmt = stmt.order_by(col(UncollectedScene.created_at).desc(), col(UncollectedScene.id).asc())
+            if performer:
+                # JSON 演员字段在 SQLite/PostgreSQL 的存储表达不同; 在候选名单中按原始名称精确匹配.
+                candidates = list((await session.exec(stmt)).all())
+                matched = [
+                    item
+                    for item in candidates
+                    if any(
+                        isinstance(entry, dict)
+                        and isinstance(entry.get("name"), str)
+                        and entry["name"].casefold() == performer.strip().casefold()
+                        for entry in (item.performers or [])
+                    )
+                ]
+                return matched[offset : offset + limit], len(matched)
+
             count_stmt = select(func.count()).select_from(UncollectedScene)
             if conditions:
                 count_stmt = count_stmt.where(*conditions)
             total = int((await session.exec(count_stmt)).one())
-            stmt = select(UncollectedScene)
-            if conditions:
-                stmt = stmt.where(*conditions)
-            stmt = (
-                stmt.order_by(col(UncollectedScene.created_at).desc(), col(UncollectedScene.id).asc())
-                .offset(offset)
-                .limit(limit)
-            )
-            items = list((await session.exec(stmt)).all())
+            items = list((await session.exec(stmt.offset(offset).limit(limit))).all())
             return items, total
+
+    async def list_uncollected_scene_facets(self) -> tuple[list[str], list[str]]:
+        """返回未收录名单中实际出现的演员展示名与制作商原名."""
+        async with self._session() as session:
+            rows = (
+                await session.exec(select(UncollectedScene.studio, UncollectedScene.performers))
+            ).all()
+        studios: dict[str, str] = {}
+        performers: dict[str, str] = {}
+        for studio, entries in rows:
+            if isinstance(studio, str) and studio.strip():
+                studios.setdefault(studio.casefold(), studio.strip())
+            for entry in entries or []:
+                if isinstance(entry, dict):
+                    name = entry.get("name")
+                    if isinstance(name, str) and name.strip():
+                        performers.setdefault(name.casefold(), name.strip())
+        return sorted(performers.values(), key=str.casefold), sorted(studios.values(), key=str.casefold)
 
     async def delete_uncollected_scene(self, theporndb_uuid: str) -> bool:
         normalized_uuid = theporndb_uuid.strip().casefold()

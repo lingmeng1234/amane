@@ -82,45 +82,6 @@ def _tag_names(scene: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(names))
 
 
-async def _resolve_exact_performer(client: AsyncClient, token: str, name: str) -> dict[str, str] | None:
-    response = await client.get(
-        "https://api.theporndb.net/performers",
-        params={"q": name, "per_page": 100, "page": 1},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    response.raise_for_status()
-    payload = response.json()
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, list):
-        raise HTTPException(502, detail="ThePornDB 演员搜索返回了无效响应")
-    matches: list[dict[str, Any]] = []
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-        aliases = item.get("aliases")
-        exact_names = [item.get("name")]
-        if isinstance(aliases, list):
-            exact_names.extend(aliases)
-        if name in exact_names:
-            matches.append(item)
-    # 同一官方演员可能同时以展示名和别名命中, 按官方 ID 去重.
-    unique: dict[str, dict[str, Any]] = {}
-    for item in matches:
-        identifier = str(item.get("_id") or item.get("id") or "")
-        if identifier:
-            unique[identifier] = item
-    if not unique:
-        return None
-    if len(unique) > 1:
-        raise HTTPException(422, detail=f"ThePornDB 中存在多个完全匹配的演员：{name}")
-    item = next(iter(unique.values()))
-    identifier = str(item.get("_id") or item.get("id") or "")
-    canonical_name = item.get("name")
-    if not identifier or not isinstance(canonical_name, str) or not canonical_name:
-        raise HTTPException(502, detail="ThePornDB 演员结果缺少必要身份字段")
-    return {identifier: canonical_name}
-
-
 async def _resolve_exact_tag(client: AsyncClient, token: str, name: str) -> dict[str, str] | None:
     response = await client.get(
         "https://api.theporndb.net/tags",
@@ -230,20 +191,20 @@ async def _search_scenes(
             timeout=Timeout(30),
             follow_redirects=True,
         ) as client:
-            performer_filter, tag_filter, site_filter = await asyncio.gather(
-                _resolve_exact_performer(client, token, performer) if performer else _empty_filter(),
+            tag_filter, site_filter = await asyncio.gather(
                 _resolve_exact_tag(client, token, tag) if tag else _empty_filter(),
                 _resolve_exact_site(client, token, studio) if studio else _empty_filter(),
             )
-            if performer and performer_filter is None:
-                return {"items": []}
             if tag and tag_filter is None:
                 return {"items": []}
             if studio and site_filter is None:
                 return {"items": []}
 
             searches: list[dict[str, Any]] = []
-            if query:
+            if performer:
+                # 直接把演员展示名作为 ThePornDB 自由检索词; 不查询演员映射或 ID.
+                searches.append({"q": performer, "per_page": 50, "page": 1, "orderBy": "most_relevant"})
+            elif query:
                 searches.extend(
                     (
                         {"title": query, "per_page": 50, "page": 1, "orderBy": "most_relevant"},
@@ -257,10 +218,6 @@ async def _search_scenes(
                     params["date"] = normalized_date
                 if site_filter is not None:
                     params["site_id"] = site_filter
-                if performer_filter:
-                    performer_id, performer_name = next(iter(performer_filter.items()))
-                    params["performers[" + performer_id + "]"] = performer_name
-                    params["performer_and"] = "true"
                 if tag_filter:
                     tag_id, tag_name = next(iter(tag_filter.items()))
                     params["tags[" + tag_id + "]"] = tag_name

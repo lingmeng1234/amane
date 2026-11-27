@@ -10,6 +10,7 @@ from .metadata import MetadataRepoMixin
 from .oshash import OshashRepoMixin
 from .schedules import SchedulesRepoMixin
 from .tasks import TasksRepoMixin
+from .uncollected_scenes import UncollectedScenesRepoMixin
 
 __all__ = [
     "AgentRepoMixin",
@@ -22,4 +23,5 @@ __all__ = [
     "RepositoryMixinBase",
     "SchedulesRepoMixin",
     "TasksRepoMixin",
+    "UncollectedScenesRepoMixin",
 ]

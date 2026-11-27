@@ -37,17 +37,6 @@ type Performer = {
   official_gender?: ActorGender | null;
 };
 
-type SearchScene = {
-  id: string;
-  title: string;
-  date: string;
-  duration: number | null;
-  studio: string;
-  performers: Performer[];
-  tags: string[];
-  image: string | null;
-};
-
 type SavedScene = {
   id: number;
   theporndb_uuid: string;

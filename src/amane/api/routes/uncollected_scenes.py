@@ -81,6 +81,7 @@ def _gender(value: object) -> SceneGender:
 
 
 async def _scene_response(item: Any, local_gender_by_name: dict[str, ActorGender]) -> UncollectedSceneResponse:
+    assert item.id is not None
     performers: list[UncollectedScenePerformerResponse] = []
     for performer in item.performers or []:
         if not isinstance(performer, dict):

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from sqlalchemy import String, cast, func, or_
 from sqlmodel import col, select
+
 from ..models import Metadata, UncollectedScene
 from .base import RepositoryMixinBase, acquire_write_lock
+
 
 class UncollectedScenesRepoMixin(RepositoryMixinBase):
     async def add_uncollected_scene(

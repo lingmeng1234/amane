@@ -1,5 +1,8 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any, cast
+
+from httpx2 import AsyncClient
 
 import pytest
 
@@ -87,7 +90,7 @@ async def test_scene_search_fetches_all_pages() -> None:
         def __init__(self) -> None:
             self.pages: list[int] = []
 
-        async def get(self, _url: str, *, params: dict[str, object], headers: dict[str, str]) -> FakeResponse:
+        async def get(self, _url: str, *, params: dict[str, Any], headers: dict[str, str]) -> FakeResponse:
             page = int(params["page"])
             self.pages.append(page)
             batch = (
@@ -98,7 +101,7 @@ async def test_scene_search_fetches_all_pages() -> None:
             return FakeResponse({"data": batch})
 
     client = FakeClient()
-    scenes = await _fetch_scene_pages(client, {"orderBy": "recently_released"}, {})
+    scenes = await _fetch_scene_pages(cast(AsyncClient, client), {"orderBy": "recently_released"}, {})
     assert client.pages == [1, 2]
     assert len(scenes) == 52
     assert scenes[-1]["id"] == "scene-51"

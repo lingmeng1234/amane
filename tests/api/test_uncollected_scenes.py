@@ -3,7 +3,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from httpx2 import AsyncClient
-
 import pytest
 
 from amane.api.routes.theporndb_scenes import (

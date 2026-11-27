@@ -475,14 +475,14 @@ function ActorUncollectedBuilder({ actorName }: { actorName: string }) {
       requestUncollectedJson<ActorUncollectedBuildResult>(
         "/api/theporndb-scenes/build-uncollected",
         {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          performer: actorName,
-          studio: studio.trim(),
-          tag: tag.trim(),
-          record_actor_name: actorName,
-        }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            performer: actorName,
+            studio: studio.trim(),
+            tag: tag.trim(),
+            record_actor_name: actorName,
+          }),
         },
       }),
     onSuccess: (result) => {

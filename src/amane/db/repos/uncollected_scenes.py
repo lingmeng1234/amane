@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import String, cast, delete, func, or_
+from sqlalchemy import delete, func, or_
 from sqlmodel import col, select
 
 from ..models import Metadata, UncollectedScene

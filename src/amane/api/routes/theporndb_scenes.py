@@ -1,5 +1,4 @@
 import asyncio
-import json
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -189,10 +188,12 @@ async def search_scenes(
                 if studio:
                     params["site"] = studio
                 if performer_filter:
-                    params["performers"] = json.dumps(performer_filter, ensure_ascii=False)
+                    performer_id, performer_name = next(iter(performer_filter.items()))
+                    params["performers[" + performer_id + "]"] = performer_name
                     params["performer_and"] = "true"
                 if tag_filter:
-                    params["tags"] = json.dumps(tag_filter, ensure_ascii=False)
+                    tag_id, tag_name = next(iter(tag_filter.items()))
+                    params["tags[" + tag_id + "]"] = tag_name
                     params["tag_and"] = "true"
 
             responses = await asyncio.gather(

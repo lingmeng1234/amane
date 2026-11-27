@@ -258,7 +258,7 @@ async def search_scenes(
         if not isinstance(image, str) or not image.strip():
             image = None
 
-        performers: list[dict[str, str]] = []
+        performers: list[dict[str, Any]] = []
         for item in _performer_entries(scene):
             official = item["official_gender"]
             gender = official if official is not None else local_gender_by_name.get(

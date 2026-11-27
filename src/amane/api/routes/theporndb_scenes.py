@@ -24,15 +24,18 @@ class SceneSearchFilterRequest(BaseModel):
     tag: str = Field(default="", max_length=200)
 
 
-_PERFORMER_GENDER: dict[str, ActorGender] = {
-    "FEMALE": ActorGender.FEMALE,
-    "TRANSGENDER FEMALE": ActorGender.TRANSGENDER_FEMALE,
-    "MALE": ActorGender.MALE,
-    "UNKNOWN": ActorGender.UNKNOWN,
+_PERFORMER_GENDER: dict[str, str] = {
+    "FEMALE": "female",
+    "INTERSEX": "intersex",
+    "MALE": "male",
+    "NON BINARY": "non_binary",
+    "TRANSGENDER FEMALE": "transgender_female",
+    "TRANSGENDER MALE": "transgender_male",
+    "UNKNOWN": "unknown",
 }
 
 
-def _official_gender(performer: dict[str, Any]) -> ActorGender | None:
+def _official_gender(performer: dict[str, Any]) -> str | None:
     """返回官方明确提供的性别; None 仅表示官方没有提供该字段."""
     extras = performer.get("extras")
     value = extras.get("gender") if isinstance(extras, dict) else None
@@ -41,7 +44,7 @@ def _official_gender(performer: dict[str, Any]) -> ActorGender | None:
     if not isinstance(value, str) or not value.strip():
         return None
     normalized = value.strip().upper().replace("_", " ")
-    return _PERFORMER_GENDER.get(normalized, ActorGender.UNKNOWN)
+    return _PERFORMER_GENDER.get(normalized, "unknown")
 
 
 def _performer_entries(scene: dict[str, Any]) -> list[dict[str, Any]]:
@@ -291,13 +294,15 @@ async def _search_scenes(
         performers: list[dict[str, Any]] = []
         for item in _performer_entries(scene):
             official = item["official_gender"]
-            gender = official if official is not None else local_gender_by_name.get(
-                item["name"], ActorGender.UNKNOWN
+            gender = (
+                official
+                if official is not None
+                else local_gender_by_name.get(item["name"], ActorGender.UNKNOWN).value
             )
             performers.append({
                 "name": item["name"],
-                "gender": str(gender),
-                "official_gender": str(official) if official is not None else None,
+                "gender": gender,
+                "official_gender": official,
             })
 
         result.append(

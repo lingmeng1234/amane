@@ -618,7 +618,8 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
 
         # 为尚未刮削的演员扇出 ACTOR_SCRAPE.
         actor_followups = await self._actor_scrape_followups(meta.actors)
-        # 库开启自动整理时为本次刮削的文件扇出 ORGANIZE.
+        # 库开启自动整理时, 将同一作品在该媒体库中的关联视频放入同一整理任务.
+        assert meta.id is not None
         organize_followups = await self._auto_organize_followups(payload, file, meta.id)
 
         await self.report_progress(progress_total, progress_total, "done")
@@ -659,9 +660,9 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
     async def _auto_organize_followups(
         self, payload: ScrapePayload, file: MediaFile | None, metadata_id: int
     ) -> list[FollowupTask]:
-        """库开启自动整理时为本次刮削的那一个文件描述 ORGANIZE 后继.
+        """库开启自动整理时, 将同一作品在当前媒体库中的关联文件放入一个 ORGANIZE 后继.
 
-        范围只有该文件, 且后继只在父成功后创建, 因此整理必然发生在它刮削完成之后.
+        后继只在父刮削成功后创建, 因此整理必然发生在作品关联更新之后.
         按番号刮削没有可落盘的 `MediaFile` (库因此未知), 不在此列; `media_file_id` 非空但读不到
         文件或库说明索引与任务不一致, 记 debug 后不链.
         ``priority=-1``: 不抢占交互提交的任务; 自动整理彼此仍按 FIFO.
@@ -694,7 +695,7 @@ class ScrapeHandler(TaskHandler[ScrapePayload, ScrapeResult]):
             organize = OrganizePayload(library_id=file.library_id, media_file_ids=media_file_ids)
             return [
                 FollowupTask(
-                    key=f"organize:{file.id}",
+                    key=f"organize:{file.library_id}:{metadata_id}",
                     task_type=TaskType.ORGANIZE,
                     payload=organize.model_dump(mode="json"),
                     priority=-1,

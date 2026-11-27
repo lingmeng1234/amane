@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException
 from httpx2 import AsyncClient, Timeout
 from pydantic import BaseModel, Field
 
-from ...db import Actor
 from ...enums import ActorGender, SiteName
 from ..deps import RepoDep, RuntimeDep
 
@@ -229,8 +228,9 @@ async def search_scenes(
         for scene in scenes_by_id.values()
         for performer in _performer_entries(scene)
     ))
-    local_actors: list[Actor] = await repo.get_actors_by_names(performer_names) if performer_names else []
-    local_gender_by_name = {actor.name: actor.gender for actor in local_actors}
+    local_gender_by_name = (
+        await repo.get_actor_genders_by_names_or_aliases(performer_names) if performer_names else {}
+    )
 
     result: list[dict[str, Any]] = []
     for scene in scenes_by_id.values():

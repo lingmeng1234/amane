@@ -31,7 +31,7 @@ def _official_gender(performer: dict[str, Any]) -> ActorGender | None:
     """返回官方明确提供的性别; None 仅表示官方没有提供该字段."""
     extras = performer.get("extras")
     value = extras.get("gender") if isinstance(extras, dict) else None
-    if value is None:
+    if not isinstance(value, str) or not value.strip():
         value = performer.get("gender")
     if not isinstance(value, str) or not value.strip():
         return None

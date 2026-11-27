@@ -75,17 +75,9 @@ async def uncollected_scene_facets(repo: RepoDep) -> dict[str, list[str]]:
 @router.get("/status", include_in_schema=False)
 async def uncollected_scene_status(
     repo: RepoDep,
-    performer: Annotated[list[str], Query(min_length=1, max_length=100)],
+    actor_name: Annotated[str, Query(min_length=1, max_length=200)],
 ) -> dict[str, bool]:
-    for name in dict.fromkeys(value.strip() for value in performer if value.strip()):
-        _, total = await repo.list_uncollected_scenes(
-            offset=0,
-            limit=1,
-            performer=name,
-        )
-        if total > 0:
-            return {"exists": True}
-    return {"exists": False}
+    return {"exists": await repo.has_uncollected_scene_actor_build(actor_name)}
 
 
 def _gender(value: object) -> SceneGender:

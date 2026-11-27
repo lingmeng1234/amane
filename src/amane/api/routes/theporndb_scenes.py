@@ -136,6 +136,29 @@ async def _resolve_exact_tag(client: AsyncClient, token: str, name: str) -> dict
     return {identifier: name}
 
 
+async def _resolve_exact_site(client: AsyncClient, token: str, name: str) -> int | None:
+    response = await client.get(
+        "https://api.theporndb.net/sites",
+        params={"q": name, "per_page": 100, "page": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    response.raise_for_status()
+    payload = response.json()
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        raise HTTPException(502, detail="ThePornDB 厂牌搜索返回了无效响应")
+    matches = [
+        item for item in data
+        if isinstance(item, dict) and item.get("name") == name and item.get("id") is not None
+    ]
+    unique = {int(item["id"]) for item in matches}
+    if not unique:
+        return None
+    if len(unique) > 1:
+        raise HTTPException(422, detail=f"ThePornDB 中存在多个完全匹配的厂牌：{name}")
+    return next(iter(unique))
+
+
 @router.post("/search")
 async def search_scenes(
     req: SceneSearchRequest,
@@ -163,13 +186,16 @@ async def search_scenes(
             timeout=Timeout(30),
             follow_redirects=True,
         ) as client:
-            performer_filter, tag_filter = await asyncio.gather(
+            performer_filter, tag_filter, site_filter = await asyncio.gather(
                 _resolve_exact_performer(client, token, performer) if performer else _empty_filter(),
                 _resolve_exact_tag(client, token, tag) if tag else _empty_filter(),
+                _resolve_exact_site(client, token, studio) if studio else _empty_filter(),
             )
             if performer and performer_filter is None:
                 return {"items": []}
             if tag and tag_filter is None:
+                return {"items": []}
+            if studio and site_filter is None:
                 return {"items": []}
 
             searches: list[dict[str, Any]] = []
@@ -185,8 +211,8 @@ async def search_scenes(
             for params in searches:
                 if normalized_date:
                     params["date"] = normalized_date
-                if studio:
-                    params["site"] = studio
+                if site_filter is not None:
+                    params["site_id"] = site_filter
                 if performer_filter:
                     performer_id, performer_name = next(iter(performer_filter.items()))
                     params["performers[" + performer_id + "]"] = performer_name

@@ -2,8 +2,31 @@ import { AspectRatio, Center, SimpleGrid, Skeleton, Stack, Text } from "@mantine
 import type { MetadataResponse } from "@/client/types.gen";
 import { PosterCard } from "./poster-card";
 
+export type PosterGridCardSize =
+  | "xs"
+  | "sm"
+  | "small"
+  | "medium"
+  | "default"
+  | "large"
+  | "xl"
+  | "xxl";
+
+export function getPosterGridMinCardWidth(cardSize: PosterGridCardSize): number {
+  return {
+    xs: 112,
+    sm: 136,
+    small: 160,
+    medium: 184,
+    default: 208,
+    large: 240,
+    xl: 272,
+    xxl: 304,
+  }[cardSize];
+}
+
 interface PosterGridProps {
-  cardSize?: "xs" | "sm" | "small" | "medium" | "default" | "large" | "xl" | "xxl";
+  cardSize?: PosterGridCardSize;
   items: MetadataResponse[];
   loading?: boolean;
   emptyMessage?: string;
@@ -29,16 +52,7 @@ export function PosterGrid({
   imageFit = "cover",
   cardSize = "default",
 }: PosterGridProps) {
-  const minCardWidth = {
-    xs: 112,
-    sm: 136,
-    small: 160,
-    medium: 184,
-    default: 208,
-    large: 240,
-    xl: 272,
-    xxl: 304,
-  }[cardSize];
+  const minCardWidth = getPosterGridMinCardWidth(cardSize);
   const gridStyle = {
     gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${minCardWidth}px), 1fr))`,
   };

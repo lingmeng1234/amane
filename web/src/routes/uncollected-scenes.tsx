@@ -24,8 +24,10 @@ import { useMemo, useState } from "react";
 import { notifications } from "@mantine/notifications";
 import type { ActorGender } from "@/client/types.gen";
 import { FacetBadge } from "@/components/media/facet-badge";
+import { getPosterGridMinCardWidth } from "@/components/media/poster-grid";
 import { apiFetch } from "@/lib/api-token";
 import { proxyImageUrl } from "@/lib/utils";
+import { useUIStore } from "@/stores/ui";
 
 export const Route = createFileRoute("/uncollected-scenes")({
   component: UncollectedScenesPage,
@@ -175,6 +177,8 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
 }
 
 function UncollectedScenesPage() {
+  const coverCardSize = useUIStore((s) => s.cardSizes.metaCover);
+  const minCardWidth = getPosterGridMinCardWidth(coverCardSize);
   const queryClient = useQueryClient();
   const [studioInput, setStudioInput] = useState("");
   const [performerInput, setPerformerInput] = useState("");
@@ -439,7 +443,13 @@ function UncollectedScenesPage() {
             {activeFilters.length > 0 ? "没有符合筛选条件的未收录影片" : "暂无未收录影片"}
           </Text>
         ) : (
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <SimpleGrid
+            cols={1}
+            spacing="md"
+            style={{
+              gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${minCardWidth}px), 1fr))`,
+            }}
+          >
             {list?.items.map((scene) => (
               <SceneCard
                 key={scene.id}

@@ -64,6 +64,10 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                 )
             ).first()
             if existing is not None:
+                refreshed_performers = _refresh_official_performer_genders(existing.performers or [], performers)
+                if refreshed_performers != (existing.performers or []):
+                    existing.performers = refreshed_performers
+                    session.add(existing)
                 await session.commit()
                 return existing, False
             item = UncollectedScene(

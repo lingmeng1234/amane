@@ -281,7 +281,7 @@ async def _search_scenes(
                 {
                     "name": item["name"],
                     "gender": gender,
-                    "official_gender": official,
+                    "official_gender": item.get("official_gender"),
                 }
             )
 

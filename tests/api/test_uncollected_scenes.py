@@ -11,7 +11,7 @@ from amane.api.routes.theporndb_scenes import (
     _performer_entries,
     _tag_names,
 )
-from amane.api.routes.uncollected_scenes import _scene_response
+from amane.api.routes.uncollected_scenes import _female_performer_facets, _scene_response
 from amane.db.repos.uncollected_scenes import _refresh_official_performer_genders
 from amane.enums import ActorGender
 
@@ -131,7 +131,7 @@ async def test_scene_search_fetches_all_pages() -> None:
 
 
 @pytest.mark.asyncio
-async def test_saved_scene_gender_uses_official_then_local_then_unknown() -> None:
+async def test_saved_scene_gender_uses_local_profile_then_unknown() -> None:
     item = SimpleNamespace(
         id=1,
         theporndb_uuid="scene-uuid",
@@ -158,10 +158,23 @@ async def test_saved_scene_gender_uses_official_then_local_then_unknown() -> Non
         },
     )
     assert [performer.gender for performer in response.performers] == [
+        "male",
         "female",
         "male",
-        "male",
         "unknown",
-        "unknown",
+        "female",
     ]
     assert [performer.actor_id for performer in response.performers] == [101, 102, 103, None, 104]
+
+
+
+def test_uncollected_performer_facets_only_include_female_profiles() -> None:
+    names = ["Female", "Trans Woman", "Male", "Unknown", "No Profile"]
+    profiles = {
+        "Female": (1, ActorGender.FEMALE),
+        "Trans Woman": (2, ActorGender.TRANSGENDER_FEMALE),
+        "Male": (3, ActorGender.MALE),
+        "Unknown": (4, ActorGender.UNKNOWN),
+    }
+
+    assert _female_performer_facets(names, profiles) == ["Female", "Trans Woman"]

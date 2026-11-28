@@ -22,7 +22,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { notifications } from "@mantine/notifications";
-import type { ActorGender } from "@/client/types.gen";
 import { FacetBadge } from "@/components/media/facet-badge";
 import { apiFetch } from "@/lib/api-token";
 import { proxyImageUrl } from "@/lib/utils";

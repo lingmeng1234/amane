@@ -67,7 +67,6 @@ class UncollectedSceneRefreshResponse(BaseModel):
     deleted: int
 
 
-@router.get("/facets", include_in_schema=False)
 def _female_performer_facets(
     names: list[str],
     local_actor_by_name: dict[str, tuple[int, ActorGender]],

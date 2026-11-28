@@ -130,11 +130,7 @@ export function FacetBadge({
       );
     }
     return (
-      <Link
-        to="/catalog/$kind/$facetId"
-        params={{ kind, facetId: String(id) }}
-        style={linkStyle}
-      >
+      <Link to="/catalog/$kind/$facetId" params={{ kind, facetId: String(id) }} style={linkStyle}>
         <Badge
           component="span"
           color={color}

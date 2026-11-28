@@ -179,6 +179,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
                 gender={actor.gender}
                 size="sm"
                 variant="light"
+                fullWidth
                 style={{
                   display: "flex",
                   width: "100%",

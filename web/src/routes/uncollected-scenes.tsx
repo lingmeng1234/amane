@@ -96,13 +96,17 @@ function genderOrder(gender: SceneGender): number {
     gender === "non_binary" ||
     gender === "transgender_female" ||
     gender === "transgender_male"
-  ) return 1;
+  ) {
+    return 1;
+  }
   if (gender === "male") return 2;
   return 3;
 }
 
 function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => void }) {
-  const actors = [...scene.performers].sort((a, b) => genderOrder(a.gender) - genderOrder(b.gender));
+  const actors = [...scene.performers].sort(
+    (a, b) => genderOrder(a.gender) - genderOrder(b.gender),
+  );
   while (actors.length < 4) actors.push({ name: "—", gender: "unknown" });
 
   return (

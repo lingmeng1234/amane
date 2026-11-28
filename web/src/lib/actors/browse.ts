@@ -17,7 +17,7 @@ export const ACTOR_GENDERS = [
   "unknown",
 ] as const satisfies readonly ActorGender[];
 
-/** 管理界面性别筛选只提供女性与第三性别选项; 男性/未知仍保留在数据及 URL 类型中. */
+/** 管理界面性别筛选只提供女性与跨性别女性; 男性/未知仍保留在数据及 URL 类型中. */
 export const ACTOR_GENDER_FILTER_OPTIONS = [
   "female",
   "transgender_female",

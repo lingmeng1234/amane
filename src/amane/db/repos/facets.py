@@ -345,18 +345,25 @@ class FacetsRepoMixin(RepositoryMixinBase):
             stmt = select(Actor).where(col(Actor.name).in_(unique))
             return list((await session.exec(stmt)).all())
 
-    async def get_actor_genders_by_names_or_aliases(self, names: Sequence[str]) -> dict[str, ActorGender]:
-        """按演员展示名或唯一别名查本地档案; 别名歧义时不猜测."""
+    async def get_actor_profiles_by_names_or_aliases(
+        self, names: Sequence[str]
+    ) -> dict[str, tuple[int, ActorGender]]:
+        """按演员展示名或唯一别名查当前本地档案; 返回 ID 与性别, 别名歧义时不猜测."""
         unique = list(dict.fromkeys(name for name in names if name))
         if not unique:
             return {}
-        result: dict[str, ActorGender] = {}
+        result: dict[str, tuple[int, ActorGender]] = {}
         async with self._session() as session:
             for name in unique:
                 matches = await lookup_actors_by_name(session, name)
-                if len(matches) == 1:
-                    result[name] = matches[0].gender
+                if len(matches) == 1 and matches[0].id is not None:
+                    result[name] = (matches[0].id, matches[0].gender)
         return result
+
+    async def get_actor_genders_by_names_or_aliases(self, names: Sequence[str]) -> dict[str, ActorGender]:
+        """兼容旧调用方; 按展示名或唯一别名读取性别."""
+        profiles = await self.get_actor_profiles_by_names_or_aliases(names)
+        return {name: gender for name, (_actor_id, gender) in profiles.items()}
 
     async def get_actor_lookup_names(self, actor_id: int) -> list[str] | None:
         """展示名加别名行. Actor 不存在返回 None."""

@@ -36,6 +36,7 @@ class UncollectedSceneCreateRequest(BaseModel):
 class UncollectedScenePerformerResponse(BaseModel):
     name: str
     gender: SceneGender
+    actor_id: int | None = None
 
 
 class UncollectedSceneResponse(BaseModel):
@@ -94,7 +95,10 @@ def _gender(value: object) -> SceneGender:
     return "unknown"
 
 
-async def _scene_response(item: Any, local_gender_by_name: dict[str, ActorGender]) -> UncollectedSceneResponse:
+async def _scene_response(
+    item: Any,
+    local_actor_by_name: dict[str, tuple[int, ActorGender]],
+) -> UncollectedSceneResponse:
     assert item.id is not None
     performers: list[UncollectedScenePerformerResponse] = []
     for performer in item.performers or []:
@@ -103,14 +107,21 @@ async def _scene_response(item: Any, local_gender_by_name: dict[str, ActorGender
         name = performer.get("name")
         if not isinstance(name, str) or not name.strip():
             continue
+        profile = local_actor_by_name.get(name)
         official = performer.get("official_gender")
         # 官方明确给出性别时始终优先; 只有字段缺失才使用本地演员档案.
         gender = (
             _gender(official)
             if official is not None
-            else _gender(local_gender_by_name.get(name, ActorGender.UNKNOWN).value)
+            else _gender(profile[1].value if profile is not None else ActorGender.UNKNOWN.value)
         )
-        performers.append(UncollectedScenePerformerResponse(name=name, gender=gender))
+        performers.append(
+            UncollectedScenePerformerResponse(
+                name=name,
+                gender=gender,
+                actor_id=profile[0] if profile is not None else None,
+            )
+        )
     return UncollectedSceneResponse(
         id=item.id,
         theporndb_uuid=item.theporndb_uuid,
@@ -139,6 +150,7 @@ async def list_uncollected_scenes(
         performer=performer,
         studio=studio,
     )
+    # 每次请求都按当前演员展示名/别名重新解析档案; 不把 actor_id 固化到未收录记录.
     names = list(
         dict.fromkeys(
             performer["name"]
@@ -146,11 +158,11 @@ async def list_uncollected_scenes(
             for performer in (item.performers or [])
             if isinstance(performer, dict)
             and isinstance(performer.get("name"), str)
-            and performer.get("official_gender") is None
+            and performer.get("name", "").strip()
         )
     )
-    local_gender_by_name = await repo.get_actor_genders_by_names_or_aliases(names) if names else {}
-    responses = [await _scene_response(item, local_gender_by_name) for item in items]
+    local_actor_by_name = await repo.get_actor_profiles_by_names_or_aliases(names) if names else {}
+    responses = [await _scene_response(item, local_actor_by_name) for item in items]
     return UncollectedSceneListResponse(
         items=responses,
         total=total,

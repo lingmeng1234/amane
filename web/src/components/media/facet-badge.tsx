@@ -73,12 +73,23 @@ export function FacetBadge({
       <GenderMark gender={gender} size={12} />
     ) : undefined;
   const badgeStyle = fullWidth
-    ? { width: "100%", minWidth: 0, boxSizing: "border-box" as const, ...style }
+    ? {
+        width: "100%",
+        minWidth: 0,
+        boxSizing: "border-box" as const,
+        ...style,
+      }
     : style;
   const linkStyle = fullWidth
-    ? { ...BADGE_LINK_STYLE, display: "flex", width: "100%", minWidth: 0 }
+    ? {
+        ...BADGE_LINK_STYLE,
+        display: "flex",
+        width: "100%",
+        minWidth: 0,
+      }
     : BADGE_LINK_STYLE;
-  const textStyle = style && !fullWidth ? { ...BADGE_TEXT_STYLE, ...style } : BADGE_TEXT_STYLE;
+  const textStyle =
+    style && !fullWidth ? { ...BADGE_TEXT_STYLE, ...style } : BADGE_TEXT_STYLE;
 
   if (id == null) {
     return (

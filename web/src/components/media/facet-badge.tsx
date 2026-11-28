@@ -1,7 +1,7 @@
 import { Badge, type MantineColor } from "@mantine/core";
 import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
-import type { ActorGender, FacetKind } from "@/client/types.gen";
+import type { FacetKind } from "@/client/types.gen";
 import { GenderMark, type ActorDisplayGender } from "@/components/media/gender-mark";
 import { metaSearchForFacet } from "@/lib/facets";
 

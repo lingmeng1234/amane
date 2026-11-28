@@ -13,7 +13,7 @@ def _refresh_official_performer_genders(
     existing: list[dict[str, Any]],
     incoming: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """仅用新抓取到的官方性别补充名单记录; 不覆盖已知官方值或触碰本地演员档案."""
+    """仅用新抓取到的官方性别更新名单记录; 不使用本地推断值, 也不触碰本地演员档案."""
     incoming_gender = {
         str(entry.get("name") or "").strip().casefold(): entry.get("official_gender")
         for entry in incoming

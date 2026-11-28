@@ -167,7 +167,6 @@ async def test_saved_scene_gender_uses_local_profile_then_unknown() -> None:
     assert [performer.actor_id for performer in response.performers] == [101, 102, 103, None, 104]
 
 
-
 def test_uncollected_performer_facets_only_include_female_profiles() -> None:
     names = ["Female", "Trans Woman", "Male", "Unknown", "No Profile"]
     profiles = {

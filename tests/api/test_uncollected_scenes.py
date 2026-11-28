@@ -12,8 +12,8 @@ from amane.api.routes.theporndb_scenes import (
     _tag_names,
 )
 from amane.api.routes.uncollected_scenes import _scene_response
-from amane.enums import ActorGender
 from amane.db.repos.uncollected_scenes import _refresh_official_performer_genders
+from amane.enums import ActorGender
 
 
 def test_theporndb_official_gender_is_normalized() -> None:

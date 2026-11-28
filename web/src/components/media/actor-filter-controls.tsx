@@ -21,7 +21,7 @@ import type { ActorGender } from "@/client/types.gen";
 import { TriStateSegment } from "@/components/common/tri-state-segment";
 import { useResettingState } from "@/hooks/use-resetting-state";
 import {
-  ACTOR_GENDERS,
+  ACTOR_GENDER_FILTER_OPTIONS,
   ACTOR_RANGE_FILTERS,
   type ActorFilterPatch,
   type ActorFilterValues,
@@ -242,13 +242,13 @@ export function ActorFilterControls({ opened, committed, onApply }: ActorFilterC
               onChange={(values) =>
                 patchDraft({
                   gender: values.filter((v): v is ActorGender =>
-                    (ACTOR_GENDERS as readonly string[]).includes(v),
+                    (ACTOR_GENDER_FILTER_OPTIONS as readonly string[]).includes(v),
                   ),
                 })
               }
             >
               <Group gap={6} mt={4}>
-                {ACTOR_GENDERS.map((g) => (
+                {ACTOR_GENDER_FILTER_OPTIONS.map((g) => (
                   <Chip key={g} value={g} size="sm" variant="outline">
                     {t(GENDER_I18N[g])}
                   </Chip>

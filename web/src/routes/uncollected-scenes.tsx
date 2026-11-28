@@ -22,7 +22,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { notifications } from "@mantine/notifications";
-import type { ActorGender } from "@/client/types.gen";
 import { FacetBadge } from "@/components/media/facet-badge";
 import { apiFetch } from "@/lib/api-token";
 import { proxyImageUrl } from "@/lib/utils";
@@ -31,10 +30,19 @@ export const Route = createFileRoute("/uncollected-scenes")({
   component: UncollectedScenesPage,
 });
 
+type SceneGender =
+  | "female"
+  | "intersex"
+  | "male"
+  | "non_binary"
+  | "transgender_female"
+  | "transgender_male"
+  | "unknown";
+
 type Performer = {
   name: string;
-  gender: ActorGender;
-  official_gender?: ActorGender | null;
+  gender: SceneGender;
+  official_gender?: SceneGender | null;
 };
 
 type SavedScene = {
@@ -81,8 +89,24 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+function genderOrder(gender: SceneGender): number {
+  if (gender === "female") return 0;
+  if (
+    gender === "intersex" ||
+    gender === "non_binary" ||
+    gender === "transgender_female" ||
+    gender === "transgender_male"
+  ) {
+    return 1;
+  }
+  if (gender === "male") return 2;
+  return 3;
+}
+
 function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => void }) {
-  const actors = [...scene.performers];
+  const actors = [...scene.performers].sort(
+    (a, b) => genderOrder(a.gender) - genderOrder(b.gender),
+  );
   while (actors.length < 4) actors.push({ name: "—", gender: "unknown" });
 
   return (

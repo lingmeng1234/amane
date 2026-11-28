@@ -9,6 +9,32 @@ from ..models import Metadata, UncollectedScene, UncollectedSceneActorBuild
 from .base import RepositoryMixinBase, acquire_write_lock
 
 
+def _refresh_official_performer_genders(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """仅用新抓取到的官方性别更新名单记录; 不使用本地推断值, 也不触碰本地演员档案."""
+    incoming_gender = {
+        str(entry.get("name") or "").strip().casefold(): entry.get("official_gender")
+        for entry in incoming
+        if isinstance(entry, dict)
+        and isinstance(entry.get("name"), str)
+        and entry.get("name", "").strip()
+        and entry.get("official_gender") is not None
+    }
+    refreshed: list[dict[str, Any]] = []
+    for entry in existing:
+        if not isinstance(entry, dict):
+            refreshed.append(entry)
+            continue
+        official_gender = incoming_gender.get(str(entry.get("name") or "").strip().casefold())
+        if official_gender is not None and entry.get("official_gender") != official_gender:
+            refreshed.append({**entry, "official_gender": official_gender})
+        else:
+            refreshed.append(entry)
+    return refreshed
+
+
 class UncollectedScenesRepoMixin(RepositoryMixinBase):
     async def add_uncollected_scene(
         self,
@@ -38,6 +64,10 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                 )
             ).first()
             if existing is not None:
+                refreshed_performers = _refresh_official_performer_genders(existing.performers or [], performers)
+                if refreshed_performers != (existing.performers or []):
+                    existing.performers = refreshed_performers
+                    session.add(existing)
                 await session.commit()
                 return existing, False
             item = UncollectedScene(
@@ -92,6 +122,20 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                     already_collected += 1
                 elif uuid in existing:
                     already_listed += 1
+                    existing_item = (
+                        await session.exec(
+                            select(UncollectedScene).where(func.lower(col(UncollectedScene.theporndb_uuid)) == uuid)
+                        )
+                    ).first()
+                    if existing_item is not None:
+                        # 只刷新名单中保存的 ThePornDB 官方性别; 不写入或修改本地 Actor 元数据.
+                        refreshed_performers = _refresh_official_performer_genders(
+                            existing_item.performers or [],
+                            scene.get("performers") or [],
+                        )
+                        if refreshed_performers != (existing_item.performers or []):
+                            existing_item.performers = refreshed_performers
+                            session.add(existing_item)
                 else:
                     session.add(
                         UncollectedScene(

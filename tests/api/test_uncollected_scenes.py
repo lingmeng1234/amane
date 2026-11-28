@@ -12,6 +12,7 @@ from amane.api.routes.theporndb_scenes import (
     _tag_names,
 )
 from amane.api.routes.uncollected_scenes import _scene_response
+from amane.db.repos.uncollected_scenes import _refresh_official_performer_genders
 from amane.enums import ActorGender
 
 
@@ -23,6 +24,29 @@ def test_theporndb_official_gender_is_normalized() -> None:
     assert _official_gender({"extras": {"gender": "INTERSEX"}}) == "intersex"
     assert _official_gender({"extras": {"gender": "NON_BINARY"}}) == "non_binary"
     assert _official_gender({"extras": {"gender": "TRANSGENDER_MALE"}}) == "transgender_male"
+
+
+def test_official_gender_refresh_only_updates_saved_official_values() -> None:
+    existing = [
+        {"name": "Newly Identified Male", "official_gender": None},
+        {"name": "Previously Known Female", "official_gender": "female"},
+        {"name": "Still Unknown", "official_gender": None},
+    ]
+    incoming = [
+        {"name": "Newly Identified Male", "official_gender": "male"},
+        {"name": "Previously Known Female", "official_gender": None},
+        {"name": "Still Unknown", "official_gender": None},
+    ]
+
+    refreshed = _refresh_official_performer_genders(existing, incoming)
+
+    assert refreshed == [
+        {"name": "Newly Identified Male", "official_gender": "male"},
+        {"name": "Previously Known Female", "official_gender": "female"},
+        {"name": "Still Unknown", "official_gender": None},
+    ]
+    # 刷新只影响未收录名单的副本, 不原地修改旧数据对象.
+    assert existing[0]["official_gender"] is None
 
 
 def test_missing_official_gender_is_distinct_from_explicit_unknown() -> None:
@@ -116,6 +140,7 @@ async def test_saved_scene_gender_uses_official_then_local_then_unknown() -> Non
         studio="Studio",
         performers=[
             {"name": "Official Female", "official_gender": "female"},
+            {"name": "Official Male", "official_gender": "male"},
             {"name": "Local Male", "official_gender": None},
             {"name": "No Profile", "official_gender": None},
             {"name": "Official Unknown", "official_gender": "unknown"},
@@ -127,12 +152,14 @@ async def test_saved_scene_gender_uses_official_then_local_then_unknown() -> Non
         item,
         {
             "Official Female": ActorGender.MALE,
+            "Official Male": ActorGender.FEMALE,
             "Local Male": ActorGender.MALE,
             "Official Unknown": ActorGender.FEMALE,
         },
     )
     assert [performer.gender for performer in response.performers] == [
         "female",
+        "male",
         "male",
         "unknown",
         "unknown",

@@ -110,7 +110,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
   const actors = [...scene.performers].sort(
     (a, b) => genderOrder(a.gender) - genderOrder(b.gender),
   );
-  while (actors.length < 4) actors.push({ name: "—", gender: "unknown" });
+  while (actors.length < 4) actors.push({ name: "—", gender: "unknown", actor_id: null });
 
   return (
     <Card withBorder padding="sm" radius="md" style={{ position: "relative" }}>

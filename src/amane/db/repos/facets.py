@@ -345,9 +345,7 @@ class FacetsRepoMixin(RepositoryMixinBase):
             stmt = select(Actor).where(col(Actor.name).in_(unique))
             return list((await session.exec(stmt)).all())
 
-    async def get_actor_profiles_by_names_or_aliases(
-        self, names: Sequence[str]
-    ) -> dict[str, tuple[int, ActorGender]]:
+    async def get_actor_profiles_by_names_or_aliases(self, names: Sequence[str]) -> dict[str, tuple[int, ActorGender]]:
         """按演员展示名或唯一别名查当前本地档案; 返回 ID 与性别, 别名歧义时不猜测."""
         unique = list(dict.fromkeys(name for name in names if name))
         if not unique:

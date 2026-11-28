@@ -89,7 +89,9 @@ export function FacetBadge({
       }
     : BADGE_LINK_STYLE;
   const textStyle =
-    style && !fullWidth ? { ...BADGE_TEXT_STYLE, ...style } : BADGE_TEXT_STYLE;
+    style && !fullWidth
+      ? { ...BADGE_TEXT_STYLE, ...style }
+      : BADGE_TEXT_STYLE;
 
   if (id == null) {
     return (

@@ -1,10 +1,18 @@
 import { Tooltip } from "@mantine/core";
-import { IconGenderFemale, IconGenderMale, IconGenderTransgender } from "@tabler/icons-react";
+import {
+  IconGenderFemale,
+  IconGenderMale,
+  IconGenderTransgender,
+} from "@tabler/icons-react";
 import type { ParseKeys } from "i18next";
 import { useTranslation } from "react-i18next";
 import type { ActorGender } from "@/client/types.gen";
 
-export type ActorDisplayGender = ActorGender | "intersex" | "non_binary" | "transgender_male";
+export type ActorDisplayGender =
+  | ActorGender
+  | "intersex"
+  | "non_binary"
+  | "transgender_male";
 
 const GENDER_LABEL_KEY = {
   female: "browse.person.gender_female",
@@ -27,7 +35,12 @@ export function GenderMark({
   const { t } = useTranslation("metadata");
   if (gender == null || gender === "unknown") return null;
 
-  const Icon = gender === "female" ? IconGenderFemale : gender === "male" ? IconGenderMale : IconGenderTransgender;
+  const Icon =
+    gender === "female"
+      ? IconGenderFemale
+      : gender === "male"
+        ? IconGenderMale
+        : IconGenderTransgender;
 
   const color =
     gender === "female"

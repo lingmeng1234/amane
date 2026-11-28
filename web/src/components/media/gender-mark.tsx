@@ -4,30 +4,30 @@ import type { ParseKeys } from "i18next";
 import { useTranslation } from "react-i18next";
 import type { ActorGender } from "@/client/types.gen";
 
+export type ActorDisplayGender = ActorGender | "intersex" | "non_binary" | "transgender_male";
+
 const GENDER_LABEL_KEY = {
   female: "browse.person.gender_female",
   transgender_female: "browse.person.gender_transgender_female",
+  intersex: "browse.person.gender_third",
+  non_binary: "browse.person.gender_third",
+  transgender_male: "browse.person.gender_third",
   male: "browse.person.gender_male",
   unknown: "browse.person.gender_unknown",
-} as const satisfies Record<ActorGender, ParseKeys<"metadata">>;
+} as const satisfies Record<ActorDisplayGender, ParseKeys<"metadata">>;
 
 /** 已知性别显示对应符号; unknown 不画. */
 export function GenderMark({
   gender,
   size = 14,
 }: {
-  gender: ActorGender | null | undefined;
+  gender: ActorDisplayGender | null | undefined;
   size?: number;
 }) {
   const { t } = useTranslation("metadata");
-  if (gender !== "female" && gender !== "male" && gender !== "transgender_female") return null;
+  if (gender == null || gender === "unknown") return null;
 
-  const Icon =
-    gender === "female"
-      ? IconGenderFemale
-      : gender === "male"
-        ? IconGenderMale
-        : IconGenderTransgender;
+  const Icon = gender === "female" ? IconGenderFemale : gender === "male" ? IconGenderMale : IconGenderTransgender;
 
   const color =
     gender === "female"

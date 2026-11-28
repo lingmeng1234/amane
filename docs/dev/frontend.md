@@ -20,6 +20,7 @@
 | **Manage** | `/libraries` | `routes/libraries.tsx` + `libraries.index.tsx` | `components/library/library-form.tsx` |
 | **Manage** | `/libraries/$libraryId` | `routes/libraries.$libraryId.tsx` | `components/library/` (文件表与扫描 / 整理入口) |
 | **Manage** | `/plugins` | `routes/plugins.tsx` | `components/plugins/`, `components/path-picker/` |
+| **Manage** | `/uncollected-scenes` | `routes/uncollected-scenes.tsx` | `components/media/facet-badge.tsx`, `components/media/poster-grid.tsx` |
 | **Manage** | `/feeds/sources` | `routes/feeds.sources.tsx` | `components/feeds/feed-sources-table.tsx`, `lib/feeds/opml.ts` |
 | **Ops** | `/tasks` | `routes/tasks.tsx` | `components/task/task-tree.tsx`, `lib/task/` |
 | **Ops** | `/schedules` | `routes/schedules.tsx` | `components/cron-picker/`, `lib/cron.ts` |
@@ -34,6 +35,8 @@
 **列表默认**: 侧栏「片库 / 演员 / 订阅」按钮携带 `lib/nav-defaults.ts` 白名单内的默认列表参数 (排序、筛选、视图; 存于 ui store), 点击时经路由跳转整体替换 search, 因此 URL 仍是列表态的唯一事实来源 —— 页面内清除的筛选不会被默认重新写入. Mantine 的多态 props 把 `component={Link}` 的 `search` 收窄成 `never`, 参数只能这样送入; 中键与修饰键保留浏览器行为, 打开的地址因此不带默认参数.
 
 **入口分流**: 非演员实体进 `/catalog/$kind/$facetId`, 演员进 `/actors/$actorId` (演员不进入 `/catalog`); `FacetBadge` 默认深链分类, 筛选深链 `/meta`.
+
+**未收录影片演员徽标**: `/uncollected-scenes` 的演员徽标在三列网格中使用 `FacetBadge.fullWidth`, 让链接外层与徽标本身共同填满网格单元; 该属性默认关闭, 仅在需要占满单元格的调用点显式启用, 不改变其他页面的徽标布局.
 
 **分类收藏**: 星形控件在分类列表的动作列与分类详情页标题行 (窄屏动作列只容一个按钮, 一律走详情页), 词云与索引页徽章只有只读星标; 单条与列表多选都提交 `POST /api/facets/{kind}/batch` 的 `favorite` / `unfavorite` 动作, 单条提交单元素列表, 两者都是整体赋值, 界面不做逐项取反; 「收藏」筛选与演员页的「有头像 / 无头像」同形, 用共享的三态分段控件放在高级筛选区, 取值是 URL search 上的字符串三态, 只在支持收藏的 kind 上渲染与发送; 索引页顶部的收藏区块按五个 kind 各取一次列表, 全部就绪且至少一项非空才渲染.
 

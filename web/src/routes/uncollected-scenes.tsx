@@ -31,10 +31,19 @@ export const Route = createFileRoute("/uncollected-scenes")({
   component: UncollectedScenesPage,
 });
 
+type SceneGender =
+  | "female"
+  | "intersex"
+  | "male"
+  | "non_binary"
+  | "transgender_female"
+  | "transgender_male"
+  | "unknown";
+
 type Performer = {
   name: string;
-  gender: ActorGender;
-  official_gender?: ActorGender | null;
+  gender: SceneGender;
+  official_gender?: SceneGender | null;
 };
 
 type SavedScene = {
@@ -81,8 +90,20 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+function genderOrder(gender: SceneGender): number {
+  if (gender === "female") return 0;
+  if (
+    gender === "intersex" ||
+    gender === "non_binary" ||
+    gender === "transgender_female" ||
+    gender === "transgender_male"
+  ) return 1;
+  if (gender === "male") return 2;
+  return 3;
+}
+
 function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => void }) {
-  const actors = [...scene.performers];
+  const actors = [...scene.performers].sort((a, b) => genderOrder(a.gender) - genderOrder(b.gender));
   while (actors.length < 4) actors.push({ name: "—", gender: "unknown" });
 
   return (
@@ -155,7 +176,11 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
                   kind="actor"
                   id={null}
                   name={actor.name}
-                  gender={actor.gender}
+                  gender={
+                    actor.gender === "female" || actor.gender === "male" || actor.gender === "unknown"
+                      ? actor.gender
+                      : "transgender_female"
+                  }
                   size="sm"
                   variant="light"
                   style={{

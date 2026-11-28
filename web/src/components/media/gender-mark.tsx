@@ -53,7 +53,11 @@ export function GenderMark({
   return (
     <Tooltip label={label}>
       <span
-        style={{ display: "inline-flex", lineHeight: 0, verticalAlign: "middle" }}
+        style={{
+          display: "inline-flex",
+          lineHeight: 0,
+          verticalAlign: "middle",
+        }}
         aria-label={label}
       >
         <Icon size={size} color={color} aria-hidden />

@@ -124,9 +124,7 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                     already_listed += 1
                     existing_item = (
                         await session.exec(
-                            select(UncollectedScene).where(
-                                func.lower(col(UncollectedScene.theporndb_uuid)) == uuid
-                            )
+                            select(UncollectedScene).where(func.lower(col(UncollectedScene.theporndb_uuid)) == uuid)
                         )
                     ).first()
                     if existing_item is not None:

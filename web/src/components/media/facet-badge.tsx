@@ -51,7 +51,16 @@ export function FacetBadge({
   size = "sm",
   style,
 }: FacetBadgeProps) {
-  const color = KIND_COLOR[kind];
+  const color: MantineColor =
+    kind === "actor" && gender != null
+      ? gender === "female"
+        ? "pink"
+        : gender === "male"
+          ? "blue"
+          : gender === "transgender_female"
+            ? "grape"
+            : "gray"
+      : KIND_COLOR[kind];
   // 名称字段统一保留数据本身的大小写；不得由 Badge 默认样式自动转成大写.
   const leftSection =
     kind === "actor" && gender != null && gender !== "unknown" ? (

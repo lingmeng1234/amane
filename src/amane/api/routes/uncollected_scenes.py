@@ -126,7 +126,6 @@ async def _scene_response(
         if not isinstance(name, str) or not name.strip():
             continue
         profile = local_actor_by_name.get(name)
-        official = performer.get("official_gender")
         # 本地演员档案是性别显示的唯一依据; 未建档时显示未知性别.
         gender = _gender(profile[1].value if profile is not None else ActorGender.UNKNOWN.value)
         performers.append(

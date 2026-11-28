@@ -2,7 +2,15 @@ import { AspectRatio, Center, SimpleGrid, Skeleton, Stack, Text } from "@mantine
 import type { MetadataResponse } from "@/client/types.gen";
 import { PosterCard } from "./poster-card";
 
-export type PosterGridCardSize = "xs" | "sm" | "small" | "medium" | "default" | "large" | "xl" | "xxl";
+export type PosterGridCardSize =
+  | "xs"
+  | "sm"
+  | "small"
+  | "medium"
+  | "default"
+  | "large"
+  | "xl"
+  | "xxl";
 
 export function getPosterGridMinCardWidth(cardSize: PosterGridCardSize): number {
   return {

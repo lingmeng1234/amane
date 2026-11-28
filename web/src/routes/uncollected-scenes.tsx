@@ -107,10 +107,9 @@ function genderOrder(gender: SceneGender): number {
 }
 
 function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => void }) {
-  const actors = [...scene.performers].sort(
-    (a, b) => genderOrder(a.gender) - genderOrder(b.gender),
-  );
-  while (actors.length < 4) actors.push({ name: "—", gender: "unknown", actor_id: null });
+  const actors = [...scene.performers]
+    .sort((a, b) => genderOrder(a.gender) - genderOrder(b.gender))
+    .slice(0, 3);
 
   return (
     <Card withBorder padding="sm" radius="md" style={{ position: "relative" }}>
@@ -145,7 +144,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
       </Box>
 
       <Stack gap={4} mt="sm" style={{ minWidth: 0 }}>
-        <Text fw={600} size="sm" lineClamp={2} title={scene.title}>
+        <Text fw={600} size="sm" lineClamp={1} title={scene.title}>
           {scene.title || "—"}
         </Text>
         <Text size="xs" c="dimmed">
@@ -165,34 +164,32 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
         <Box
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             columnGap: 8,
             rowGap: 5,
             paddingRight: 4,
           }}
         >
-          {actors.map((actor, index) => (
-            <Box key={index} style={{ minWidth: 0 }}>
-              {actor.name === "—" ? (
-                <Text size="sm" c="dimmed">
-                  —
-                </Text>
-              ) : (
-                <FacetBadge
-                  kind="actor"
-                  id={actor.actor_id}
-                  name={actor.name}
-                  gender={actor.gender}
-                  size="sm"
-                  variant="light"
-                  style={{
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                    whiteSpace: "nowrap",
-                    textOverflow: "ellipsis",
-                  }}
-                />
-              )}
+          {actors.map((actor) => (
+            <Box key={actor.actor_id ?? actor.name} style={{ minWidth: 0, width: "100%" }}>
+              <FacetBadge
+                kind="actor"
+                id={actor.actor_id}
+                name={actor.name}
+                gender={actor.gender}
+                size="sm"
+                variant="light"
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  maxWidth: "100%",
+                  minWidth: 0,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                  boxSizing: "border-box",
+                }}
+              />
             </Box>
           ))}
         </Box>

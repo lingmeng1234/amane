@@ -92,6 +92,41 @@ class UncollectedScenesRepoMixin(RepositoryMixinBase):
                     already_collected += 1
                 elif uuid in existing:
                     already_listed += 1
+                    existing_item = (
+                        await session.exec(
+                            select(UncollectedScene).where(
+                                func.lower(col(UncollectedScene.theporndb_uuid)) == uuid
+                            )
+                        )
+                    ).first()
+                    if existing_item is not None:
+                        # 只刷新名单中保存的 ThePornDB 官方性别; 不写入或修改本地 Actor 元数据.
+                        incoming_gender = {
+                            str(entry.get("name") or "").strip().casefold(): entry.get("official_gender")
+                            for entry in (scene.get("performers") or [])
+                            if isinstance(entry, dict)
+                            and isinstance(entry.get("name"), str)
+                            and entry.get("name", "").strip()
+                            and entry.get("official_gender") is not None
+                        }
+                        if incoming_gender:
+                            refreshed_performers = []
+                            changed = False
+                            for entry in existing_item.performers or []:
+                                if not isinstance(entry, dict):
+                                    refreshed_performers.append(entry)
+                                    continue
+                                official_gender = incoming_gender.get(
+                                    str(entry.get("name") or "").strip().casefold()
+                                )
+                                if official_gender is not None and entry.get("official_gender") != official_gender:
+                                    refreshed_performers.append({**entry, "official_gender": official_gender})
+                                    changed = True
+                                else:
+                                    refreshed_performers.append(entry)
+                            if changed:
+                                existing_item.performers = refreshed_performers
+                                session.add(existing_item)
                 else:
                     session.add(
                         UncollectedScene(

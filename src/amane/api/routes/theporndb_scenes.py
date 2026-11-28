@@ -262,7 +262,7 @@ async def _search_scenes(
             if scene.get("id"):
                 scenes_by_id.setdefault(str(scene["id"]), scene)
 
-    # 官方明确提供的性别优先; 只有官方缺失时才查询本地演员档案.
+    # 演员性别以本地档案为准; 尚未建档的演员显示未知性别.
     performer_names = list(
         dict.fromkeys(performer["name"] for scene in scenes_by_id.values() for performer in _performer_entries(scene))
     )
@@ -276,10 +276,7 @@ async def _search_scenes(
 
         performers: list[dict[str, Any]] = []
         for item in _performer_entries(scene):
-            official = item["official_gender"]
-            gender = (
-                official if official is not None else local_gender_by_name.get(item["name"], ActorGender.UNKNOWN).value
-            )
+            gender = local_gender_by_name.get(item["name"], ActorGender.UNKNOWN).value
             performers.append(
                 {
                     "name": item["name"],

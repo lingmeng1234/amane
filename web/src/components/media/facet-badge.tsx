@@ -2,7 +2,7 @@ import { Badge, type MantineColor } from "@mantine/core";
 import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import type { ActorGender, FacetKind } from "@/client/types.gen";
-import { GenderMark } from "@/components/media/gender-mark";
+import { GenderMark, type ActorDisplayGender } from "@/components/media/gender-mark";
 import { metaSearchForFacet } from "@/lib/facets";
 
 const KIND_COLOR: Record<FacetKind, MantineColor> = {
@@ -32,7 +32,7 @@ interface FacetBadgeProps {
   id: number | null | undefined;
   name: string;
   /** 仅 actor: 来自 Actor 实体. unknown / 缺省不画符号. */
-  gender?: ActorGender | null;
+  gender?: ActorDisplayGender | null;
   /** "catalog": 分类实体页 (actor → /actors/$id); "meta": 片库列表并附带该 facet 过滤. @default "catalog" */
   mode?: "meta" | "catalog";
   variant?: "filled" | "light" | "outline" | "dot" | "transparent";
@@ -57,7 +57,10 @@ export function FacetBadge({
         ? "pink"
         : gender === "male"
           ? "blue"
-          : gender === "transgender_female"
+          : gender === "transgender_female" ||
+              gender === "intersex" ||
+              gender === "non_binary" ||
+              gender === "transgender_male"
             ? "grape"
             : "gray"
       : KIND_COLOR[kind];

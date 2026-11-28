@@ -176,11 +176,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
                   kind="actor"
                   id={null}
                   name={actor.name}
-                  gender={
-                    actor.gender === "female" || actor.gender === "male" || actor.gender === "unknown"
-                      ? actor.gender
-                      : "transgender_female"
-                  }
+                  gender={actor.gender}
                   size="sm"
                   variant="light"
                   style={{

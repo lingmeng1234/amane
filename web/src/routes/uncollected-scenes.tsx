@@ -439,7 +439,13 @@ function UncollectedScenesPage() {
             {activeFilters.length > 0 ? "没有符合筛选条件的未收录影片" : "暂无未收录影片"}
           </Text>
         ) : (
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <SimpleGrid
+            cols={1}
+            spacing="md"
+            style={{
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 304px), 1fr))",
+            }}
+          >
             {list?.items.map((scene) => (
               <SceneCard
                 key={scene.id}

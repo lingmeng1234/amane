@@ -23,8 +23,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { notifications } from "@mantine/notifications";
 import { FacetBadge } from "@/components/media/facet-badge";
+import { getPosterGridMinCardWidth } from "@/components/media/poster-grid";
 import { apiFetch } from "@/lib/api-token";
 import { proxyImageUrl } from "@/lib/utils";
+import { useUIStore } from "@/stores/ui";
 
 export const Route = createFileRoute("/uncollected-scenes")({
   component: UncollectedScenesPage,
@@ -42,6 +44,7 @@ type SceneGender =
 type Performer = {
   name: string;
   gender: SceneGender;
+  actor_id: number | null;
   official_gender?: SceneGender | null;
 };
 
@@ -107,7 +110,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
   const actors = [...scene.performers].sort(
     (a, b) => genderOrder(a.gender) - genderOrder(b.gender),
   );
-  while (actors.length < 4) actors.push({ name: "—", gender: "unknown" });
+  while (actors.length < 4) actors.push({ name: "—", gender: "unknown", actor_id: null });
 
   return (
     <Card withBorder padding="sm" radius="md" style={{ position: "relative" }}>
@@ -177,7 +180,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
               ) : (
                 <FacetBadge
                   kind="actor"
-                  id={null}
+                  id={actor.actor_id}
                   name={actor.name}
                   gender={actor.gender}
                   size="sm"
@@ -199,6 +202,8 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
 }
 
 function UncollectedScenesPage() {
+  const coverCardSize = useUIStore((s) => s.cardSizes.metaCover);
+  const minCardWidth = getPosterGridMinCardWidth(coverCardSize);
   const queryClient = useQueryClient();
   const [studioInput, setStudioInput] = useState("");
   const [performerInput, setPerformerInput] = useState("");
@@ -217,6 +222,9 @@ function UncollectedScenesPage() {
       if (filters.studio) params.set("studio", filters.studio);
       return requestJson<SceneList>("/api/uncollected-scenes?" + params.toString());
     },
+    // 演员档案可能在未收录记录创建之后才建立; 定期重新请求, 让当前卡片自动取得新 ID.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: "always",
   });
 
   const facetsQuery = useQuery({
@@ -463,7 +471,13 @@ function UncollectedScenesPage() {
             {activeFilters.length > 0 ? "没有符合筛选条件的未收录影片" : "暂无未收录影片"}
           </Text>
         ) : (
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+          <SimpleGrid
+            cols={1}
+            spacing="md"
+            style={{
+              gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${minCardWidth}px), 1fr))`,
+            }}
+          >
             {list?.items.map((scene) => (
               <SceneCard
                 key={scene.id}

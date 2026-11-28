@@ -82,6 +82,33 @@ def _tag_names(scene: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(names))
 
 
+def _image_url(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, dict):
+        for key in ("url", "large", "full", "medium", "small", "image"):
+            result = _image_url(value.get(key))
+            if result:
+                return result
+    return None
+
+
+def _scene_cover_image(scene: dict[str, Any]) -> str | None:
+    """优先选择横向正面图/背景图, 竖版 poster 仅在没有横图时兜底."""
+    for key in ("image", "background", "back_image", "images", "poster_image", "poster"):
+        value = scene.get(key)
+        if isinstance(value, list):
+            for item in value:
+                result = _image_url(item)
+                if result:
+                    return result
+        else:
+            result = _image_url(value)
+            if result:
+                return result
+    return None
+
+
 async def _resolve_exact_tag(client: AsyncClient, token: str, name: str) -> dict[str, str] | None:
     response = await client.get(
         "https://api.theporndb.net/tags",
@@ -245,26 +272,7 @@ async def _search_scenes(
     for scene in scenes_by_id.values():
         site = scene.get("site")
         studio_value = scene.get("studio")
-        image: Any = scene.get("poster") or scene.get("image")
-        if isinstance(image, dict):
-            image = image.get("url") or image.get("large")
-        background = scene.get("background")
-        images = scene.get("images")
-        if not image and isinstance(background, dict):
-            image = background.get("large") or background.get("url")
-        if not image and isinstance(images, list):
-            for candidate in images:
-                if isinstance(candidate, str) and candidate.strip():
-                    image = candidate
-                    break
-                if isinstance(candidate, dict):
-                    image = candidate.get("url") or candidate.get("large") or candidate.get("image")
-                    if isinstance(image, dict):
-                        image = image.get("url") or image.get("large")
-                    if image:
-                        break
-        if not isinstance(image, str) or not image.strip():
-            image = None
+        image = _scene_cover_image(scene)
 
         performers: list[dict[str, Any]] = []
         for item in _performer_entries(scene):

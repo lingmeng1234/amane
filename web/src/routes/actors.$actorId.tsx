@@ -148,6 +148,7 @@ function ActorDetailPage() {
       queryKey: getActorQueryKey({ path: { actor_id: id } }),
     });
     void queryClient.invalidateQueries({ queryKey: listActorsQueryKey() });
+    void queryClient.invalidateQueries({ queryKey: ["uncollected-scenes"] });
   };
 
   const scrapeMutation = useMutation({

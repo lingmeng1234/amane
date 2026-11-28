@@ -189,3 +189,39 @@ async def test_browse_actors_has_person_and_sort(repo: Repository) -> None:
     )
     bdays = [i.birthday for i in by_bday if i.birthday]
     assert bdays == sorted(bdays)
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_get_actor_profiles_by_names_or_aliases_resolves_late_profiles(repo: Repository) -> None:
+    # 未收录记录先存在时, 尚无本地档案; 后续建档后重新查询应立即得到当前 ID.
+    assert await repo.get_actor_profiles_by_names_or_aliases(["LateProfile"]) == {}
+
+    await repo.upsert_metadata(number="UC-PROFILE-1", actors=["LateProfile"])
+    actors, _ = await repo.list_facets(FacetKind.ACTOR)
+    actor_id = next(actor.id for actor in actors if actor.name == "LateProfile")
+    assert actor_id is not None
+    actor = await repo.get_actor(actor_id)
+    assert actor is not None
+    actor.gender = ActorGender.TRANSGENDER_FEMALE
+    await repo.save_actor(actor, aliases=["LateAlias", "SharedAlias"])
+
+    profiles = await repo.get_actor_profiles_by_names_or_aliases(["LateProfile", "LateAlias"])
+    assert profiles == {
+        "LateProfile": (actor_id, ActorGender.TRANSGENDER_FEMALE),
+        "LateAlias": (actor_id, ActorGender.TRANSGENDER_FEMALE),
+    }
+
+    # 共享别名存在歧义时不能随意把未收录演员链接到任一档案.
+    await repo.upsert_metadata(number="UC-PROFILE-2", actors=["OtherProfile"])
+    actors, _ = await repo.list_facets(FacetKind.ACTOR)
+    other_id = next(actor.id for actor in actors if actor.name == "OtherProfile")
+    assert other_id is not None
+    other = await repo.get_actor(other_id)
+    assert other is not None
+    await repo.save_actor(other, aliases=["SharedAlias"])
+
+    profiles = await repo.get_actor_profiles_by_names_or_aliases(["LateProfile", "LateAlias", "SharedAlias"])
+    assert profiles == {
+        "LateProfile": (actor_id, ActorGender.TRANSGENDER_FEMALE),
+        "LateAlias": (actor_id, ActorGender.TRANSGENDER_FEMALE),
+    }

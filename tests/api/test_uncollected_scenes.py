@@ -151,10 +151,10 @@ async def test_saved_scene_gender_uses_official_then_local_then_unknown() -> Non
     response = await _scene_response(
         item,
         {
-            "Official Female": ActorGender.MALE,
-            "Official Male": ActorGender.FEMALE,
-            "Local Male": ActorGender.MALE,
-            "Official Unknown": ActorGender.FEMALE,
+            "Official Female": (101, ActorGender.MALE),
+            "Official Male": (102, ActorGender.FEMALE),
+            "Local Male": (103, ActorGender.MALE),
+            "Official Unknown": (104, ActorGender.FEMALE),
         },
     )
     assert [performer.gender for performer in response.performers] == [
@@ -164,3 +164,4 @@ async def test_saved_scene_gender_uses_official_then_local_then_unknown() -> Non
         "unknown",
         "unknown",
     ]
+    assert [performer.actor_id for performer in response.performers] == [101, 102, 103, None, 104]

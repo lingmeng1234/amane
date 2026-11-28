@@ -38,6 +38,8 @@ interface FacetBadgeProps {
   variant?: "filled" | "light" | "outline" | "dot" | "transparent";
   size?: "xs" | "sm" | "md" | "lg";
   style?: CSSProperties;
+  /** Fill the available grid/flex cell width, including the link wrapper. */
+  fullWidth?: boolean;
 }
 
 /** 默认为实体页; `mode="meta"` 时进入片库筛选. */
@@ -50,6 +52,7 @@ export function FacetBadge({
   variant = "light",
   size = "sm",
   style,
+  fullWidth = false,
 }: FacetBadgeProps) {
   const color: MantineColor =
     kind === "actor" && gender != null
@@ -69,7 +72,12 @@ export function FacetBadge({
     kind === "actor" && gender != null && gender !== "unknown" ? (
       <GenderMark gender={gender} size={12} />
     ) : undefined;
-  const badgeStyle = style;
+  const badgeStyle = fullWidth
+    ? { width: "100%", minWidth: 0, boxSizing: "border-box" as const, ...style }
+    : style;
+  const linkStyle = fullWidth
+    ? { ...BADGE_LINK_STYLE, display: "flex", width: "100%", minWidth: 0 }
+    : BADGE_LINK_STYLE;
   const textStyle = style ? { ...BADGE_TEXT_STYLE, ...style } : undefined;
 
   if (id == null) {
@@ -93,7 +101,7 @@ export function FacetBadge({
   if (mode === "catalog") {
     if (kind === "actor") {
       return (
-        <Link to="/actors/$actorId" params={{ actorId: String(id) }} style={BADGE_LINK_STYLE}>
+        <Link to="/actors/$actorId" params={{ actorId: String(id) }} style={linkStyle}>
           <Badge
             component="span"
             color={color}
@@ -115,7 +123,7 @@ export function FacetBadge({
       <Link
         to="/catalog/$kind/$facetId"
         params={{ kind, facetId: String(id) }}
-        style={BADGE_LINK_STYLE}
+        style={linkStyle}
       >
         <Badge
           component="span"

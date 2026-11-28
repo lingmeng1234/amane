@@ -67,10 +67,27 @@ class UncollectedSceneRefreshResponse(BaseModel):
     deleted: int
 
 
+def _female_performer_facets(
+    names: list[str],
+    local_actor_by_name: dict[str, tuple[int, ActorGender]],
+) -> list[str]:
+    """筛选项只展示本地档案确认为女性或跨性别女性的演员."""
+    return sorted(
+        {
+            name
+            for name in names
+            if (profile := local_actor_by_name.get(name)) is not None
+            and profile[1] in {ActorGender.FEMALE, ActorGender.TRANSGENDER_FEMALE}
+        },
+        key=str.casefold,
+    )
+
+
 @router.get("/facets", include_in_schema=False)
 async def uncollected_scene_facets(repo: RepoDep) -> dict[str, list[str]]:
     performers, studios = await repo.list_uncollected_scene_facets()
-    return {"performers": performers, "studios": studios}
+    local_actor_by_name = await repo.get_actor_profiles_by_names_or_aliases(performers) if performers else {}
+    return {"performers": _female_performer_facets(performers, local_actor_by_name), "studios": studios}
 
 
 @router.get("/status", include_in_schema=False)
@@ -108,13 +125,8 @@ async def _scene_response(
         if not isinstance(name, str) or not name.strip():
             continue
         profile = local_actor_by_name.get(name)
-        official = performer.get("official_gender")
-        # 官方明确给出性别时始终优先; 只有字段缺失才使用本地演员档案.
-        gender = (
-            _gender(official)
-            if official is not None
-            else _gender(profile[1].value if profile is not None else ActorGender.UNKNOWN.value)
-        )
+        # 本地演员档案是性别显示的唯一依据; 未建档时显示未知性别.
+        gender = _gender(profile[1].value if profile is not None else ActorGender.UNKNOWN.value)
         performers.append(
             UncollectedScenePerformerResponse(
                 name=name,

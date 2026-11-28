@@ -125,7 +125,7 @@ function SceneCard({ scene, onDelete }: { scene: SavedScene; onDelete: () => voi
               alt={scene.title}
               w="100%"
               h="100%"
-              fit="contain"
+              fit="cover"
               fallbackSrc=""
             />
           </Box>
@@ -230,6 +230,9 @@ function UncollectedScenesPage() {
   const facetsQuery = useQuery({
     queryKey: ["uncollected-scene-facets"],
     queryFn: () => requestJson<SceneFacets>("/api/uncollected-scenes/facets"),
+    // 演员档案创建或修改后, 定期刷新筛选项以同步最新性别.
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: "always",
   });
 
   const buildMutation = useMutation({
